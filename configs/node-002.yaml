@@ -1,0 +1,47 @@
+# MeetAgent Node — 第二个 Node，用于多 Node / 授权隔离验收。
+node:
+  id: "node-002"
+  name: "second-machine"
+  token: "dev-node-002-token-change-me"
+
+  policy:
+    allowed_actions:
+      - ping
+      - echo
+      - get_status
+      - send_prompt
+      - interrupt
+      - list_sessions
+      # 演示显式开启权限审批能力。
+      - permission_response
+    max_prompt_bytes: 32768
+
+  agents:
+    - id: "opencode-secondary"
+      type: "opencode"
+      name: "OpenCode Secondary"
+      enabled: true
+      connection:
+        base_url: "http://127.0.0.1:49374"
+        username: "opencode"
+        password_env: "OPENCODE_PASSWORD"
+        timeout: 15s
+      capabilities:
+        send_prompt: true
+        interrupt: true
+        list_sessions: true
+
+cloud:
+  url: "ws://127.0.0.1:8080/ws"
+  register_timeout: 10s
+  heartbeat_interval: 20s
+  read_timeout: 60s
+  request_timeout: 15s
+  reconnect:
+    initial_delay: 1s
+    max_delay: 30s
+    multiplier: 2
+    jitter: 0.2
+
+log:
+  level: info

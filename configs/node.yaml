@@ -1,0 +1,56 @@
+# MeetAgent Node — Phase 2 本地开发配置
+#
+# Node 主动向 Cloud 建立出站 WSS 连接，因此不需要公网 IP 或端口映射。
+# 生产环境请把 cloud.url 改为 wss://，并替换 node.token。
+node:
+  id: "node-001"
+  name: "developer-machine"
+  token: "dev-node-token-change-me"
+
+  # Node 级本地安全策略。未列出的动作一律拒绝，且不能超出协议白名单。
+  # 本地开发配置显式开启 permission_response，用于验证真实权限审批链路。
+  # 生产部署请先移除该动作，只对可信 Device 开放（见根 README 安全说明）。
+  policy:
+    allowed_actions:
+      - ping
+      - echo
+      - get_status
+      - send_prompt
+      - interrupt
+      - list_sessions
+      - permission_response
+    max_prompt_bytes: 32768
+
+  agents:
+    - id: "opencode-main"
+      type: "opencode"
+      name: "OpenCode Main"
+      enabled: true
+      connection:
+        # 本机 OpenCode 服务地址；密码推荐用环境变量注入。
+        #   export OPENCODE_PASSWORD="$(opencode service get password)"
+        base_url: "http://127.0.0.1:49374"
+        username: "opencode"
+        password_env: "OPENCODE_PASSWORD"
+        # 可选：只暴露某个项目目录的 Session。
+        directory: ""
+        timeout: 15s
+      capabilities:
+        send_prompt: true
+        interrupt: true
+        list_sessions: true
+
+cloud:
+  url: "ws://127.0.0.1:8080/ws"
+  register_timeout: 10s
+  heartbeat_interval: 20s
+  read_timeout: 60s
+  request_timeout: 15s
+  reconnect:
+    initial_delay: 1s
+    max_delay: 30s
+    multiplier: 2
+    jitter: 0.2
+
+log:
+  level: info

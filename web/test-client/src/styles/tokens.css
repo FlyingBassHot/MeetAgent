@@ -1,0 +1,190 @@
+/* MeetAgent design tokens
+ * 颜色全部走变量；组件中禁止写死十六进制色值（本文件除外）。
+ */
+
+:root {
+  /* 字体 */
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei', 'Noto Sans CJK SC', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+
+  /* 圆角：卡片 14–16，控件 8–10 */
+  --radius-card: 16px;
+  --radius-control: 10px;
+  --radius-small: 8px;
+  --radius-pill: 999px;
+
+  /* 间距（4 的倍数） */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* 布局尺寸 */
+  --header-height: 64px;
+  --sidebar-width: 248px;
+  --content-max-width: 1560px;
+
+  /* 过渡 */
+  --transition-fast: 140ms ease;
+  --transition-base: 180ms ease;
+
+  color-scheme: dark;
+}
+
+/* ---------- 明暗表面色 ---------- */
+
+[data-mode='dark'] {
+  color-scheme: dark;
+  --bg: #0c1312;
+  --surface: #111c1a;
+  --surface-raised: #182622;
+  --surface-sunken: #0f1715;
+  --border: rgb(163 224 203 / 0.12);
+  --border-strong: rgb(163 224 203 / 0.22);
+  --text: #e9f2ef;
+  --text-muted: #8ca8a0;
+  --text-faint: #5f7a73;
+
+  --success: #34d399;
+  --warn: #fbbf24;
+  --danger: #f87171;
+  --danger-contrast: #2b0a0a;
+  --info: #60a5fa;
+
+  --shadow-card: 0 18px 48px rgb(0 0 0 / 0.45), 0 2px 8px rgb(0 0 0 / 0.3);
+  --shadow-raised: 0 10px 28px rgb(0 0 0 / 0.4);
+  --glass-highlight: rgb(255 255 255 / 0.04);
+  --focus-ring: rgb(45 212 191 / 0.45);
+}
+
+[data-mode='light'] {
+  color-scheme: light;
+  --bg: #f2f6f4;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-sunken: #e9efec;
+  --border: rgb(16 48 43 / 0.12);
+  --border-strong: rgb(16 48 43 / 0.24);
+  --text: #1b2a27;
+  --text-muted: #54706b;
+  --text-faint: #71877f;
+
+  --success: #15803d;
+  --warn: #b45309;
+  --danger: #b91c1c;
+  --danger-contrast: #ffffff;
+  --info: #2563eb;
+
+  --shadow-card: 0 12px 32px rgb(18 48 43 / 0.1), 0 2px 6px rgb(18 48 43 / 0.06);
+  --shadow-raised: 0 8px 22px rgb(18 48 43 / 0.14);
+  --glass-highlight: rgb(255 255 255 / 0.6);
+  --focus-ring: rgb(13 148 136 / 0.35);
+}
+
+/* ---------- 强调色：teal / jade / cyan / violet / amber / rose ---------- */
+
+/* teal（默认） */
+[data-theme='teal'] {
+  --accent: #2dd4bf;
+  --accent-strong: #5eead4;
+  --accent-soft: rgb(45 212 191 / 0.14);
+  --accent-contrast: #04241f;
+}
+[data-mode='light'][data-theme='teal'] {
+  --accent: #0f766e;
+  --accent-strong: #0d9488;
+  --accent-soft: rgb(15 118 110 / 0.1);
+  --accent-contrast: #ffffff;
+  --focus-ring: rgb(15 118 110 / 0.35);
+}
+
+/* jade */
+[data-theme='jade'] {
+  --accent: #34d399;
+  --accent-strong: #6ee7b7;
+  --accent-soft: rgb(52 211 153 / 0.14);
+  --accent-contrast: #032a1e;
+}
+[data-mode='light'][data-theme='jade'] {
+  --accent: #047857;
+  --accent-strong: #059669;
+  --accent-soft: rgb(4 120 87 / 0.1);
+  --accent-contrast: #ffffff;
+  --focus-ring: rgb(4 120 87 / 0.35);
+}
+
+/* cyan */
+[data-theme='cyan'] {
+  --accent: #22d3ee;
+  --accent-strong: #67e8f9;
+  --accent-soft: rgb(34 211 238 / 0.13);
+  --accent-contrast: #032831;
+}
+[data-mode='light'][data-theme='cyan'] {
+  --accent: #0e7490;
+  --accent-strong: #0891b2;
+  --accent-soft: rgb(14 116 144 / 0.1);
+  --accent-contrast: #ffffff;
+  --focus-ring: rgb(14 116 144 / 0.35);
+}
+
+/* violet */
+[data-theme='violet'] {
+  --accent: #a78bfa;
+  --accent-strong: #c4b5fd;
+  --accent-soft: rgb(167 139 250 / 0.15);
+  --accent-contrast: #221036;
+}
+[data-mode='light'][data-theme='violet'] {
+  --accent: #6d28d9;
+  --accent-strong: #7c3aed;
+  --accent-soft: rgb(109 40 217 / 0.1);
+  --accent-contrast: #ffffff;
+  --focus-ring: rgb(109 40 217 / 0.35);
+}
+
+/* amber */
+[data-theme='amber'] {
+  --accent: #fbbf24;
+  --accent-strong: #fcd34d;
+  --accent-soft: rgb(251 191 36 / 0.14);
+  --accent-contrast: #2b1c03;
+}
+[data-mode='light'][data-theme='amber'] {
+  --accent: #b45309;
+  --accent-strong: #d97706;
+  --accent-soft: rgb(180 83 9 / 0.1);
+  --accent-contrast: #ffffff;
+  --focus-ring: rgb(180 83 9 / 0.35);
+}
+
+/* rose */
+[data-theme='rose'] {
+  --accent: #fb7185;
+  --accent-strong: #fda4af;
+  --accent-soft: rgb(251 113 133 / 0.14);
+  --accent-contrast: #330b13;
+}
+[data-mode='light'][data-theme='rose'] {
+  --accent: #be123d;
+  --accent-strong: #e11d48;
+  --accent-soft: rgb(190 18 61 / 0.1);
+  --accent-contrast: #ffffff;
+  --focus-ring: rgb(190 18 61 / 0.35);
+}
+
+/* ---------- 主题切换器色板（固定色值，仅 tokens.css 允许） ---------- */
+
+:root {
+  --swatch-teal: #2dd4bf;
+  --swatch-jade: #34d399;
+  --swatch-cyan: #22d3ee;
+  --swatch-violet: #a78bfa;
+  --swatch-amber: #fbbf24;
+  --swatch-rose: #fb7185;
+}

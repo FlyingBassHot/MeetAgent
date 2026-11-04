@@ -1,0 +1,99 @@
+# ---------------------------------------------------------------------------
+# MeetAgent .gitignore
+#
+# 原则：
+#   1. 只提交源码、配置模板、文档与测试；构建产物、依赖、日志一律不入库。
+#   2. 任何可能包含真实凭据的文件（.env、私钥、本地覆盖配置）必须忽略。
+#   3. 开发用的 Token 只存在于 configs/*.yaml 的 dev-* 占位值中，生产值不要写进仓库。
+#   4. vendor/ 不默认忽略：如果以后需要 vendor 依赖以保证可复现构建，应显式提交。
+# ---------------------------------------------------------------------------
+
+# --- Go / 通用构建产物 ---
+/bin/
+/build/
+/dist/
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+coverage.txt
+coverage.html
+*.prof
+*.pprof
+
+# --- Web 测试客户端 ---
+node_modules/
+.vite/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+
+# --- 凭据与本地覆盖 ---
+# 环境变量文件（保留示例文件，方便新成员照抄）
+.env
+.env.*
+!.env.example
+!*.env.example
+*.env
+# 私钥与证书私钥；公开证书如确需入库请用 git add -f
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+*.jks
+secrets/
+# 本地配置覆盖（configs/*.yaml 中的 dev-* 值仅用于本地开发）
+configs/*.local.yaml
+configs/*.local.yml
+configs/*.local.json
+
+# --- 日志 / 运行时临时文件 ---
+*.log
+*.pid
+*.tmp
+tmp/
+.cache/
+
+# --- 真机 E2E 的本地状态 ---
+# state 与权限 fixture 默认写在 /tmp；这里兜底防止误提交
+scripts/e2e/state.json
+scripts/e2e/*.env
+
+# --- 内部任务书（含执行者与本机工作流信息，不进入公开仓库）---
+web/test-client/FRONTEND_TASKS.md
+
+# --- ESP32 / ESP-IDF（Phase 4 预留）---
+build/
+managed_components/
+sdkconfig.old
+.espressif/
+compile_commands.json
+*.elf
+*.bin
+*.hex
+*.uf2
+
+# --- Python 工具脚本（后续阶段可能使用）---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- 编辑器 / 操作系统 ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+*~

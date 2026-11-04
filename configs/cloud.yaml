@@ -1,0 +1,51 @@
+# MeetAgent Cloud — Phase 1 本地开发配置
+#
+# 注意：这里的 Token 仅用于本地开发。部署到公网前必须替换，
+# 并使用 TLS（在反向代理终止 TLS，对外暴露 wss://）。
+server:
+  addr: "127.0.0.1:8080"
+  ws_path: "/ws"
+  # 管理端点 /api/v1/status 与 /api/v1/snapshot 需要 Bearer Token。
+  # 生产环境必须替换为强随机值。
+  admin_token: "dev-admin-token-change-me"
+  allowed_origins:
+    - "http://localhost:5173"
+    - "http://127.0.0.1:5173"
+    # `vite preview` 默认端口，用于构建产物验收。
+    - "http://localhost:4173"
+    - "http://127.0.0.1:4173"
+  read_timeout: 90s
+  ping_interval: 25s
+  register_timeout: 10s
+  pending_ttl: 2m
+  max_pending: 10000
+  # 单连接入站消息限流；0 表示关闭。
+  rate_limit_per_second: 100
+  rate_limit_burst: 200
+
+auth:
+  nodes:
+    node-001:
+      token: "dev-node-token-change-me"
+    node-002:
+      token: "dev-node-002-token-change-me"
+  devices:
+    # web-001 可以访问全部 Node，用于多 Node 验收。
+    web-001:
+      token: "dev-device-token-change-me"
+      allowed_nodes:
+        - "*"
+    # web-002 只能访问 node-001，用于验证授权隔离。
+    web-002:
+      token: "dev-device-002-token-change-me"
+      allowed_nodes:
+        - "node-001"
+
+event_cache:
+  capacity: 5000
+  ttl: 10m
+  snapshot_events: 50
+  replay_limit: 1000
+
+log:
+  level: info
