@@ -1,8 +1,8 @@
 <template>
   <footer class="footer">
-    <span>MeetAgent · Core MVP</span>
+    <span>MeetAgent · Debug Console</span>
     <span class="footer-note">
-      Phase 2 connects OpenCode through the Node Adapter: live sessions, prompts, interrupts, permissions and normalized events.
+      Browser → Cloud → Node → OpenCode：实时会话、Prompt、中断、权限与标准化事件。
     </span>
   </footer>
 </template>

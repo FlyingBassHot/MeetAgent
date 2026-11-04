@@ -70,39 +70,39 @@ export const useCommandsStore = defineStore('commands', () => {
     return true
   })
 
-  /** 发送命令；校验失败时写 Activity 日志并中止。 */
+  /** 发送命令；校验失败时写 Activity 日志并中止。返回是否已发出。 */
   function sendCommand(
     targetAction: TestAction = action.value,
     text = '',
     options: CommandOptions = {},
-  ): void {
+  ): boolean {
     if (!connection.isOnline) {
       events.addLog('error', 'command', '发送失败', '尚未连接 Cloud')
-      return
+      return false
     }
     const nodeId = options.nodeId ?? inventory.selectedNodeId
     if (!nodeId) {
       events.addLog('error', 'command', '发送失败', '请先选择一个在线 Node')
-      return
+      return false
     }
 
     const agentId = options.agentId ?? inventory.selectedAgentId
     const sessionId = options.sessionId ?? inventory.selectedSessionId
     if (requiresAgent(targetAction) && !agentId) {
       events.addLog('error', 'command', '发送失败', '请先选择一个 Agent')
-      return
+      return false
     }
     if (requiresSession(targetAction) && !sessionId) {
       events.addLog('error', 'command', '发送失败', '请先选择一个 Session')
-      return
+      return false
     }
     if (targetAction === 'send_prompt' && !text.trim()) {
       events.addLog('error', 'command', '发送失败', 'Prompt 不能为空')
-      return
+      return false
     }
     if (targetAction === 'permission_response' && !options.permissionId) {
       events.addLog('error', 'command', '发送失败', '缺少 permission_id')
-      return
+      return false
     }
 
     const requestId = newMessageId('req')
@@ -139,7 +139,7 @@ export const useCommandsStore = defineStore('commands', () => {
     events.addPending(requestId, targetAction, nodeId)
     if (!cloudClient.sendEnvelope(envelope)) {
       events.removePending(requestId)
-      return
+      return false
     }
     events.addLog(
       'out',
@@ -147,6 +147,51 @@ export const useCommandsStore = defineStore('commands', () => {
       `→ ${nodeId}${sessionId ? ` / ${sessionId.slice(-8)}` : ''}`,
       Object.keys(payload).length ? summarize(payload) : '{}',
     )
+    return true
+  }
+
+  /** Session 工作台：向指定 Session 发送 Prompt。 */
+  function sendPromptTo(sessionId: string, text: string): boolean {
+    const entry = inventory.allSessions.find((session) => session.session_id === sessionId)
+    return sendCommand('send_prompt', text, {
+      nodeId: entry?.node_id,
+      agentId: entry?.agent_id,
+      sessionId,
+    })
+  }
+
+  /** Session 工作台：中断指定 Session。 */
+  function interruptSession(sessionId: string): boolean {
+    const entry = inventory.allSessions.find((session) => session.session_id === sessionId)
+    return sendCommand('interrupt', '', {
+      nodeId: entry?.node_id,
+      agentId: entry?.agent_id,
+      sessionId,
+    })
+  }
+
+  /** Session 工作台：Node 级工具命令。 */
+  function sendNodeTool(action: 'ping' | 'echo' | 'get_status' | 'list_sessions', text = ''): boolean {
+    return sendCommand(action, text, { nodeId: inventory.selectedNodeId })
+  }
+
+  /** 发送 Prompt 前的禁用原因（空字符串表示可发送）。 */
+  function promptBlockReason(sessionId: string, text: string): string {
+    if (!connection.isOnline) return 'Cloud 离线'
+    if (!inventory.selectedNodeId) return '未选择 Node'
+    if (!sessionId) return '未选择 Session'
+    if (!text.trim()) return 'Prompt 为空'
+    return ''
+  }
+
+  /** 中断按钮的禁用原因（空字符串表示可中断）。 */
+  function interruptBlockReason(sessionId: string): string {
+    if (!connection.isOnline) return 'Cloud 离线'
+    if (!sessionId) return '未选择 Session'
+    const entry = inventory.allSessions.find((session) => session.session_id === sessionId)
+    if (!entry) return 'Session 已失效'
+    if (entry.status !== 'running' && entry.status !== 'busy') return 'Session 当前未运行'
+    return ''
   }
 
   /** 响应权限审批：定位 permission 并把它的 node/agent/session 带上。 */
@@ -174,6 +219,11 @@ export const useCommandsStore = defineStore('commands', () => {
     promptText,
     canSend,
     sendCommand,
+    sendPromptTo,
+    interruptSession,
+    sendNodeTool,
+    promptBlockReason,
+    interruptBlockReason,
     respondPermission,
     requestSnapshot,
   }

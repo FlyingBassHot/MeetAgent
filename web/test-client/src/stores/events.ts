@@ -24,10 +24,21 @@ export type { LogDirection }
 export interface LogEntry {
   id: number
   time: string
+  /** 写入时间（毫秒），用于异常汇总排序。 */
+  at: number
   direction: LogDirection
   type: string
   title: string
   detail?: string
+}
+
+/** 总览「最近异常」条目。 */
+export interface IssueView {
+  key: string
+  at: number
+  title: string
+  detail: string
+  kind: 'event' | 'log' | 'command'
 }
 
 export interface PendingView {
@@ -63,9 +74,49 @@ export const useEventsStore = defineStore('events', () => {
   const inventory = useInventoryStore()
 
   const recentEvents = computed(() => [...events.value].reverse())
+  const lastEventAt = computed(() => {
+    const last = events.value[events.value.length - 1]
+    return last?.timestamp ?? ''
+  })
   const selectedNodePermissions = computed(() =>
     pendingPermissions.value.filter((item) => item.node_id === inventory.selectedNodeId),
   )
+
+  /** 最近异常：Agent error、命令失败 / 超时、通信错误日志，最多 5 条。 */
+  const recentIssues = computed<IssueView[]>(() => {
+    const issues: IssueView[] = []
+    for (const event of events.value) {
+      if (!event.event_type.includes('error') && !event.event_type.includes('failed')) continue
+      issues.push({
+        key: `event:${event.node_id}:${event.sequence}`,
+        at: Date.parse(event.timestamp) || 0,
+        title: event.event_type,
+        detail: [event.agent_id, event.session_id].filter(Boolean).join(' · '),
+        kind: 'event',
+      })
+    }
+    for (const entry of logs.value) {
+      if (entry.direction !== 'error') continue
+      issues.push({
+        key: `log:${entry.id}`,
+        at: entry.at,
+        title: entry.title,
+        detail: entry.detail ?? entry.type,
+        kind: 'log',
+      })
+    }
+    const response = lastResponse.value
+    if (response && (response.status === 'failed' || response.status === 'rejected' || response.status === 'timeout')) {
+      issues.push({
+        key: `command:${response.at}`,
+        at: response.at,
+        title: `${response.action} · ${response.status}`,
+        detail: [response.nodeId, response.detail].filter(Boolean).join(' · '),
+        kind: 'command',
+      })
+    }
+    return issues.sort((left, right) => right.at - left.at).slice(0, 5)
+  })
 
   // ---------- Activity 日志 ----------
 
@@ -73,6 +124,7 @@ export const useEventsStore = defineStore('events', () => {
     logs.value.unshift({
       id: ++logId,
       time: new Date().toLocaleTimeString('zh-CN', { hour12: false }),
+      at: Date.now(),
       direction,
       type,
       title,
@@ -289,6 +341,16 @@ export const useEventsStore = defineStore('events', () => {
       : []
   }
 
+  /** 某个 Session 的待审批权限（会话详情用）。 */
+  function sessionPermissions(sessionId: string): PermissionView[] {
+    return pendingPermissions.value.filter((item) => item.session_id === sessionId)
+  }
+
+  /** 某个 Session 的事件（最新在前）。 */
+  function sessionEvents(sessionId: string): AgentEvent[] {
+    return recentEvents.value.filter((event) => event.session_id === sessionId)
+  }
+
   // ---------- 生命周期 ----------
 
   /** 发起连接前清空依赖会话的数据（连接成功后由快照重建）。 */
@@ -313,7 +375,9 @@ export const useEventsStore = defineStore('events', () => {
     logs,
     showHeartbeats,
     recentEvents,
+    lastEventAt,
     selectedNodePermissions,
+    recentIssues,
     addLog,
     clearLogs,
     addPending,
@@ -325,6 +389,8 @@ export const useEventsStore = defineStore('events', () => {
     handleEventReplay,
     dropEventsOfNodes,
     applySnapshotData,
+    sessionPermissions,
+    sessionEvents,
     resetForConnect,
     clearForDisconnect,
   }

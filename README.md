@@ -541,9 +541,9 @@ Phase 3 的范围是**真机闭环与加固**：不新增协议字段，用真�
 |---|---|---|
 | Prompt 闭环 | ✅ | 9/9：浏览器向指定 Session 发送 `Reply with exactly one line: PONG-PHASE3`，`send_prompt` 返回 `accepted`/`completed`，事件流出现 `message.started` → `message.delta` → `message.completed`，`text` 为 `PONG-PHASE3` |
 | Interrupt | ✅ | 7/7：`sleep 30` 生成中发送 `interrupt`，响应 `"interrupted": true`，Session 回到 `idle`，其后该 Session 无残留事件 |
-| 权限审批（批准） | ✅ | 7/7：`read *.env` 触发 `permission.requested`，UI 点击「允许一次」后 `permission.resolved`，工具执行并回传文件内容 `E2E_PERMISSION_PROBE=1` |
+| 权限审批（批准） | ✅ | 8/8：`read *.env` 触发 `permission.requested`，UI 点击「允许一次」后 `permission.resolved=approved`，工具执行并回传 `E2E_PERMISSION_PROBE` |
 | 权限审批（拒绝） | ✅ | 9/9：点击「拒绝」后 `permission.resolved` 为 `rejected`，随后 `tool.failed`，回复未泄漏文件内容 |
-| 断线恢复 | ✅ | 9/9：生成中断开 Device，离线窗口内新增事件（本次 208–211）在重连后全部补发，缺失 0，事件流无缺口，在途请求残留 0 |
+| 断线恢复 | ✅ | 9/9：生成中断开 Device，离线窗口内新增事件在重连后全部补发，缺失 0，事件流无缺口，在途请求残留 0 |
 | 事件归一化 | ✅ | `session.*` / `message.*` / `tool.*` / `permission.*` / `agent.*` 均在真机事件流中出现且顺序正确 |
 | 版本与健康 | ✅ | `/api/v1/status` 返回 `version: 0.4.0-phase3`；`/healthz` 公开可用 |
 | 回归 | ✅ | `gofmt -l .` 无输出、`go vet ./...`、`go test ./... -race -count=1`、`make build`、前端 `npm run typecheck` / `npm run build` 全部通过 |

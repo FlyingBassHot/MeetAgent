@@ -3,14 +3,14 @@ interface NavItem {
   to: string
   label: string
   icon: string
+  testId: string
 }
 
 const navItems: NavItem[] = [
-  { to: '/console', label: '总览', icon: 'dashboard' },
-  { to: '/sessions', label: '会话', icon: 'sessions' },
-  { to: '/events', label: '事件', icon: 'events' },
-  { to: '/activity', label: '活动', icon: 'activity' },
-  { to: '/settings', label: '设置', icon: 'settings' },
+  { to: '/console', label: '总览', icon: 'dashboard', testId: 'nav-console' },
+  { to: '/sessions', label: '会话', icon: 'sessions', testId: 'nav-sessions' },
+  { to: '/events', label: '事件', icon: 'events', testId: 'nav-events' },
+  { to: '/settings', label: '设置', icon: 'settings', testId: 'nav-settings' },
 ]
 </script>
 
@@ -22,6 +22,7 @@ const navItems: NavItem[] = [
       :to="item.to"
       class="bottom-nav-link"
       active-class="active"
+      :data-testid="`${item.testId}-mobile`"
     >
       <svg v-if="item.icon === 'dashboard'" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
         <rect x="3" y="3" width="7" height="7" rx="1.5" />
@@ -35,9 +36,6 @@ const navItems: NavItem[] = [
       </svg>
       <svg v-else-if="item.icon === 'events'" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true">
         <polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-      </svg>
-      <svg v-else-if="item.icon === 'activity'" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
       </svg>
       <svg v-else viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <circle cx="12" cy="12" r="3" />

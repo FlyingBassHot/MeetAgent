@@ -1,18 +1,22 @@
 <script setup lang="ts">
 import BaseCard from '../components/ui/BaseCard.vue'
-import ConnectionCard from '../components/connection/ConnectionCard.vue'
+import ConnectionSettings from '../components/connection/ConnectionSettings.vue'
 import ThemeSwitcher from '../components/ui/ThemeSwitcher.vue'
 import { PROTOCOL_VERSION } from '../lib/protocol'
+
+const FRONTEND_VERSION = '0.4.0-phase3'
 </script>
 
 <template>
-  <div class="page-stack">
+  <div class="page-stack settings-page">
     <header class="view-header">
       <h2>设置</h2>
-      <p>Cloud 连接配置、外观主题与协议说明。</p>
+      <p>连接配置、自动连接、外观主题与协议说明。</p>
     </header>
 
-    <ConnectionCard />
+    <BaseCard title="Cloud 连接" description="Device 出站 WSS · Token 只保存在本机 localStorage">
+      <ConnectionSettings />
+    </BaseCard>
 
     <BaseCard title="外观" description="强调色与明暗模式即时生效，选择会持久化到本机">
       <div class="settings-row">
@@ -29,6 +33,10 @@ import { PROTOCOL_VERSION } from '../lib/protocol'
         <div>
           <dt>协议版本</dt>
           <dd><code>v{{ PROTOCOL_VERSION }}</code></dd>
+        </div>
+        <div>
+          <dt>前端版本</dt>
+          <dd><code data-testid="frontend-version">{{ FRONTEND_VERSION }}</code></dd>
         </div>
         <div>
           <dt>注册</dt>

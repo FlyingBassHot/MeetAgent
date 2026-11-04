@@ -5,7 +5,7 @@
  */
 
 import { defineStore } from 'pinia'
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import {
   cloudClient,
   type CloudClientHandlers,
@@ -24,26 +24,62 @@ interface SavedSettings {
   url: string
   deviceId: string
   token: string
+  autoConnect?: boolean
+}
+
+function isLocalHost(): boolean {
+  try {
+    const hostname = window.location.hostname
+    return (
+      !hostname ||
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname === '::1' ||
+      hostname === '[::1]'
+    )
+  } catch {
+    return true
+  }
+}
+
+function defaultUrl(): string {
+  if (isLocalHost()) return 'ws://127.0.0.1:8080/ws'
+  try {
+    // 公网部署走同域反向代理（wss）。
+    return `wss://${window.location.host}/ws`
+  } catch {
+    return 'ws://127.0.0.1:8080/ws'
+  }
+}
+
+function defaultDeviceId(): string {
+  return isLocalHost() ? 'web-001' : ''
+}
+
+function defaultToken(): string {
+  return isLocalHost() ? 'dev-device-token-change-me' : ''
 }
 
 const FALLBACK_SETTINGS: SavedSettings = {
-  url: 'ws://127.0.0.1:8080/ws',
-  deviceId: 'web-001',
-  token: 'dev-device-token-change-me',
+  url: defaultUrl(),
+  deviceId: defaultDeviceId(),
+  token: defaultToken(),
+  autoConnect: true,
 }
 
-function loadSettings(): SavedSettings {
+function readStoredSettings(): SavedSettings | null {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY)
-    if (!raw) return { ...FALLBACK_SETTINGS }
+    if (!raw) return null
     const parsed = JSON.parse(raw) as Partial<SavedSettings>
     return {
       url: typeof parsed.url === 'string' ? parsed.url : FALLBACK_SETTINGS.url,
       deviceId: typeof parsed.deviceId === 'string' ? parsed.deviceId : FALLBACK_SETTINGS.deviceId,
       token: typeof parsed.token === 'string' ? parsed.token : FALLBACK_SETTINGS.token,
+      autoConnect: parsed.autoConnect !== false,
     }
   } catch {
-    return { ...FALLBACK_SETTINGS }
+    return null
   }
 }
 
@@ -51,16 +87,28 @@ function loadSettings(): SavedSettings {
 let handlersRegistered = false
 
 export const useConnectionStore = defineStore('connection', () => {
-  const saved = loadSettings()
+  const stored = readStoredSettings()
+  const saved = stored ?? { ...FALLBACK_SETTINGS }
 
   const url = ref(saved.url)
   const deviceId = ref(saved.deviceId)
   const token = ref(saved.token)
+  const autoConnect = ref(saved.autoConnect !== false)
   const phase = ref<ConnectionPhase>('offline')
   const lastError = ref('')
   const reconnectAttempt = ref(0)
   const connectionId = ref('')
   const heartbeatRttMs = ref<number | null>(null)
+
+  /** 本地是否保存过连接配置（用于连接门禁判断，不能用 fallback 代替）。 */
+  const hasSavedConfig = ref(stored !== null)
+  /** 本次会话是否成功连上过（成功后断线保留控制台）。 */
+  const hasEverConnected = ref(false)
+  /** 用户手动断开后回到门禁页，直到再次连接。 */
+  const disconnectedManually = ref(false)
+  /** 忘记设备时抑制 watch 回写（否则会立刻重建 localStorage）。 */
+  const suppressPersist = ref(false)
+  let bootstrapDone = false
 
   const events = useEventsStore()
   const inventory = useInventoryStore()
@@ -68,14 +116,29 @@ export const useConnectionStore = defineStore('connection', () => {
   const isOnline = computed(() => phase.value === 'online')
   /** 连接中 / 注册中 / 重连中（用于加载态，区别于离线空态）。 */
   const isConnecting = computed(() => phase.value !== 'online' && phase.value !== 'offline')
+  /** 是否显示全屏连接门禁。 */
+  const showGate = computed(() => !hasEverConnected.value || disconnectedManually.value)
 
-  watch([url, deviceId, token], () => persistSettings())
+  watch([url, deviceId, token, autoConnect], () => persistSettings())
+
+  watch(phase, (next) => {
+    if (next === 'online') {
+      hasEverConnected.value = true
+      disconnectedManually.value = false
+    }
+  })
 
   function persistSettings(): void {
+    if (suppressPersist.value) return
     try {
       window.localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ url: url.value, deviceId: deviceId.value, token: token.value }),
+        JSON.stringify({
+          url: url.value,
+          deviceId: deviceId.value,
+          token: token.value,
+          autoConnect: autoConnect.value,
+        }),
       )
     } catch {
       // localStorage 不可用时仅保留会话内生效
@@ -212,36 +275,92 @@ export const useConnectionStore = defineStore('connection', () => {
       return
     }
 
+    hasSavedConfig.value = true
+    disconnectedManually.value = false
     persistSettings()
     lastError.value = ''
     events.resetForConnect()
     cloudClient.connect()
   }
 
+  /** 首次挂载：有保存配置且开启自动连接时自动握手。 */
+  function bootstrap(): void {
+    if (bootstrapDone) return
+    bootstrapDone = true
+    if (!hasSavedConfig.value || !autoConnect.value) return
+    connect()
+  }
+
   function disconnect(): void {
     cloudClient.disconnect()
     events.clearForDisconnect('连接已手动断开')
+    disconnectedManually.value = true
   }
 
   /** 立即重连：复用配置重新握手，不清空本地清单（由快照覆盖）。 */
   function retryNow(): void {
     lastError.value = ''
+    disconnectedManually.value = false
     cloudClient.connect()
+  }
+
+  function setAutoConnect(next: boolean): void {
+    autoConnect.value = next
+    persistSettings()
+  }
+
+  /** 忘记此设备：清除连接配置与选中态，回到门禁并填入默认值。 */
+  function forgetDevice(): void {
+    suppressPersist.value = true
+    try {
+      window.localStorage.removeItem(STORAGE_KEY)
+    } catch {
+      // 忽略
+    }
+    cloudClient.disconnect()
+    events.clearForDisconnect('已清除本地连接配置')
+    inventory.clearSelection()
+    url.value = FALLBACK_SETTINGS.url
+    deviceId.value = FALLBACK_SETTINGS.deviceId
+    token.value = FALLBACK_SETTINGS.token
+    autoConnect.value = true
+    hasSavedConfig.value = false
+    hasEverConnected.value = false
+    disconnectedManually.value = true
+    lastError.value = ''
+    connectionId.value = ''
+    heartbeatRttMs.value = null
+    void nextTick(() => {
+      suppressPersist.value = false
+      try {
+        window.localStorage.removeItem(STORAGE_KEY)
+      } catch {
+        // 忽略
+      }
+    })
   }
 
   return {
     url,
     deviceId,
     token,
+    autoConnect,
     phase,
     lastError,
     reconnectAttempt,
     connectionId,
     heartbeatRttMs,
+    hasSavedConfig,
+    hasEverConnected,
+    disconnectedManually,
     isOnline,
     isConnecting,
+    showGate,
     connect,
+    bootstrap,
     disconnect,
     retryNow,
+    setAutoConnect,
+    forgetDevice,
   }
 })

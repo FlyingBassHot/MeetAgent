@@ -39,6 +39,32 @@ export function pendingStatusLabel(status: string): string {
   }
 }
 
+/** Session 状态中文文案（未知状态原样返回）。 */
+export function sessionStatusLabel(status: string): string {
+  switch (status) {
+    case 'running':
+    case 'busy':
+      return '运行中'
+    case 'idle':
+      return '空闲'
+    case 'error':
+    case 'failed':
+      return '错误'
+    default:
+      return status || '未知'
+  }
+}
+
+export type StatusTone = 'success' | 'busy' | 'danger' | 'idle'
+
+/** Session 状态色调：运行中 / 空闲 / 错误 / 其他。 */
+export function sessionStatusTone(status: string): StatusTone {
+  if (status === 'running' || status === 'busy') return 'busy'
+  if (status === 'error' || status === 'failed') return 'danger'
+  if (status === 'idle') return 'success'
+  return 'idle'
+}
+
 type EventTone = 'danger' | 'warn' | 'success' | 'muted' | ''
 
 /** 根据事件类型推断色调（用于事件流左边线 / 标签）。 */

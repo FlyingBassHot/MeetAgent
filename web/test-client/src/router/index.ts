@@ -23,17 +23,13 @@ export const router = createRouter({
       meta: { title: '事件' },
     },
     {
-      path: '/activity',
-      name: 'activity',
-      component: () => import('../views/ActivityView.vue'),
-      meta: { title: '活动' },
-    },
-    {
       path: '/settings',
       name: 'settings',
       component: () => import('../views/SettingsView.vue'),
       meta: { title: '设置' },
     },
+    // 兼容旧链接：活动页并入事件页的第二个 Tab
+    { path: '/activity', redirect: { path: '/events', query: { tab: 'activity' } } },
     { path: '/:pathMatch(.*)*', redirect: '/console' },
   ],
 })

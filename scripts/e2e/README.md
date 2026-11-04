@@ -6,7 +6,7 @@
 |---|---|---|
 | `prompt.js` | Prompt 闭环 | 9/9：命令 `accepted` → `completed`，事件流出现 `message.started/delta/completed`，回复文本为 `PONG-PHASE3` |
 | `interrupt.js` | Interrupt | 7/7：长任务执行中打断，响应 `"interrupted": true`，Session 回到 `idle`，之后无该 Session 残留事件 |
-| `permission-approve.js` | 权限批准 | 7/7：`permission.requested` 出现在 UI，点击「允许一次」后工具执行并回传 `E2E_PERMISSION_PROBE=1` |
+| `permission-approve.js` | 权限批准 | 8/8：`permission.requested` 出现在 UI，点击「允许一次」后 `permission.resolved=approved`，工具执行并回传 `E2E_PERMISSION_PROBE` |
 | `permission-reject.js` | 权限拒绝 | 9/9：点击「拒绝」后 `permission.resolved` 为 `rejected`、`tool.failed` 出现，回复未泄漏文件内容 |
 | `reconnect.js` | 断线恢复 | 9/9：生成中断开 Device，离线窗口内的事件重连后全部补发（缺失 0），在途请求残留 0 |
 
@@ -39,7 +39,9 @@ node scripts/e2e/reconnect.js
 
 `prepare.mjs` 每次创建一个新的 OpenCode Session（标题带时间戳）并写入 `/tmp/opencode/meetagent-e2e/state.json`；后续脚本自动读取，无需手动 export。需要复用固定 Session 时设置 `E2E_SESSION_TITLE`，需要覆盖 Session 时设置 `E2E_SESSION_ID`。
 
-每个脚本会启动自己的 Chromium 实例并在结束时关闭；默认 CDP 端口分别为 9230 / 9232 / 9233 / 9235 / 9234，可用 `CDP_PORT` 覆盖单个端口。脚本退出码：`0` 全部通过，`1` 有失败项，`2` 运行错误。
+每个脚本会启动自己的 Chromium 实例（独立临时 profile）并在结束时关闭；默认 CDP 端口分别为 9230 / 9232 / 9233 / 9235 / 9234，可用 `CDP_PORT` 覆盖单个端口。脚本退出码：`0` 全部通过，`1` 有失败项，`2` 运行错误。
+
+脚本默认使用 Device `web-002` 连接，避免覆盖开发者自己打开的 `web-001` 页面；可用 `E2E_DEVICE_ID` / `E2E_DEVICE_TOKEN` 覆盖。连接门禁会自动填入这组测试凭据。
 
 ## 环境变量
 
