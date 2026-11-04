@@ -357,7 +357,7 @@ export class CloudClient {
       name: 'Web Test Client',
       hostname: window.location.host,
       platform: 'web',
-      version: '0.3.0-phase2',
+      version: '0.4.0-phase3',
     }
     if (Object.keys(resumeFrom).length > 0) {
       payload.last_sequences = { ...resumeFrom }

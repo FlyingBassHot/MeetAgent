@@ -286,6 +286,26 @@ log:
 - 重连采用指数退避 + 抖动：`1s → 2s → 4s → 8s → 16s → 30s`（封顶）。
 - `read_timeout` 必须至少为 `heartbeat_interval` 的两倍。
 
+**多个 Agent 实例**：一个 Node 可以同时管理多个 Agent，每个 `node.agents[]` 条目对应一个独立的 Adapter 实例，`id` 必须唯一，并各自配置 `base_url`、`password_env` 与可选的 `directory`。Node **不会自动发现**本机的 OpenCode 进程，需要把每个 OpenCode Server 显式写进配置：
+
+```yaml
+agents:
+  - id: "opencode-main"
+    type: "opencode"
+    name: "OpenCode Main"
+    connection:
+      base_url: "http://127.0.0.1:49374"
+      password_env: "OPENCODE_PASSWORD"
+  - id: "opencode-second"
+    type: "opencode"
+    name: "OpenCode Second"
+    connection:
+      base_url: "http://127.0.0.1:4096"
+      password_env: "OPENCODE_SECOND_PASSWORD"
+```
+
+多个 TUI / 终端窗口如果连接的是同一个 OpenCode Server，只会表现为该 Agent 下的多个 Session，不会变成多个 Agent；只有独立的 OpenCode Server（不同端口/进程）才需要新增 `agents[]` 条目。
+
 ---
 
 ## Adapter 层

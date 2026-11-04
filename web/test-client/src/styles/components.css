@@ -1278,6 +1278,61 @@
   border-top: 1px solid var(--border);
 }
 
+.command-result {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-top: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-small);
+  background: var(--surface-sunken);
+  font-size: 12px;
+}
+
+.command-result strong {
+  font-size: 13px;
+}
+
+.command-result-status {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.command-result.is-completed {
+  border-left-color: var(--success);
+}
+
+.command-result.is-completed .command-result-status {
+  color: var(--success);
+}
+
+.command-result.is-failed,
+.command-result.is-rejected,
+.command-result.is-timeout {
+  border-left-color: var(--danger);
+}
+
+.command-result.is-failed .command-result-status,
+.command-result.is-rejected .command-result-status,
+.command-result.is-timeout .command-result-status {
+  color: var(--danger);
+}
+
+.command-result-detail {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+.command-result time {
+  margin-left: auto;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
 /* ---------- 活动日志 ---------- */
 
 .log-tools {

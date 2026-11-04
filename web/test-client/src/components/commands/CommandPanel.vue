@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { COMMAND_ACTIONS, useCommandsStore } from '../../stores/commands'
 import { useInventoryStore } from '../../stores/inventory'
+import { useEventsStore } from '../../stores/events'
 import { shortId } from '../../lib/format'
 import ActionPicker from './ActionPicker.vue'
 
 const commands = useCommandsStore()
 const inventory = useInventoryStore()
+const events = useEventsStore()
 
 function submitCommand(): void {
   if (!commands.canSend) return
@@ -99,5 +101,19 @@ function onTextareaKeydown(event: KeyboardEvent): void {
           : '该操作需要先选择 Agent 与 Session'
       }}
     </span>
+  </div>
+
+  <div
+    v-if="events.lastResponse"
+    class="command-result"
+    :class="`is-${events.lastResponse.status}`"
+    role="status"
+  >
+    <span class="eyebrow">LAST</span>
+    <strong>{{ events.lastResponse.action }}</strong>
+    <span class="command-result-status">{{ events.lastResponse.status }}</span>
+    <small v-if="events.lastResponse.nodeId">@ {{ events.lastResponse.nodeId }}</small>
+    <span class="command-result-detail">{{ events.lastResponse.detail || '—' }}</span>
+    <time>{{ new Date(events.lastResponse.at).toLocaleTimeString('zh-CN', { hour12: false }) }}</time>
   </div>
 </template>

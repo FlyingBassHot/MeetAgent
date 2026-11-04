@@ -43,14 +43,14 @@ export const useInventoryStore = defineStore('inventory', () => {
     syncAgentSelection()
   }
 
-  /** 点击 Node 卡片：仅允许选中在线 Node，并自动挑选 Agent/Session。 */
+  /** 点击 Node 卡片：仅允许选中在线 Node，并自动挑选 Agent（Session 由用户显式选择）。 */
   function selectNode(node: NodeView): void {
     if (node.status !== 'online') return
     selectedNodeId.value = node.node_id
     const agent =
       node.agents?.find((item) => item.status === 'online') ?? node.agents?.[0]
     selectedAgentId.value = agent?.agent_id ?? ''
-    selectedSessionId.value = agent?.sessions?.[0]?.session_id ?? ''
+    selectedSessionId.value = ''
   }
 
   function selectAgent(agentId: string): void {
@@ -58,7 +58,7 @@ export const useInventoryStore = defineStore('inventory', () => {
     const agent = selectedNodeAgents.value.find((item) => item.agent_id === agentId)
     const sessions = agent?.sessions ?? []
     if (!sessions.some((session) => session.session_id === selectedSessionId.value)) {
-      selectedSessionId.value = sessions[0]?.session_id ?? ''
+      selectedSessionId.value = ''
     }
   }
 
@@ -72,10 +72,11 @@ export const useInventoryStore = defineStore('inventory', () => {
     if (!agents.some((agent) => agent.agent_id === selectedAgentId.value)) {
       selectedAgentId.value =
         agents.find((agent) => agent.status === 'online')?.agent_id ?? agents[0]?.agent_id ?? ''
+      selectedSessionId.value = ''
     }
     const sessions = selectedAgentSessions.value
     if (!sessions.some((session) => session.session_id === selectedSessionId.value)) {
-      selectedSessionId.value = sessions[0]?.session_id ?? ''
+      selectedSessionId.value = ''
     }
   }
 

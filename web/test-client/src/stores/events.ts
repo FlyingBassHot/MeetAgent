@@ -38,6 +38,14 @@ export interface PendingView {
   status: CommandStatus | 'sent'
 }
 
+export interface LastResponseView {
+  action: string
+  nodeId: string
+  status: CommandStatus | 'timeout'
+  detail: string
+  at: number
+}
+
 const MAX_EVENTS = 300
 const MAX_LOGS = 300
 
@@ -48,6 +56,7 @@ export const useEventsStore = defineStore('events', () => {
   const lastSequences = ref<Record<string, number>>({})
   const pendingPermissions = ref<PermissionView[]>([])
   const pending = ref<PendingView[]>([])
+  const lastResponse = ref<LastResponseView | null>(null)
   const logs = ref<LogEntry[]>([])
   const showHeartbeats = ref(false)
 
@@ -116,6 +125,20 @@ export const useEventsStore = defineStore('events', () => {
     }
 
     const current = pending.value.find((item) => item.requestId === envelope.request_id)
+    const action = current?.action ?? envelope.action ?? 'command'
+    const nodeId = current?.nodeId ?? envelope.target?.node_id ?? envelope.source?.id ?? ''
+    lastResponse.value = {
+      action,
+      nodeId,
+      status: result.status,
+      detail: result.error
+        ? `error=${result.error}`
+        : result.data !== undefined
+          ? summarize(result.data)
+          : '',
+      at: Date.now(),
+    }
+
     if (current) {
       current.status = result.status
       if (result.status === 'accepted' || result.status === 'executing') {
@@ -150,6 +173,13 @@ export const useEventsStore = defineStore('events', () => {
 
   /** 15s 超时（由 cloud-client 触发）。 */
   function handlePendingTimeout(requestId: string, action: string, nodeId: string): void {
+    lastResponse.value = {
+      action,
+      nodeId,
+      status: 'timeout',
+      detail: '超过 15 秒未收到最终结果',
+      at: Date.now(),
+    }
     addLog('error', 'response · timeout', `${action} @ ${nodeId}`, '超过 15 秒未收到最终结果')
     removePending(requestId)
   }
@@ -279,6 +309,7 @@ export const useEventsStore = defineStore('events', () => {
     lastSequences,
     pendingPermissions,
     pending,
+    lastResponse,
     logs,
     showHeartbeats,
     recentEvents,
