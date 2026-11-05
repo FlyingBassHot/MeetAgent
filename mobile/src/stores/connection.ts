@@ -47,6 +47,12 @@ export const useConnectionStore = defineStore('connection', () => {
   let transport: ClientTransport | null = null;
   let unsubscribe: (() => void) | null = null;
   let bootstrapped = false;
+  const connectionToastIds = new Set<number>();
+
+  function clearConnectionErrors(): void {
+    for (const id of connectionToastIds) ui.dismiss(id);
+    connectionToastIds.clear();
+  }
 
   const isOnline = computed(() => phase.value === 'online');
   const isBusy = computed(
@@ -71,6 +77,7 @@ export const useConnectionStore = defineStore('connection', () => {
         if (event.phase === 'online') {
           error.value = null;
           lastConnectedAt.value = new Date().toISOString();
+          clearConnectionErrors();
         }
         if (event.phase === 'error' && event.detail) error.value = event.detail;
         break;
@@ -110,7 +117,8 @@ export const useConnectionStore = defineStore('connection', () => {
       case 'error':
         error.value = event.message;
         if (event.fatal) phase.value = 'error';
-        ui.push(event.message, 'danger');
+        clearConnectionErrors();
+        connectionToastIds.add(ui.push(event.message, 'danger'));
         break;
       default:
         break;
@@ -197,6 +205,7 @@ export const useConnectionStore = defineStore('connection', () => {
       transport.disconnect();
       transport = null;
     }
+    clearConnectionErrors();
     phase.value = 'offline';
     detail.value = '已断开连接';
     preferences.patch({ autoConnect: false });

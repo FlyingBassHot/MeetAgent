@@ -110,7 +110,7 @@ ClientTransport
 - 握手：`hello` → `welcome`，支持 Token、配对码与 `last_sequence`
 - 状态：`welcome.snapshot` 全量覆盖本地状态；`snapshot` 消息同样处理
 - 事件：按 `sequence` 去重，检测序号缺口并在 UI 提示；忽略未知事件类型
-- 命令：`ping`、`node.status`、`session.list`、`session.prompt`、`session.interrupt`、`permission.respond`
+- 命令：`ping`、`node.status`、`session.list`、`session.prompt`、`session.interrupt`、`permission.respond`；Node 对 Session 级命令强制要求同时携带 `agent_id` 与 `session_id`
 - 结果：`command.result`；15 秒超时、连接断开时拒绝在途命令
 - 心跳：JSON `heartbeat` 计算 RTT
 - 重连：指数退避（1s → 15s）；重连后携带最新 `last_sequence`，以 Snapshot 为准再应用补发事件
@@ -128,14 +128,27 @@ ClientTransport
 - 响应式：390×844 手机优先，≥900px 切换侧边栏布局，1440×900 可用
 - Mock 与真实 Node 共用协议类型与通信接口；组件与通信层分离
 
+## M3 真实 Node 联调
+
+联调环境：Node `http://127.0.0.1:8787`，OpenCode Adapter 在线；Mobile `http://127.0.0.1:5174`。
+
+已验证：
+
+- 配对与 Snapshot：真实 `welcome` 返回 41 个 Session、1 个 Agent（OpenCode Main）；Agent 状态与事件流正常
+- Session 列表与详情：真实 Session 标题、状态、更新时间、工作目录与历史事件正常展示
+- Prompt：仅向测试 Session `ses_e5a1c7989ffefcU1XdrTiq6WXX` 发送，流式增量与完成消息正常；未向主会话 `ses_e5e6e776fffeeeCdeah5WtPEhJ` 发送任何命令
+- Interrupt：对测试 Session 生效，状态回到 idle，流式消息停止
+- 权限：新建 `/tmp/opencode/meetagent-e2e/m3-approve-*.env` 触发 read 审批并「允许一次」，Agent 成功读取；新建 `m3-reject-*.env` 触发审批并「拒绝」，工具失败且未读取内容
+- 断线/重连：通过 DevTools 网络离线模拟断开，UI 显示「重连中」并退避重试；恢复网络后自动重连，重新收到 Snapshot（41 个 Session），无序号缺口提示
+- 真机联调修复：Session 级命令现在同时携带 `agent_id` 与 `session_id`（Node 对缺失字段返回 `rejected`）
+
 ## 尚未实现（后续里程碑）
 
-- 与真实 Node 的端到端联调（等待主会话提供可运行 Node 与配对码）
-- OpenCode 真实 Session / 事件 / 审批交互
 - Capacitor Android / iOS 打包、Keychain / Keystore、APNs / FCM
 - mDNS 自动发现、Tailscale / VPN 状态展示
 - 语音 / STT
 - 通知的更细粒度策略（仅审批提醒基础已预留）
+- 多客户端场景（M4）：同 Token 多标签页/设备并发连接尚未做互斥或独立身份管理
 
 ## 截图
 
@@ -161,9 +174,25 @@ M2 验收截图位于 `/tmp/opencode/meetagent-mobile/`：
 - `15-settings-1440.png`
 - `15b-settings-bottom-1440.png`
 
+M3 真实 Node 截图位于 `/tmp/opencode/meetagent-mobile-live/`：
+
+- `live-home-390.png` / `live-home-1440.png`
+- `live-sessions-390.png` / `live-sessions-1440.png`
+- `live-session-detail-390.png` / `live-session-detail-1440.png`
+- `live-activity-390.png` / `live-activity-1440.png`
+- `live-prompt-streaming-390.png`
+- `live-interrupt-390.png`
+- `live-permission-pending-390.png`
+- `live-permission-approved-390.png`
+- `live-permission-reject-pending-390.png`
+- `live-permission-rejected-390.png`
+- `live-reconnecting-390.png`
+- `live-reconnected-390.png`
+
 ## 已知限制
 
 - Web 原型的 Token 存在 `localStorage`，不等同于安全存储。
+- 同一 Token / client_id 同时打开多个标签页会互相替换 Node 连接并触发重连抖动；联调或使用时保持单标签页，M4 再实现多客户端身份与互斥。
 - 真实 Node 需要允许 `http://localhost:5174` / `http://localhost:4173` 的 CORS 来源；WSS 证书需浏览器信任。
 - 浏览器通知依赖用户授权；部分移动浏览器要求 Service Worker 才能展示系统通知。
 - Mock 心跳、RTT 与回复均为本地模拟值，不能作为真实 Agent 性能依据。

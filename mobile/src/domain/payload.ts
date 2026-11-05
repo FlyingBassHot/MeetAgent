@@ -48,7 +48,9 @@ export function eventSummary(event: ProtocolEvent): string {
   } else if (event.type.startsWith('tool.')) {
     const tool = textField(payload, 'tool');
     const target = textField(payload, 'target');
+    const callId = textField(payload, 'call_id');
     if (tool) pieces.push(target ? `${tool} ${target}` : tool);
+    else if (callId) pieces.push(`调用 ${callId}`);
     if (status) pieces.push(status);
   } else if (event.type === 'session.created' || event.type === 'session.updated') {
     pieces.push(textField(payload, 'title') ?? event.session_id ?? event.type);

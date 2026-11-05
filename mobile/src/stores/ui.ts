@@ -17,11 +17,12 @@ export const useUiStore = defineStore('ui', () => {
     toasts.value = toasts.value.filter((toast) => toast.id !== id);
   }
 
-  function push(message: string, tone: Tone = 'info'): void {
+  function push(message: string, tone: Tone = 'info'): number {
     toastCounter += 1;
     const id = toastCounter;
     toasts.value.push({ id, message, tone });
     window.setTimeout(() => dismiss(id), 4200);
+    return id;
   }
 
   return { toasts, push, dismiss };

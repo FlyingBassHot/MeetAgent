@@ -4,6 +4,7 @@ import type { PermissionDecision } from '@/domain/protocol';
 import { commandStatusLabel, decisionLabel } from '@/domain/labels';
 import type { CommandRequest } from '@/services/client/types';
 import { useConnectionStore } from './connection';
+import { useNodeStore } from './node';
 import { useUiStore } from './ui';
 
 export interface SentPrompt {
@@ -16,6 +17,7 @@ const MAX_PROMPTS = 40;
 
 export const useCommandsStore = defineStore('commands', () => {
   const connection = useConnectionStore();
+  const nodeStore = useNodeStore();
   const ui = useUiStore();
 
   const inFlight = ref<Record<string, boolean>>({});
@@ -61,7 +63,11 @@ export const useCommandsStore = defineStore('commands', () => {
     }
     const ok = await run(
       `prompt:${sessionId}`,
-      { type: 'session.prompt', sessionId, payload: { text: trimmed } },
+      {
+        type: 'session.prompt',
+        ...sessionContext(sessionId),
+        payload: { text: trimmed },
+      },
       'Prompt 已发送',
     );
     if (ok) {
@@ -76,7 +82,7 @@ export const useCommandsStore = defineStore('commands', () => {
   function interrupt(sessionId: string): Promise<boolean> {
     return run(
       `interrupt:${sessionId}`,
-      { type: 'session.interrupt', sessionId, payload: {} },
+      { type: 'session.interrupt', ...sessionContext(sessionId), payload: {} },
       '已发送 Interrupt',
     );
   }
@@ -85,10 +91,20 @@ export const useCommandsStore = defineStore('commands', () => {
     permissionId: string,
     decision: PermissionDecision,
   ): Promise<boolean> {
+    const permission = nodeStore.pendingPermissions.find(
+      (item) => item.permission_id === permissionId,
+    );
+    const context = permission
+      ? {
+          ...(permission.agent_id ? { agentId: permission.agent_id } : {}),
+          ...(permission.session_id ? { sessionId: permission.session_id } : {}),
+        }
+      : {};
     return run(
       `permission:${permissionId}`,
       {
         type: 'permission.respond',
+        ...context,
         payload: { permission_id: permissionId, decision },
       },
       `已提交审批：${decisionLabel(decision)}`,
@@ -97,6 +113,12 @@ export const useCommandsStore = defineStore('commands', () => {
 
   function promptsFor(sessionId: string): SentPrompt[] {
     return sentPrompts.value.filter((promptRecord) => promptRecord.sessionId === sessionId);
+  }
+
+  function sessionContext(sessionId: string): { agentId?: string; sessionId: string } {
+    const session = nodeStore.sessionById[sessionId];
+    if (!session) return { sessionId };
+    return { agentId: session.agent_id, sessionId };
   }
 
   return {
