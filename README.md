@@ -140,6 +140,28 @@ agents:
 
 ---
 
+## 本地 WSS / 远程访问
+
+生成本地自签证书（仅开发）：
+
+```bash
+make dev-tls
+# data/tls/cert.pem, data/tls/key.pem
+```
+
+在 `configs/node.yaml` 的 `server` 中启用：
+
+```yaml
+server:
+  tls_cert: "./data/tls/cert.pem"
+  tls_key: "./data/tls/key.pem"
+```
+
+- 浏览器/手机必须信任该证书；自签证书只用于本机测试
+- 生产环境用 Caddy/Nginx 终止 TLS，Node 可继续监听 `127.0.0.1`
+- Mobile 填写 `https://<主机>:8787`，客户端会自动使用 `wss://`
+- 公网部署请关闭 `allow_lan_origins`，只放行明确域名
+
 ## 协议与安全
 
 - 客户端先通过 6 位配对码换取独立 Token；Token 只保存 SHA-256 哈希

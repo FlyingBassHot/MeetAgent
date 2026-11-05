@@ -9,7 +9,7 @@ WEB_DIR := web/test-client
 CLOUD_CONFIG ?= configs/cloud.yaml
 NODE_CONFIG ?= configs/node.yaml
 
-.PHONY: all build cloud node simulator test fmt vet clean run-cloud run-node run-node-mock simulator-run web-install web-dev web-build
+.PHONY: all build cloud node simulator test fmt vet clean run-cloud run-node run-node-mock simulator-run dev-tls web-install web-dev web-build
 
 all: build
 
@@ -53,6 +53,10 @@ run-cloud:
 ## run-node: start the Node with the development configuration
 run-node:
 	go run ./cmd/node -config $(NODE_CONFIG)
+
+## dev-tls: generate a self-signed certificate for local WSS testing
+dev-tls:
+	./scripts/dev-tls.sh
 
 ## run-node-mock: start the Node with the mock Agent configuration
 run-node-mock:
