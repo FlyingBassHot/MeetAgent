@@ -93,6 +93,9 @@ type Server struct {
 	clientsMu sync.Mutex
 	clients   map[string]*clientConn
 	commands  *commandCache
+
+	permissionMu    sync.Mutex
+	permissionState map[string]permissionState
 }
 
 // New creates a Node server.
@@ -102,14 +105,15 @@ func New(opts Options, nodeID, nodeName string, manager *adapter.Manager, hub *e
 	}
 	opts = opts.withDefaults()
 	s := &Server{
-		opts:     opts,
-		node:     newNodeInfo(nodeID, nodeName),
-		manager:  manager,
-		hub:      hub,
-		pairing:  pairingManager,
-		logger:   logger,
-		clients:  make(map[string]*clientConn),
-		commands: newCommandCache(5*time.Minute, 1000),
+		opts:            opts,
+		node:            newNodeInfo(nodeID, nodeName),
+		manager:         manager,
+		hub:             hub,
+		pairing:         pairingManager,
+		logger:          logger,
+		clients:         make(map[string]*clientConn),
+		commands:        newCommandCache(5*time.Minute, 1000),
+		permissionState: make(map[string]permissionState),
 	}
 	s.upgrader = websocket.Upgrader{
 		ReadBufferSize:  4096,
@@ -564,6 +568,37 @@ func (s *Server) unregisterClient(cc *clientConn) {
 		delete(s.clients, cc.id)
 	}
 	s.clientsMu.Unlock()
+}
+
+type permissionState struct {
+	resolved bool
+	expires  time.Time
+}
+
+func (s *Server) beginPermission(permissionID string) bool {
+	s.permissionMu.Lock()
+	defer s.permissionMu.Unlock()
+	now := time.Now()
+	for id, state := range s.permissionState {
+		if now.After(state.expires) {
+			delete(s.permissionState, id)
+		}
+	}
+	if _, exists := s.permissionState[permissionID]; exists {
+		return false
+	}
+	s.permissionState[permissionID] = permissionState{expires: now.Add(10 * time.Minute)}
+	return true
+}
+
+func (s *Server) finishPermission(permissionID string, resolved bool) {
+	s.permissionMu.Lock()
+	defer s.permissionMu.Unlock()
+	if resolved {
+		s.permissionState[permissionID] = permissionState{resolved: true, expires: time.Now().Add(10 * time.Minute)}
+		return
+	}
+	delete(s.permissionState, permissionID)
 }
 
 func (s *Server) adapterInfos() []clientproto.AdapterInfo {

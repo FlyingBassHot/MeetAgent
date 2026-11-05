@@ -172,3 +172,21 @@ func mustJSON(value any) json.RawMessage {
 	}
 	return raw
 }
+
+func TestPermissionSingleDecision(t *testing.T) {
+	s := &Server{permissionState: make(map[string]permissionState)}
+	if !s.beginPermission("per-1") {
+		t.Fatal("first decision should be accepted")
+	}
+	if s.beginPermission("per-1") {
+		t.Fatal("second concurrent decision must be rejected")
+	}
+	s.finishPermission("per-1", false)
+	if !s.beginPermission("per-1") {
+		t.Fatal("failed decision should be retryable")
+	}
+	s.finishPermission("per-1", true)
+	if s.beginPermission("per-1") {
+		t.Fatal("resolved permission must not accept another decision")
+	}
+}

@@ -115,9 +115,14 @@ func (s *Server) handleCommand(c *clientConn, cmd clientproto.Command) clientpro
 		if decision == "" {
 			return finish(commandFailure(cmd, protocol.StatusRejected, "decision must be once, always or reject"))
 		}
+		if !s.beginPermission(payload.PermissionID) {
+			return finish(commandFailure(cmd, protocol.StatusRejected, "permission has already been handled"))
+		}
 		ctx, cancel := context.WithTimeout(context.Background(), s.opts.CommandTimeout)
-		defer cancel()
-		if err := s.manager.RespondPermission(ctx, cmd.AgentID, cmd.SessionID, payload.PermissionID, decision, payload.Message); err != nil {
+		err := s.manager.RespondPermission(ctx, cmd.AgentID, cmd.SessionID, payload.PermissionID, decision, payload.Message)
+		cancel()
+		s.finishPermission(payload.PermissionID, err == nil)
+		if err != nil {
 			return finish(commandError(cmd, err))
 		}
 		return finish(commandSuccess(cmd, map[string]any{"permission_id": payload.PermissionID, "decision": decision}))
