@@ -32,6 +32,8 @@ var (
 	ErrUnauthorized = errors.New("unknown or revoked client token")
 	// ErrInvalidClient means the client declaration is invalid.
 	ErrInvalidClient = errors.New("invalid client declaration")
+	// ErrUnknownClient means the client id is not paired.
+	ErrUnknownClient = errors.New("unknown client")
 )
 
 const (
@@ -207,6 +209,40 @@ func (m *Manager) Revoke(clientID string) bool {
 	delete(m.byToken, client.TokenHash)
 	_ = m.saveLocked()
 	return true
+}
+
+// SetPermissions replaces one client's permissions. The caller should close
+// the client's live connection so the new permissions are loaded on reconnect.
+func (m *Manager) SetPermissions(clientID string, permissions []string) (Client, error) {
+	normalized := normalizeList(permissions)
+	for _, permission := range normalized {
+		if !validPermission(permission) {
+			return Client{}, fmt.Errorf("%w: unknown permission %q", ErrInvalidClient, permission)
+		}
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	client, ok := m.clients[clientID]
+	if !ok {
+		return Client{}, ErrUnknownClient
+	}
+	client.Permissions = normalized
+	if err := m.saveLocked(); err != nil {
+		return Client{}, err
+	}
+	return *client, nil
+}
+
+func validPermission(value string) bool {
+	switch value {
+	case clientproto.PermissionSessionRead,
+		clientproto.PermissionSessionControl,
+		clientproto.PermissionPermissionRespond,
+		clientproto.PermissionNodeManage:
+		return true
+	default:
+		return false
+	}
 }
 
 // Clients returns a copy of the paired client list.

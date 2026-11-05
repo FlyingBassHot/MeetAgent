@@ -123,3 +123,31 @@ func TestExpiredCode(t *testing.T) {
 		t.Fatalf("error = %v, want ErrExpiredCode", err)
 	}
 }
+
+func TestSetPermissions(t *testing.T) {
+	manager, err := New("", time.Minute, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager.SetCode("123456")
+	client, _, err := manager.Pair(clientproto.PairRequest{
+		ClientType:  clientproto.ClientTerminal,
+		PairingCode: "123456",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated, err := manager.SetPermissions(client.ClientID, []string{clientproto.PermissionSessionRead})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(updated.Permissions) != 1 || updated.Permissions[0] != clientproto.PermissionSessionRead {
+		t.Fatalf("permissions = %v", updated.Permissions)
+	}
+	if _, err := manager.SetPermissions(client.ClientID, []string{"root"}); !errors.Is(err, ErrInvalidClient) {
+		t.Fatalf("invalid permission error = %v", err)
+	}
+	if _, err := manager.SetPermissions("missing", nil); !errors.Is(err, ErrUnknownClient) {
+		t.Fatalf("unknown client error = %v", err)
+	}
+}

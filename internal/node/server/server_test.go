@@ -310,6 +310,19 @@ func TestAdminClientListAndRevoke(t *testing.T) {
 		t.Fatalf("clients = %+v", list.Clients)
 	}
 
+	patchBody := strings.NewReader(`{"permissions":["session.read"]}`)
+	patchReq, _ := http.NewRequest(http.MethodPatch, ts.URL+"/api/v2/clients/"+paired.ClientID, patchBody)
+	patchReq.Header.Set("Authorization", "Bearer admin-token")
+	patchReq.Header.Set("Content-Type", "application/json")
+	patchResp, err := http.DefaultClient.Do(patchReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	patchResp.Body.Close()
+	if patchResp.StatusCode != http.StatusOK {
+		t.Fatalf("patch status = %d", patchResp.StatusCode)
+	}
+
 	delReq, _ := http.NewRequest(http.MethodDelete, ts.URL+"/api/v2/clients/"+paired.ClientID, nil)
 	delReq.Header.Set("Authorization", "Bearer admin-token")
 	delResp, err := http.DefaultClient.Do(delReq)

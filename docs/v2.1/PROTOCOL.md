@@ -76,6 +76,7 @@ Token 只保存哈希；设备端必须安全保存（Mobile 用 Keychain/Keysto
 `server.admin_token` 非空时启用：
 
 - `GET /api/v2/clients`：列出已配对客户端（不含 Token 哈希）
+- `PATCH /api/v2/clients/{client_id}`：更新该客户端的权限（如 `{"permissions":["session.read"]}`），并关闭其在线连接以便重连后生效
 - `DELETE /api/v2/clients/{client_id}`：撤销客户端并关闭其在线连接
 
 请求头：`Authorization: Bearer <admin_token>`。未配置 admin_token 时端点返回 401。
@@ -255,7 +256,7 @@ permission.requested / permission.resolved
 
 - `command_id` 幂等；重复提交返回同一结果
 - 同一 Session 的并发控制由 Node/Adapter 负责
-- 多客户端审批只有一个最终有效决策
+- 多客户端审批只有一个最终有效决策；Node 对同一 `permission_id` 的并发/重复决策直接拒绝
 - 命令超时默认 15 秒（由 Node 配置）
 
 ## 6. 心跳

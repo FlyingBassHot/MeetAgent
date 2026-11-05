@@ -362,21 +362,51 @@ func (s *Server) handleClientByID(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "admin token required", http.StatusUnauthorized)
 		return
 	}
-	if r.Method != http.MethodDelete {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
 	clientID := strings.TrimSpace(strings.TrimPrefix(r.URL.Path, "/api/v2/clients/"))
 	if clientID == "" {
 		http.Error(w, "client id is required", http.StatusBadRequest)
 		return
 	}
-	if !s.pairing.Revoke(clientID) {
-		http.Error(w, "unknown client", http.StatusNotFound)
-		return
+	switch r.Method {
+	case http.MethodDelete:
+		if !s.pairing.Revoke(clientID) {
+			http.Error(w, "unknown client", http.StatusNotFound)
+			return
+		}
+		s.disconnectClient(clientID)
+		writeJSON(w, http.StatusOK, map[string]any{"revoked": clientID})
+	case http.MethodPatch:
+		var body struct {
+			Permissions []string `json:"permissions"`
+		}
+		if err := decodeJSON(r, &body); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		client, err := s.pairing.SetPermissions(clientID, body.Permissions)
+		if err != nil {
+			status := http.StatusBadRequest
+			if errors.Is(err, pairing.ErrUnknownClient) {
+				status = http.StatusNotFound
+			}
+			http.Error(w, err.Error(), status)
+			return
+		}
+		s.disconnectClient(clientID)
+		writeJSON(w, http.StatusOK, clientproto.ClientInfo{
+			ClientID:     client.ClientID,
+			Name:         client.Name,
+			ClientType:   client.Type,
+			Version:      client.Version,
+			Capabilities: client.Capabilities,
+			Permissions:  client.Permissions,
+			CreatedAt:    client.CreatedAt,
+			LastSeen:     client.LastSeen,
+		})
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
-	s.disconnectClient(clientID)
-	writeJSON(w, http.StatusOK, map[string]any{"revoked": clientID})
+
 }
 
 func (s *Server) adminAuthorized(r *http.Request) bool {
