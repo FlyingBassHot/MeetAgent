@@ -6,8 +6,8 @@
 |---|---|---|---|---|
 | Core / Node | 主会话 | M0 + M1 | 可运行 | M3 真实双端集成 |
 | Protocol v2 | 主会话 | M0 | 完成 | 随实现补兼容测试 |
-| Mobile | omp | M2 | 完成（Mock；真实 Node 握手已验证） | M3 真实 Prompt/审批 |
-| Terminal / ESPUI | pi | E0–E2 | 完成（host tests 620/620，31 files syntax） | 安装 ESP-IDF 后板级编译 |
+| Mobile | omp | M3 | 完成（真实 Node Prompt / Interrupt / 审批 / 重连） | M4 多客户端 |
+| Terminal / ESPUI | pi | E0–E2 + E3a | 暂停（host tests 805/805，33 files syntax） | 等 ESP32 真机 + ESP-IDF |
 | Cloud relay | 主会话 | 可选 | 保留 V1 实现 | M6 再验证混合模式 |
 
 ## 已完成
@@ -32,8 +32,9 @@
 - Admin：`GET /api/v2/clients` 正确列出模拟器；撤销后 Token 失效（集成测试）
 - mDNS：`avahi-browse -rt _meetagent._tcp` 能看到 node-001:8787
 
-## 阻塞
+## 阻塞 / 暂停
 
-- pi：本机没有 ESP-IDF，无法真实编译；只能先完成代码/架构/host tests
-- Mobile：V1 dev server 占用 5173，Mobile 使用 5174
+- **ESP32 模块暂停**：硬件未到、ESP-IDF 未安装；Terminal 停在 E3a，不继续写 ESP 代码
+- Mobile：使用 5174，避免与 V1 的 5173 冲突
 - 语音/STT：按用户要求暂缓
+- 多客户端/同 Token 多标签页：M4 处理
