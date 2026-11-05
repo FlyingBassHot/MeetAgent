@@ -6,7 +6,7 @@
 |---|---|---|---|---|
 | Core / Node | 主会话 | M0 + M1 + M4 Core | 完成 | M5 远程/Cloud 增强 |
 | Protocol v2 | 主会话 | M0 | 完成 | 随实现补兼容测试 |
-| Mobile | omp | M4 | 完成（单标签页守卫、多客户端、Node 重启恢复） | M5 Tailscale/Capacitor |
+| Mobile | omp | M4 + M5a | 完成（网络切换、WSS/TLS、诊断、远程文档） | Tailscale 实网 / Capacitor |
 | Terminal / ESPUI | pi | E0–E2 + E3a | 暂停（host tests 805/805，33 files syntax） | 等 ESP32 真机 + ESP-IDF |
 | Cloud relay | 主会话 | 可选 | 保留 V1 实现 | M6 再验证混合模式 |
 
@@ -33,6 +33,8 @@
 - mDNS：`avahi-browse -rt _meetagent._tcp` 能看到 node-001:8787
 - Cloud 可选：node-002 同时跑本地服务 + Cloud relay；Cloud Device 成功下发 `send_prompt` 并收到完整 message.* 事件
 - WSS/TLS：自签证书 + `wss://127.0.0.1:8789/ws` + simulator，prompt/event 闭环通过（仅本地自签验证，生产证书仍需配置）
+- M5a Mobile：浏览器 online/offline 暂停重试与立即恢复；TLS 自签配对/Snapshot/Prompt；诊断面板；`mobile/docs/REMOTE.md`
+- `make dev-tls`：本地自签证书生成脚本（data/ 已忽略）
 - M4 Core：双客户端同时收到同一 Prompt 事件；同一 permission 只允许一个最终决策；按 last_sequence 补发事件；PATCH 可独立配置客户端权限（集成测试）
 - M4 Mobile：单标签页 Web Locks 守卫 + 接管；两个独立 client 跨端事件/Interrupt/审批一致；Node 受控重启后 Snapshot 恢复、序号重置不报缺口
 

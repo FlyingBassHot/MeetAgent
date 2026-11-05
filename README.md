@@ -200,9 +200,9 @@ make run-cloud        # 旧 V1 Cloud（可选）
 | M2 | Mobile M2 + Terminal E0–E2 | 完成（Mock / host tests） |
 | M3 | 真实 OpenCode 集成 | Mobile 完成；Terminal 待真机 |
 | M4 | 双端一致性与稳定性 | Core + Mobile 完成；Terminal 暂停 |
-| M5 | Mobile 远程（Tailscale/Capacitor） | 下一步 |
+| M5 | Mobile 远程（Tailscale/Capacitor） | M5a 完成（网络/WSS/TLS/诊断）；原生与 Tailscale 实网待环境 |
 | M4 | 双端一致性与稳定性 | 待开始 |
 | M5 | Mobile 远程（Tailscale/Capacitor） | 待开始 |
 | M6 | 语音/STT、Cloud Relay、第二 Adapter、OTA | 暂缓 |
 
-> 语音/STT 按当前要求暂缓。ESP32 硬件未到、ESP-IDF 未安装，Terminal 暂停在 E3a；当前继续推进 Node 与 Mobile。
+> 语音/STT 按当前要求暂缓。ESP32 硬件未到、ESP-IDF 未安装，Terminal 暂停在 E3a；Node 与 Mobile 继续推进，Mobile 已完成 M4 与 M5a（网络切换、WSS/TLS、诊断、远程部署文档）。
