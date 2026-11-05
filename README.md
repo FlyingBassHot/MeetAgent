@@ -35,8 +35,8 @@ Mobile (Vue + Capacitor)        ESP32 Terminal (ESP-IDF + LVGL)
 ```
 
 - **Node** 是核心：Agent 接入、Session、事件、命令、权限、配对、客户端注册
-- **Mobile** 是完整远程入口：LAN 直连，后续 Tailscale/Capacitor
-- **Terminal** 是局域网常驻终端：状态感知、物理交互、快捷控制，不承担完整聊天
+- **Mobile** 是完整远程入口：LAN 直连，M4 已通过多客户端/重启恢复验证，下一步 Tailscale/Capacitor
+- **Terminal** 是局域网常驻终端：E0–E3a 已完成，硬件/ESP-IDF 到位前暂停
 - **Cloud** 不再是必需项；旧 Cloud 代码保留为可选 relay
 - **Adapter** 通过统一 Manifest/Capability 接入，OpenCode 只是第一个 Adapter
 
@@ -177,7 +177,8 @@ make run-cloud        # 旧 V1 Cloud（可选）
 | M1 | Node Standalone、配对、Client Registry、Snapshot/Event/Command | 完成 |
 | M2 | Mobile M2 + Terminal E0–E2 | 完成（Mock / host tests） |
 | M3 | 真实 OpenCode 集成 | Mobile 完成；Terminal 待真机 |
-| M4 | 双端一致性与稳定性 | 下一步（Node/Mobile） |
+| M4 | 双端一致性与稳定性 | Core + Mobile 完成；Terminal 暂停 |
+| M5 | Mobile 远程（Tailscale/Capacitor） | 下一步 |
 | M4 | 双端一致性与稳定性 | 待开始 |
 | M5 | Mobile 远程（Tailscale/Capacitor） | 待开始 |
 | M6 | 语音/STT、Cloud Relay、第二 Adapter、OTA | 暂缓 |

@@ -4,9 +4,9 @@
 
 | 模块 | 负责人 | 当前阶段 | 状态 | 下一步 |
 |---|---|---|---|---|
-| Core / Node | 主会话 | M0 + M1 | 可运行 | M3 真实双端集成 |
+| Core / Node | 主会话 | M0 + M1 + M4 Core | 完成 | M5 远程/Cloud 增强 |
 | Protocol v2 | 主会话 | M0 | 完成 | 随实现补兼容测试 |
-| Mobile | omp | M3 | 完成（真实 Node Prompt / Interrupt / 审批 / 重连） | M4 多客户端 |
+| Mobile | omp | M4 | 完成（单标签页守卫、多客户端、Node 重启恢复） | M5 Tailscale/Capacitor |
 | Terminal / ESPUI | pi | E0–E2 + E3a | 暂停（host tests 805/805，33 files syntax） | 等 ESP32 真机 + ESP-IDF |
 | Cloud relay | 主会话 | 可选 | 保留 V1 实现 | M6 再验证混合模式 |
 
@@ -31,6 +31,9 @@
 - OpenCode Node：`configs/node.yaml` + simulator：36 个真实 Session，prompt `V21-SIM` 返回成功
 - Admin：`GET /api/v2/clients` 正确列出模拟器；撤销后 Token 失效（集成测试）
 - mDNS：`avahi-browse -rt _meetagent._tcp` 能看到 node-001:8787
+- Cloud 可选：node-002 同时跑本地服务 + Cloud relay；Cloud Device 成功下发 `send_prompt` 并收到完整 message.* 事件
+- M4 Core：双客户端同时收到同一 Prompt 事件；同一 permission 只允许一个最终决策；按 last_sequence 补发事件；PATCH 可独立配置客户端权限（集成测试）
+- M4 Mobile：单标签页 Web Locks 守卫 + 接管；两个独立 client 跨端事件/Interrupt/审批一致；Node 受控重启后 Snapshot 恢复、序号重置不报缺口
 
 ## 阻塞 / 暂停
 
