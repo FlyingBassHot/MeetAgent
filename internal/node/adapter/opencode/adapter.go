@@ -51,6 +51,26 @@ func (a *Adapter) Type() string { return "opencode" }
 // Capabilities reports the supported normalized operations.
 func (a *Adapter) Capabilities() adapter.Capabilities { return a.caps.Clone() }
 
+// Manifest describes this adapter for discovery and capability negotiation.
+func (a *Adapter) Manifest() adapter.Manifest {
+	return adapter.Manifest{
+		ID:         "opencode",
+		Name:       "OpenCode Adapter",
+		Version:    "2.1.0",
+		APIVersion: 1,
+		Runtime:    "local",
+		Transport:  []string{"http", "sse"},
+		Capabilities: []string{
+			adapter.CapabilityListSessions,
+			adapter.CapabilitySendPrompt,
+			adapter.CapabilityInterrupt,
+			adapter.CapabilitySubscribeEvents,
+			adapter.CapabilityPermissionResponse,
+		},
+		Permissions: []string{"session.read", "session.control", "permission.respond"},
+	}
+}
+
 // Connect verifies the OpenCode server and records the connection.
 func (a *Adapter) Connect(ctx context.Context) error {
 	var info struct {

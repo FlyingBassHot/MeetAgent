@@ -34,9 +34,10 @@ func (d Duration) Std() time.Duration { return time.Duration(d) }
 
 // Config is the root Node configuration.
 type Config struct {
-	Node  NodeConfig  `yaml:"node"`
-	Cloud CloudConfig `yaml:"cloud"`
-	Log   LogConfig   `yaml:"log"`
+	Node   NodeConfig   `yaml:"node"`
+	Server ServerConfig `yaml:"server"`
+	Cloud  CloudConfig  `yaml:"cloud"`
+	Log    LogConfig    `yaml:"log"`
 }
 
 // NodeConfig describes this Node and its Cloud credential.
@@ -106,8 +107,35 @@ type SessionConfig struct {
 	Status           string `yaml:"status"`
 }
 
-// CloudConfig controls the outbound Cloud connection.
+// ServerConfig controls the Node-local HTTP/WS service used by Mobile and
+// Terminal clients. Cloud no longer needs to be running for this service.
+type ServerConfig struct {
+	Enabled            *bool    `yaml:"enabled"`
+	Addr               string   `yaml:"addr"`
+	TLSCert            string   `yaml:"tls_cert"`
+	TLSKey             string   `yaml:"tls_key"`
+	AllowedOrigins     []string `yaml:"allowed_origins"`
+	EventBuffer        int      `yaml:"event_buffer"`
+	EventTTL           Duration `yaml:"event_ttl"`
+	SnapshotEvents     int      `yaml:"snapshot_events"`
+	PairingTTL         Duration `yaml:"pairing_ttl"`
+	PairingStore       string   `yaml:"pairing_store"`
+	AdminToken         string   `yaml:"admin_token"`
+	DefaultPermissions []string `yaml:"default_permissions"`
+	MDNS               *bool    `yaml:"mdns"`
+	CommandTimeout     Duration `yaml:"command_timeout"`
+	ReadTimeout        Duration `yaml:"read_timeout"`
+}
+
+// IsEnabled reports whether the local server should start (default true).
+func (s ServerConfig) IsEnabled() bool { return s.Enabled == nil || *s.Enabled }
+
+// MDNSEnabled reports whether mDNS advertisement should start (default true).
+func (s ServerConfig) MDNSEnabled() bool { return s.MDNS == nil || *s.MDNS }
+
+// CloudConfig controls the optional outbound Cloud relay.
 type CloudConfig struct {
+	Enabled           *bool           `yaml:"enabled"`
 	URL               string          `yaml:"url"`
 	RegisterTimeout   Duration        `yaml:"register_timeout"`
 	HeartbeatInterval Duration        `yaml:"heartbeat_interval"`
@@ -115,6 +143,10 @@ type CloudConfig struct {
 	RequestTimeout    Duration        `yaml:"request_timeout"`
 	Reconnect         ReconnectConfig `yaml:"reconnect"`
 }
+
+// IsEnabled reports whether the Cloud relay is enabled. V2.1 is LAN-first, so
+// the default is false.
+func (c CloudConfig) IsEnabled() bool { return c.Enabled != nil && *c.Enabled }
 
 // ReconnectConfig controls exponential backoff.
 type ReconnectConfig struct {
@@ -141,7 +173,26 @@ func Default() Config {
 				MaxPromptBytes: defaultMaxPromptBytes,
 			},
 		},
+		Server: ServerConfig{
+			Addr: "0.0.0.0:8787",
+			AllowedOrigins: []string{
+				"http://localhost:5173", "http://127.0.0.1:5173",
+				"http://localhost:5174", "http://127.0.0.1:5174",
+				"http://localhost:4173", "http://127.0.0.1:4173",
+			},
+			EventBuffer:        1000,
+			EventTTL:           Duration(time.Hour),
+			SnapshotEvents:     100,
+			PairingTTL:         Duration(10 * time.Minute),
+			PairingStore:       "./data/paired-clients.json",
+			AdminToken:         "",
+			DefaultPermissions: []string{"session.read", "session.control", "permission.respond"},
+			MDNS:               boolPtr(true),
+			CommandTimeout:     Duration(15 * time.Second),
+			ReadTimeout:        Duration(90 * time.Second),
+		},
 		Cloud: CloudConfig{
+			Enabled:           boolPtr(false),
 			URL:               "ws://127.0.0.1:8080/ws",
 			RegisterTimeout:   Duration(10 * time.Second),
 			HeartbeatInterval: Duration(20 * time.Second),
@@ -181,14 +232,20 @@ func (c *Config) Validate() error {
 	if c.Node.ID == "" {
 		return fmt.Errorf("node.id is required")
 	}
-	if c.Node.Token == "" {
-		return fmt.Errorf("node.token is required")
+	if c.Cloud.IsEnabled() && c.Node.Token == "" {
+		return fmt.Errorf("node.token is required when cloud.enabled is true")
 	}
 	if c.Node.Name == "" {
 		c.Node.Name = c.Node.ID
 	}
 	if err := c.validateAgents(); err != nil {
 		return err
+	}
+	if err := c.validateServer(); err != nil {
+		return err
+	}
+	if !c.Cloud.IsEnabled() {
+		return nil
 	}
 
 	parsed, err := url.Parse(c.Cloud.URL)
@@ -227,6 +284,40 @@ func (c *Config) Validate() error {
 	}
 	return nil
 }
+
+func (c *Config) validateServer() error {
+	if !c.Server.IsEnabled() {
+		return nil
+	}
+	c.Server.Addr = strings.TrimSpace(c.Server.Addr)
+	if c.Server.Addr == "" {
+		return fmt.Errorf("server.addr is required when server.enabled is true")
+	}
+	if c.Server.EventBuffer <= 0 {
+		return fmt.Errorf("server.event_buffer must be positive")
+	}
+	if c.Server.SnapshotEvents <= 0 {
+		return fmt.Errorf("server.snapshot_events must be positive")
+	}
+	if c.Server.PairingTTL.Std() <= 0 {
+		return fmt.Errorf("server.pairing_ttl must be positive")
+	}
+	if c.Server.CommandTimeout.Std() <= 0 {
+		return fmt.Errorf("server.command_timeout must be positive")
+	}
+	if c.Server.ReadTimeout.Std() <= 0 {
+		return fmt.Errorf("server.read_timeout must be positive")
+	}
+	if (c.Server.TLSCert == "") != (c.Server.TLSKey == "") {
+		return fmt.Errorf("server.tls_cert and server.tls_key must be set together")
+	}
+	if len(c.Server.DefaultPermissions) == 0 {
+		c.Server.DefaultPermissions = []string{"session.read", "session.control", "permission.respond"}
+	}
+	return nil
+}
+
+func boolPtr(value bool) *bool { return &value }
 
 func (c *Config) validateAgents() error {
 	if err := validatePolicy("node.policy", &c.Node.Policy); err != nil {

@@ -1,3 +1,5 @@
+> **V1 legacy**：这些脚本针对 Cloud 为中心的 V1 Web 控制台，V2.1 使用 Node 直连协议（`docs/v2.1/PROTOCOL.md`、`cmd/simulator`）。保留用于 V1 回归，不再是 V2.1 的主验收路径。
+
 # Phase 3 真机 E2E
 
 用无头 Chromium 通过 Chrome DevTools Protocol 驱动 `web/test-client`，验证真实 OpenCode 链路的四条主路径：

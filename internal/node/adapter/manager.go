@@ -171,6 +171,18 @@ func (m *Manager) Agents() []protocol.AgentView {
 	return views
 }
 
+// Manifests returns the manifests of all configured adapters keyed by agent ID.
+func (m *Manager) Manifests() map[string]Manifest {
+	m.mu.RLock()
+	instances := append([]*instance(nil), m.instances...)
+	m.mu.RUnlock()
+	out := make(map[string]Manifest, len(instances))
+	for _, inst := range instances {
+		out[inst.id] = ManifestFor(inst.adapter)
+	}
+	return out
+}
+
 // Capabilities returns a copy of one Agent's effective capabilities.
 func (m *Manager) Capabilities(agentID string) (Capabilities, bool) {
 	inst, ok := m.instance(agentID)
@@ -607,12 +619,13 @@ func (m *Manager) publish(inst *instance, event Event) {
 		return
 	}
 	wire := protocol.AgentEvent{
-		EventID:   protocol.NewID("evt"),
-		NodeID:    m.nodeID,
-		AgentID:   inst.id,
-		SessionID: event.SessionID,
-		EventType: event.Type,
-		Timestamp: nonzeroTime(event.Timestamp, time.Now().UTC()),
+		EventID:     protocol.NewID("evt"),
+		NodeID:      m.nodeID,
+		AgentID:     inst.id,
+		AdapterType: inst.adapter.Type(),
+		SessionID:   event.SessionID,
+		EventType:   event.Type,
+		Timestamp:   nonzeroTime(event.Timestamp, time.Now().UTC()),
 	}
 	if event.Payload != nil {
 		raw, err := json.Marshal(event.Payload)

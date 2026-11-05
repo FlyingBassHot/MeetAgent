@@ -201,14 +201,15 @@ type PermissionView struct {
 // AgentEvent is the normalized event format shared by Node, Cloud and Device.
 // Cloud assigns the authoritative Sequence per Node before caching and fanout.
 type AgentEvent struct {
-	EventID   string          `json:"event_id"`
-	Sequence  uint64          `json:"sequence"`
-	NodeID    string          `json:"node_id"`
-	AgentID   string          `json:"agent_id,omitempty"`
-	SessionID string          `json:"session_id,omitempty"`
-	EventType string          `json:"event_type"`
-	Timestamp time.Time       `json:"timestamp"`
-	Payload   json.RawMessage `json:"payload,omitempty"`
+	EventID     string          `json:"event_id"`
+	Sequence    uint64          `json:"sequence"`
+	NodeID      string          `json:"node_id"`
+	AgentID     string          `json:"agent_id,omitempty"`
+	AdapterType string          `json:"adapter_type,omitempty"`
+	SessionID   string          `json:"session_id,omitempty"`
+	EventType   string          `json:"event_type"`
+	Timestamp   time.Time       `json:"timestamp"`
+	Payload     json.RawMessage `json:"payload,omitempty"`
 }
 
 // PermissionEventPayload is the conventional payload of permission events.

@@ -1,4 +1,7 @@
 # MeetAgent
+
+> **Legacy V1 设计文档（归档参考）**：当前项目已转向 V2.1，见 `MeetAgentV2.1.md`、`TerminalUi.md` 与 `docs/v2.1/`。
+
 MVP 开发设计文档
 
 **项目名称：** MeetAgent  

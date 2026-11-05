@@ -1,0 +1,56 @@
+# MeetAgent Node — V2.1 mock 开发配置
+#
+# 不依赖 OpenCode/Cloud，用于 Mobile、Terminal 与协议联调。
+node:
+  id: "node-mock"
+  name: "mock-node"
+  policy:
+    allowed_actions:
+      - ping
+      - echo
+      - get_status
+      - send_prompt
+      - interrupt
+      - list_sessions
+      - permission_response
+    max_prompt_bytes: 32768
+
+  agents:
+    - id: "mock-1"
+      type: "mock"
+      name: "Mock Agent"
+      sessions:
+        - id: "session-1"
+          title: "Mock Session"
+          working_directory: "/tmp/meetagent"
+          status: "idle"
+
+server:
+  enabled: true
+  addr: "0.0.0.0:8787"
+  allowed_origins:
+    - "http://localhost:5173"
+    - "http://127.0.0.1:5173"
+    - "http://localhost:5174"
+    - "http://127.0.0.1:5174"
+    - "http://localhost:4173"
+    - "http://127.0.0.1:4173"
+  event_buffer: 500
+  event_ttl: 1h
+  snapshot_events: 50
+  pairing_ttl: 30m
+  admin_token: "dev-admin-token"
+  pairing_store: "./data/mock-clients.json"
+  default_permissions:
+    - "session.read"
+    - "session.control"
+    - "permission.respond"
+  mdns: false
+  command_timeout: 10s
+  read_timeout: 90s
+
+cloud:
+  enabled: false
+
+log:
+  level: "debug"

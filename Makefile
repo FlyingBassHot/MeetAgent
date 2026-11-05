@@ -3,12 +3,13 @@ SHELL := /bin/bash
 BIN_DIR := bin
 CLOUD_BIN := $(BIN_DIR)/meetagent-cloud
 NODE_BIN := $(BIN_DIR)/meetagent-node
+SIM_BIN := $(BIN_DIR)/meetagent-simulator
 WEB_DIR := web/test-client
 
 CLOUD_CONFIG ?= configs/cloud.yaml
 NODE_CONFIG ?= configs/node.yaml
 
-.PHONY: all build cloud node test fmt vet clean run-cloud run-node web-install web-dev web-build
+.PHONY: all build cloud node simulator test fmt vet clean run-cloud run-node run-node-mock simulator-run web-install web-dev web-build
 
 all: build
 
@@ -25,6 +26,11 @@ $(NODE_BIN): $(shell find cmd internal pkg -name '*.go') go.mod go.sum
 
 cloud: $(CLOUD_BIN)
 node: $(NODE_BIN)
+simulator: $(SIM_BIN)
+
+$(SIM_BIN): $(shell find cmd internal pkg -name '*.go') go.mod go.sum
+	@mkdir -p $(BIN_DIR)
+	go build -o $(SIM_BIN) ./cmd/simulator
 
 ## test: run the full Go test suite with the race detector
 test:
@@ -47,6 +53,14 @@ run-cloud:
 ## run-node: start the Node with the development configuration
 run-node:
 	go run ./cmd/node -config $(NODE_CONFIG)
+
+## run-node-mock: start the Node with the mock Agent configuration
+run-node-mock:
+	go run ./cmd/node -config configs/node-mock.yaml
+
+## simulator-run: connect the simulator to a local Node
+simulator-run:
+	go run ./cmd/simulator -url ws://127.0.0.1:8787/ws
 
 web-install:
 	cd $(WEB_DIR) && npm install

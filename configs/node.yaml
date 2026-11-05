@@ -1,7 +1,7 @@
-# MeetAgent Node — Phase 2 本地开发配置
+# MeetAgent Node — V2.1 本地开发配置
 #
-# Node 主动向 Cloud 建立出站 WSS 连接，因此不需要公网 IP 或端口映射。
-# 生产环境请把 cloud.url 改为 wss://，并替换 node.token。
+# V2.1 以 Node 为中心：默认启动本地 HTTP/WSS 服务，Mobile/Terminal 直接
+# 连接 Node；Cloud 仅作为可选 relay（默认关闭）。
 node:
   id: "node-001"
   name: "developer-machine"
@@ -40,7 +40,32 @@ node:
         interrupt: true
         list_sessions: true
 
+server:
+  enabled: true
+  addr: "0.0.0.0:8787"
+  allowed_origins:
+    - "http://localhost:5173"
+    - "http://127.0.0.1:5173"
+    - "http://localhost:5174"
+    - "http://127.0.0.1:5174"
+    - "http://localhost:4173"
+    - "http://127.0.0.1:4173"
+  event_buffer: 1000
+  event_ttl: 1h
+  snapshot_events: 100
+  pairing_ttl: 10m
+  admin_token: "dev-admin-token-change-me"
+  pairing_store: "./data/paired-clients.json"
+  default_permissions:
+    - "session.read"
+    - "session.control"
+    - "permission.respond"
+  mdns: true
+  command_timeout: 15s
+  read_timeout: 90s
+
 cloud:
+  enabled: false
   url: "ws://127.0.0.1:8080/ws"
   register_timeout: 10s
   heartbeat_interval: 20s

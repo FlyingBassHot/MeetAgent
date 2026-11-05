@@ -234,6 +234,7 @@ func TestValidateTrimsAndDeduplicatesActions(t *testing.T) {
 func TestValidateRequiresPositiveHeartbeat(t *testing.T) {
 	cfg := Default()
 	cfg.Node.Token = "token"
+	cfg.Cloud.Enabled = boolPtr(true)
 	cfg.Cloud.HeartbeatInterval = 0
 
 	if err := cfg.Validate(); err == nil {

@@ -15,11 +15,12 @@ import (
 
 	"github.com/FlyingBassHot/meetagent/internal/node/adapter"
 	"github.com/FlyingBassHot/meetagent/internal/node/config"
+	"github.com/FlyingBassHot/meetagent/internal/version"
 	"github.com/FlyingBassHot/meetagent/pkg/protocol"
 )
 
 // Version is this Node build's protocol-compatible version.
-const Version = "0.4.0-phase3"
+const Version = version.Version
 
 // Executor runs remote actions against local Node state and Agent adapters.
 type Executor struct {

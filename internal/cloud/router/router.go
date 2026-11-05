@@ -11,7 +11,7 @@ import (
 
 	"github.com/FlyingBassHot/meetagent/internal/cloud/auth"
 	"github.com/FlyingBassHot/meetagent/internal/cloud/connection"
-	"github.com/FlyingBassHot/meetagent/internal/cloud/eventcache"
+	"github.com/FlyingBassHot/meetagent/internal/eventcache"
 	"github.com/FlyingBassHot/meetagent/pkg/protocol"
 )
 

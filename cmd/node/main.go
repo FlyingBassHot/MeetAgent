@@ -13,9 +13,13 @@ import (
 	"time"
 
 	"github.com/FlyingBassHot/meetagent/internal/node/adapter"
+	"github.com/FlyingBassHot/meetagent/internal/node/adapter/mock"
 	"github.com/FlyingBassHot/meetagent/internal/node/adapter/opencode"
 	"github.com/FlyingBassHot/meetagent/internal/node/config"
 	"github.com/FlyingBassHot/meetagent/internal/node/connection"
+	"github.com/FlyingBassHot/meetagent/internal/node/eventhub"
+	"github.com/FlyingBassHot/meetagent/internal/node/pairing"
+	"github.com/FlyingBassHot/meetagent/internal/node/server"
 )
 
 func main() {
@@ -44,15 +48,68 @@ func run() error {
 	if err != nil {
 		return err
 	}
+
+	nodeInfo := server.NodeInfo(cfg.Node.ID, cfg.Node.Name)
+	hub := eventhub.New(nodeInfo, manager, cfg.Server.EventBuffer, cfg.Server.EventTTL.Std(), logger)
 	manager.Start(ctx)
 	defer func() {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		manager.Stop(shutdownCtx)
 	}()
+	go hub.Run(ctx)
 
-	client := connection.New(cfg, manager, logger)
-	return client.Run(ctx)
+	if !cfg.Server.IsEnabled() && !cfg.Cloud.IsEnabled() {
+		return fmt.Errorf("both server.enabled and cloud.enabled are false; nothing to run")
+	}
+
+	runCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	errCh := make(chan error, 2)
+
+	if cfg.Server.IsEnabled() {
+		pairingManager, err := pairing.New(cfg.Server.PairingStore, cfg.Server.PairingTTL.Std(), cfg.Server.DefaultPermissions)
+		if err != nil {
+			return err
+		}
+		nodeServer := server.New(server.Options{
+			Addr:           cfg.Server.Addr,
+			TLSCert:        cfg.Server.TLSCert,
+			TLSKey:         cfg.Server.TLSKey,
+			AllowedOrigins: cfg.Server.AllowedOrigins,
+			SnapshotEvents: cfg.Server.SnapshotEvents,
+			PairingTTL:     cfg.Server.PairingTTL.Std(),
+			AdminToken:     cfg.Server.AdminToken,
+			MDNS:           cfg.Server.MDNSEnabled(),
+			CommandTimeout: cfg.Server.CommandTimeout.Std(),
+			ReadTimeout:    cfg.Server.ReadTimeout.Std(),
+		}, cfg.Node.ID, cfg.Node.Name, manager, hub, pairingManager, logger)
+		go func() {
+			errCh <- nodeServer.Run(runCtx)
+		}()
+	}
+
+	if cfg.Cloud.IsEnabled() {
+		events, unsubscribe := hub.SubscribeRaw(1024)
+		defer unsubscribe()
+		client := connection.New(cfg, manager, logger)
+		client.SetEventSource(events)
+		go func() {
+			errCh <- client.Run(runCtx)
+		}()
+	}
+
+	select {
+	case <-ctx.Done():
+		cancel()
+		return nil
+	case err := <-errCh:
+		cancel()
+		if err != nil {
+			return err
+		}
+		return nil
+	}
 }
 
 // buildManager instantiates one Adapter per enabled Agent declaration.
@@ -73,6 +130,11 @@ func buildManager(cfg config.Config, logger *slog.Logger) (*adapter.Manager, err
 				Password:  agent.Connection.Password,
 				Directory: agent.Connection.Directory,
 				Timeout:   agent.Connection.Timeout.Std(),
+			})
+		case "mock":
+			impl = mock.New(mock.Options{
+				Sessions:    staticSessions(agent.Sessions),
+				Permissions: true,
 			})
 		default:
 			logger.Warn("unsupported agent type, skipping", "agent_id", agent.ID, "type", agent.Type)

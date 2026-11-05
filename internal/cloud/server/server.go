@@ -16,8 +16,9 @@ import (
 	"github.com/FlyingBassHot/meetagent/internal/cloud/auth"
 	"github.com/FlyingBassHot/meetagent/internal/cloud/config"
 	"github.com/FlyingBassHot/meetagent/internal/cloud/connection"
-	"github.com/FlyingBassHot/meetagent/internal/cloud/eventcache"
 	"github.com/FlyingBassHot/meetagent/internal/cloud/router"
+	"github.com/FlyingBassHot/meetagent/internal/eventcache"
+	"github.com/FlyingBassHot/meetagent/internal/version"
 	"github.com/FlyingBassHot/meetagent/pkg/protocol"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -25,7 +26,7 @@ import (
 )
 
 // Version is the Cloud build version shown by the status endpoint.
-const Version = "0.4.0-phase3"
+const Version = version.Version
 
 // Server is the MeetAgent Cloud process.
 type Server struct {

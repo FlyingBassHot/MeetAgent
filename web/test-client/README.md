@@ -1,3 +1,5 @@
+> **V1 legacy**：这是 Cloud 为中心的 V1 浏览器调试控制台。V2.1 的正式移动端在 `mobile/`，Node 直连协议见 `docs/v2.1/PROTOCOL.md`。本目录保留作 V1 参考。
+
 # MeetAgent Debug Console（Web）
 
 Phase 3 的浏览器调试控制台：通过 MeetAgent Cloud 连接远程机器上的 `meetagent-node`（OpenCode Adapter），

@@ -33,6 +33,7 @@ type Client struct {
 	platform string
 
 	writeMu sync.Mutex
+	events  <-chan protocol.AgentEvent
 }
 
 // New creates a Node Cloud client backed by the local Adapter Manager.
@@ -46,6 +47,12 @@ func New(cfg config.Config, manager *adapter.Manager, logger *slog.Logger) *Clie
 		hostname: hostname,
 		platform: runtime.GOOS + "/" + runtime.GOARCH,
 	}
+}
+
+// SetEventSource overrides the Manager event channel with a fan-out source
+// (for example the Node event hub). It must be called before Run.
+func (c *Client) SetEventSource(events <-chan protocol.AgentEvent) {
+	c.events = events
 }
 
 // Run connects and reconnects until ctx is canceled.
@@ -231,14 +238,18 @@ func (c *Client) announceState(conn *websocket.Conn) error {
 
 // eventLoop forwards normalized Adapter events to Cloud until the session ends.
 func (c *Client) eventLoop(ctx context.Context, conn *websocket.Conn) {
-	if c.manager == nil {
+	if c.manager == nil && c.events == nil {
 		return
+	}
+	source := c.events
+	if source == nil {
+		source = c.manager.Events()
 	}
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case event, ok := <-c.manager.Events():
+		case event, ok := <-source:
 			if !ok {
 				return
 			}
