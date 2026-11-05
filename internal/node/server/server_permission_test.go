@@ -163,6 +163,41 @@ func TestServerPermissionFlow(t *testing.T) {
 	if !resultOK || !completed {
 		t.Fatalf("resultOK=%v completed=%v", resultOK, completed)
 	}
+
+	duplicate := clientproto.Command{
+		SchemaVersion: clientproto.Version,
+		CommandID:     "cmd-respond-duplicate",
+		AgentID:       "mock-1",
+		SessionID:     "session-1",
+		Type:          clientproto.CommandPermissionRespond,
+		Payload:       mustJSON(clientproto.PermissionResponsePayload{PermissionID: permissionID, Decision: "reject"}),
+		CreatedAt:     time.Now().UTC(),
+	}
+	duplicateEnv, _ := clientproto.NewEnvelope(clientproto.TypeCommand, duplicate)
+	if err := conn.WriteJSON(duplicateEnv); err != nil {
+		t.Fatal(err)
+	}
+	_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	for {
+		var env clientproto.Envelope
+		if err := conn.ReadJSON(&env); err != nil {
+			t.Fatal(err)
+		}
+		if env.Type != clientproto.TypeCommandResult {
+			continue
+		}
+		var result clientproto.CommandResult
+		if err := env.DecodePayload(&result); err != nil {
+			t.Fatal(err)
+		}
+		if result.CommandID != "cmd-respond-duplicate" {
+			continue
+		}
+		if result.Status != protocol.StatusRejected || !strings.Contains(result.Error, "already been handled") {
+			t.Fatalf("duplicate result = %+v", result)
+		}
+		break
+	}
 }
 
 func mustJSON(value any) json.RawMessage {
