@@ -75,6 +75,7 @@ mobile/
     ├── services/
     │   ├── api/http.ts         # GET /api/v2/info、POST /api/v2/pair
     │   ├── client/             # ClientTransport / WsClient / MockClient
+    │   ├── connectivity/       # Web Locks 单连接守卫 + BroadcastChannel 接管
     │   ├── mock/scenario.ts    # 可复现的 Mock Node 数据
     │   ├── platform/           # browser / capacitor 平台抽象
     │   └── storage/            # 偏好与 Token（localStorage）
@@ -142,13 +143,26 @@ ClientTransport
 - 断线/重连：通过 DevTools 网络离线模拟断开，UI 显示「重连中」并退避重试；恢复网络后自动重连，重新收到 Snapshot（41 个 Session），无序号缺口提示
 - 真机联调修复：Session 级命令现在同时携带 `agent_id` 与 `session_id`（Node 对缺失字段返回 `rejected`）
 
+## M4 单连接守卫与多客户端
+
+已验证：
+
+- 单标签页保护：同 Origin 第二个标签页使用 Web Locks 获锁失败，显示「已在另一个标签页连接」，不建立 Node WebSocket；Node 日志无替换连接
+- 接管：点击「在此标签页接管」通过 BroadcastChannel 通知旧标签页；旧标签页主动断开并释放锁，新标签页获得锁后使用已保存 Token 重连；Node 侧仅发生一次 disconnect
+- 多客户端：使用独立 Chromium profile 分别配对，两个 client_id / Token 同时在线；A 发送 Prompt 后 B 实时收到相同 `message` / `tool` 事件（两端同一 `sequence`）
+- 跨客户端 Interrupt：A Interrupt 后，B 的 Session 状态同步回到 idle
+- 审批一致性：同一权限请求在 A、B 两端同时出现；A 批准后 B 的待审批卡片自动消失
+- 重复决策：独立探针客户端对已处理权限再次提交决策，Node 返回失败（`PermissionNotFoundError`），未产生第二次执行
+- Node 重启恢复：受控重启 Node 后，两端自动重连，Snapshot 恢复 41 个 Session；事件序号重置为 46，UI 未报告序号缺口；测试 Session 状态为 idle
+- 全程仅对测试 Session `ses_e5a1c7989ffefcU1XdrTiq6WXX` 发送 Prompt，未触碰主会话 `ses_e5e6e776fffeeeCdeah5WtPEhJ`
+
 ## 尚未实现（后续里程碑）
 
 - Capacitor Android / iOS 打包、Keychain / Keystore、APNs / FCM
 - mDNS 自动发现、Tailscale / VPN 状态展示
 - 语音 / STT
 - 通知的更细粒度策略（仅审批提醒基础已预留）
-- 多客户端场景（M4）：同 Token 多标签页/设备并发连接尚未做互斥或独立身份管理
+- 跨设备客户端身份与权限管理（当前每个设备/Profile 独立配对）
 
 ## 截图
 
@@ -189,10 +203,23 @@ M3 真实 Node 截图位于 `/tmp/opencode/meetagent-mobile-live/`：
 - `live-reconnecting-390.png`
 - `live-reconnected-390.png`
 
+M4 截图位于 `/tmp/opencode/meetagent-mobile-live/`：
+
+- `m4-tab-guard-390.png`（第二标签页被单连接守卫拦截）
+- `m4-tab-takeover-390.png`（旧标签页显示已被接管）
+- `m4-tab-takeover-active-390.png`（新标签页接管后在线）
+- `m4-client-a-prompt-390.png` / `m4-client-b-prompt-390.png`（跨客户端 Prompt 事件）
+- `m4-client-b-interrupt-390.png`（B 看到 Interrupt 后 idle）
+- `m4-permission-both-a-390.png` / `m4-permission-both-b-390.png`（两端待审批）
+- `m4-permission-cleared-b-390.png`（A 批准后 B pending 消失）
+- `m4-node-restart-c1.png` / `m4-node-restart-c2.png`（Node 重启后两端恢复）
+
 ## 已知限制
 
 - Web 原型的 Token 存在 `localStorage`，不等同于安全存储。
-- 同一 Token / client_id 同时打开多个标签页会互相替换 Node 连接并触发重连抖动；联调或使用时保持单标签页，M4 再实现多客户端身份与互斥。
+- 单连接守卫使用 Web Locks + BroadcastChannel，作用范围为同 Origin、同浏览器 Profile；不同 Profile / 不同设备使用独立 Token，可同时在线。
+- 接管依赖旧标签页响应 BroadcastChannel；旧标签页被浏览器冻结且不响应时，接管会在 6 秒后失败并提示，避免强制抢占造成双连接。
+- Web Locks 不可用的环境退化为允许连接；Capacitor 单 WebView 场景不受影响。
 - 真实 Node 需要允许 `http://localhost:5174` / `http://localhost:4173` 的 CORS 来源；WSS 证书需浏览器信任。
 - 浏览器通知依赖用户授权；部分移动浏览器要求 Service Worker 才能展示系统通知。
 - Mock 心跳、RTT 与回复均为本地模拟值，不能作为真实 Agent 性能依据。

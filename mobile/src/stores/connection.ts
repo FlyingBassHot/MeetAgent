@@ -13,6 +13,7 @@ import {
 import { createClient } from '@/services/client';
 import type { ClientTransport, CommandRequest, TransportEvent } from '@/services/client/types';
 import { ApiHttpError, pairClient } from '@/services/api/http';
+import { tabGuard } from '@/services/connectivity/tabGuard';
 import { platform } from '@/services/platform';
 import {
   normalizeBaseUrl,
@@ -43,11 +44,17 @@ export const useConnectionStore = defineStore('connection', () => {
   const clientId = ref<string | null>(null);
   const grantedPermissions = ref<string[]>([]);
   const lastConnectedAt = ref<string | null>(null);
+  const tabBlocked = ref(false);
+  const blockedReason = ref('');
+  const takeoverPending = ref(false);
 
   let transport: ClientTransport | null = null;
   let unsubscribe: (() => void) | null = null;
   let bootstrapped = false;
   const connectionToastIds = new Set<number>();
+
+  tabGuard.init();
+  tabGuard.onTakeover(handleTakeoverRequest);
 
   function clearConnectionErrors(): void {
     for (const id of connectionToastIds) ui.dismiss(id);
@@ -67,6 +74,33 @@ export const useConnectionStore = defineStore('connection', () => {
     if (transport) transport.disconnect();
     transport = next;
     unsubscribe = next.subscribe(handleTransportEvent);
+  }
+
+  function stopTransport(): void {
+    if (unsubscribe) {
+      unsubscribe();
+      unsubscribe = null;
+    }
+    if (transport) {
+      transport.disconnect();
+      transport = null;
+    }
+  }
+
+  function markTabBlocked(reason: string): void {
+    tabBlocked.value = true;
+    blockedReason.value = reason;
+    phase.value = 'offline';
+    detail.value = reason;
+    error.value = null;
+  }
+
+  function handleTakeoverRequest(): void {
+    if (!tabGuard.isHolding()) return;
+    stopTransport();
+    clearConnectionErrors();
+    tabGuard.release();
+    markTabBlocked('连接已由另一个标签页接管');
   }
 
   function handleTransportEvent(event: TransportEvent): void {
@@ -116,7 +150,10 @@ export const useConnectionStore = defineStore('connection', () => {
         break;
       case 'error':
         error.value = event.message;
-        if (event.fatal) phase.value = 'error';
+        if (event.fatal) {
+          phase.value = 'error';
+          tabGuard.release();
+        }
         clearConnectionErrors();
         connectionToastIds.add(ui.push(event.message, 'danger'));
         break;
@@ -125,7 +162,7 @@ export const useConnectionStore = defineStore('connection', () => {
     }
   }
 
-  async function connect(options: ConnectOptions = {}): Promise<void> {
+  async function connect(options: ConnectOptions = {}, guardHeld = false): Promise<void> {
     const targetMode = options.mode ?? preferences.settings.mode;
     const baseUrl = normalizeBaseUrl(options.baseUrl ?? preferences.settings.baseUrl);
     const pairingCode = (options.pairingCode ?? '').trim();
@@ -138,12 +175,23 @@ export const useConnectionStore = defineStore('connection', () => {
       return;
     }
 
-    if (unsubscribe) unsubscribe();
-    unsubscribe = null;
-    if (transport) {
-      transport.disconnect();
-      transport = null;
+    if (targetMode === 'live') {
+      if (!guardHeld) {
+        const acquired = await tabGuard.acquire();
+        if (!acquired) {
+          markTabBlocked('已在另一个标签页连接 Node');
+          return;
+        }
+      }
+      tabBlocked.value = false;
+      blockedReason.value = '';
+    } else {
+      tabGuard.release();
+      tabBlocked.value = false;
+      blockedReason.value = '';
     }
+
+    stopTransport();
 
     mode.value = targetMode;
     phase.value = 'connecting';
@@ -174,6 +222,8 @@ export const useConnectionStore = defineStore('connection', () => {
           ui.push('HTTP 配对不可用，改用 WebSocket 配对', 'warning');
         } else {
           const message = err instanceof Error ? err.message : '配对失败';
+          tabGuard.release();
+          tabBlocked.value = false;
           phase.value = 'error';
           error.value = message;
           ui.push(message, 'danger');
@@ -197,18 +247,40 @@ export const useConnectionStore = defineStore('connection', () => {
   }
 
   function disconnect(): void {
-    if (unsubscribe) {
-      unsubscribe();
-      unsubscribe = null;
-    }
-    if (transport) {
-      transport.disconnect();
-      transport = null;
-    }
+    stopTransport();
+    tabGuard.release();
+    tabBlocked.value = false;
+    blockedReason.value = '';
     clearConnectionErrors();
     phase.value = 'offline';
     detail.value = '已断开连接';
     preferences.patch({ autoConnect: false });
+  }
+
+  async function takeover(): Promise<void> {
+    if (takeoverPending.value) return;
+    takeoverPending.value = true;
+    try {
+      tabGuard.requestTakeover();
+      const acquired = await tabGuard.acquireWithRetry(6000);
+      if (!acquired) {
+        blockedReason.value = '接管失败：另一个标签页未释放连接';
+        ui.push(blockedReason.value, 'danger');
+        return;
+      }
+      tabBlocked.value = false;
+      blockedReason.value = '';
+      await connect(
+        {
+          mode: preferences.settings.mode,
+          baseUrl: preferences.settings.baseUrl,
+          token: preferences.settings.token,
+        },
+        true,
+      );
+    } finally {
+      takeoverPending.value = false;
+    }
   }
 
   function bootstrap(): void {
@@ -244,10 +316,14 @@ export const useConnectionStore = defineStore('connection', () => {
     clientId,
     grantedPermissions,
     lastConnectedAt,
+    tabBlocked,
+    blockedReason,
+    takeoverPending,
     isOnline,
     isBusy,
     connect,
     disconnect,
+    takeover,
     bootstrap,
     sendCommand,
     respondPermission,
