@@ -332,3 +332,12 @@ func TestAdminClientListAndRevoke(t *testing.T) {
 		t.Fatalf("revoked token snapshot status = %d, want 401", snapResp.StatusCode)
 	}
 }
+
+func TestPrivateOriginAllowed(t *testing.T) {
+	if !isPrivateHost("192.168.1.10") || !isPrivateHost("10.0.0.5") || !isPrivateHost("localhost") || !isPrivateHost("desk.local") {
+		t.Fatal("expected private hosts to be allowed")
+	}
+	if isPrivateHost("evil.example.com") || isPrivateHost("8.8.8.8") {
+		t.Fatal("public host must not be treated as private")
+	}
+}

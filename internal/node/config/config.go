@@ -115,6 +115,7 @@ type ServerConfig struct {
 	TLSCert            string   `yaml:"tls_cert"`
 	TLSKey             string   `yaml:"tls_key"`
 	AllowedOrigins     []string `yaml:"allowed_origins"`
+	AllowLANOrigins    *bool    `yaml:"allow_lan_origins"`
 	EventBuffer        int      `yaml:"event_buffer"`
 	EventTTL           Duration `yaml:"event_ttl"`
 	SnapshotEvents     int      `yaml:"snapshot_events"`
@@ -132,6 +133,12 @@ func (s ServerConfig) IsEnabled() bool { return s.Enabled == nil || *s.Enabled }
 
 // MDNSEnabled reports whether mDNS advertisement should start (default true).
 func (s ServerConfig) MDNSEnabled() bool { return s.MDNS == nil || *s.MDNS }
+
+// LANOriginAllowed reports whether private-LAN origins are accepted. This is
+// needed when Mobile is served from a phone on the same Wi-Fi.
+func (s ServerConfig) LANOriginAllowed() bool {
+	return s.AllowLANOrigins == nil || *s.AllowLANOrigins
+}
 
 // CloudConfig controls the optional outbound Cloud relay.
 type CloudConfig struct {
@@ -180,6 +187,7 @@ func Default() Config {
 				"http://localhost:5174", "http://127.0.0.1:5174",
 				"http://localhost:4173", "http://127.0.0.1:4173",
 			},
+			AllowLANOrigins:    boolPtr(true),
 			EventBuffer:        1000,
 			EventTTL:           Duration(time.Hour),
 			SnapshotEvents:     100,

@@ -73,16 +73,17 @@ func run() error {
 			return err
 		}
 		nodeServer := server.New(server.Options{
-			Addr:           cfg.Server.Addr,
-			TLSCert:        cfg.Server.TLSCert,
-			TLSKey:         cfg.Server.TLSKey,
-			AllowedOrigins: cfg.Server.AllowedOrigins,
-			SnapshotEvents: cfg.Server.SnapshotEvents,
-			PairingTTL:     cfg.Server.PairingTTL.Std(),
-			AdminToken:     cfg.Server.AdminToken,
-			MDNS:           cfg.Server.MDNSEnabled(),
-			CommandTimeout: cfg.Server.CommandTimeout.Std(),
-			ReadTimeout:    cfg.Server.ReadTimeout.Std(),
+			Addr:               cfg.Server.Addr,
+			TLSCert:            cfg.Server.TLSCert,
+			TLSKey:             cfg.Server.TLSKey,
+			AllowedOrigins:     cfg.Server.AllowedOrigins,
+			DisallowLANOrigins: !cfg.Server.LANOriginAllowed(),
+			SnapshotEvents:     cfg.Server.SnapshotEvents,
+			PairingTTL:         cfg.Server.PairingTTL.Std(),
+			AdminToken:         cfg.Server.AdminToken,
+			MDNS:               cfg.Server.MDNSEnabled(),
+			CommandTimeout:     cfg.Server.CommandTimeout.Std(),
+			ReadTimeout:        cfg.Server.ReadTimeout.Std(),
 		}, cfg.Node.ID, cfg.Node.Name, manager, hub, pairingManager, logger)
 		go func() {
 			errCh <- nodeServer.Run(runCtx)

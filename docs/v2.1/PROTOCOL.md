@@ -281,7 +281,13 @@ WebSocket 层也可使用 ping/pong；JSON 心跳用于 UI 显示 RTT。
 3. Node 补发 `sequence > last_sequence` 的事件；如果超出缓存范围，客户端以 Snapshot 为准
 4. 客户端清空本地旧状态，应用 Snapshot，再应用补发事件
 
-## 8. 安全
+## 8. 局域网访问
+
+- Node 默认监听 `0.0.0.0:8787`，同一 Wi-Fi 下的手机可访问
+- `server.allow_lan_origins: true`（默认）允许私有网段 / `.local` / localhost 的 CORS Origin
+- 公网部署请关闭该选项，并把具体域名加入 `server.allowed_origins`
+
+## 9. 安全
 
 - LAN 内也建议启用 WSS；至少公网必须 TLS
 - 配对码 TTL 10 分钟；Token 只返回一次

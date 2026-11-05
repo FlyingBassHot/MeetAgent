@@ -38,16 +38,17 @@ const (
 
 // Options configures the local Node server.
 type Options struct {
-	Addr           string
-	TLSCert        string
-	TLSKey         string
-	AllowedOrigins []string
-	SnapshotEvents int
-	PairingTTL     time.Duration
-	AdminToken     string
-	MDNS           bool
-	CommandTimeout time.Duration
-	ReadTimeout    time.Duration
+	Addr               string
+	TLSCert            string
+	TLSKey             string
+	AllowedOrigins     []string
+	DisallowLANOrigins bool
+	SnapshotEvents     int
+	PairingTTL         time.Duration
+	AdminToken         string
+	MDNS               bool
+	CommandTimeout     time.Duration
+	ReadTimeout        time.Duration
 }
 
 func (o Options) withDefaults() Options {
@@ -617,7 +618,31 @@ func (s *Server) originAllowed(r *http.Request, origin string) bool {
 		}
 	}
 	parsed, err := url.Parse(origin)
-	return err == nil && parsed.Host == r.Host
+	if err != nil {
+		return false
+	}
+	if parsed.Host == r.Host {
+		return true
+	}
+	if s.opts.DisallowLANOrigins {
+		return false
+	}
+	return isPrivateHost(parsed.Hostname())
+}
+
+func isPrivateHost(host string) bool {
+	host = strings.ToLower(strings.TrimSpace(host))
+	if host == "" {
+		return false
+	}
+	if host == "localhost" || strings.HasSuffix(host, ".local") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return false
+	}
+	return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast()
 }
 
 func decodeJSON(r *http.Request, dst any) error {

@@ -28,6 +28,7 @@ node:
 server:
   enabled: true
   addr: "0.0.0.0:8787"
+  allow_lan_origins: true
   allowed_origins:
     - "http://localhost:5173"
     - "http://127.0.0.1:5173"
