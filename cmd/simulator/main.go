@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -33,13 +34,17 @@ func run() error {
 	sessionID := flag.String("session", "session-1", "session id for the prompt")
 	lastSequence := flag.Uint64("last-sequence", 0, "resume after this sequence")
 	timeout := flag.Duration("timeout", 30*time.Second, "maximum run time")
+	insecure := flag.Bool("insecure", false, "skip TLS certificate verification (local self-signed only)")
 	flag.Parse()
 
 	if *token == "" && *pairCode == "" {
 		return fmt.Errorf("provide -token or -pair-code")
 	}
 
-	dialer := websocket.DefaultDialer
+	dialer := *websocket.DefaultDialer
+	if *insecure {
+		dialer.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	}
 	conn, _, err := dialer.DialContext(context.Background(), *url, nil)
 	if err != nil {
 		return fmt.Errorf("dial %s: %w", *url, err)

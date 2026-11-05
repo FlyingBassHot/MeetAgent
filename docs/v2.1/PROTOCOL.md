@@ -287,6 +287,7 @@ WebSocket 层也可使用 ping/pong；JSON 心跳用于 UI 显示 RTT。
 - Node 默认监听 `0.0.0.0:8787`，同一 Wi-Fi 下的手机可访问
 - `server.allow_lan_origins: true`（默认）允许私有网段 / `.local` / localhost 的 CORS Origin
 - 公网部署请关闭该选项，并把具体域名加入 `server.allowed_origins`
+- 本地可用自签证书验证 WSS；simulator 支持 `-insecure`，仅限本机测试
 
 ## 9. 安全
 
