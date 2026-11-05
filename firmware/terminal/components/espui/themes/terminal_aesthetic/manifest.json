@@ -1,0 +1,29 @@
+{
+  "theme_id": "terminal_aesthetic",
+  "name": "Terminal Aesthetic (E2 Mock)",
+  "version": "0.2.0-mock",
+  "api_version": 1,
+  "renderer_id": "builtin.label",
+  "display": {
+    "orientation": "portrait",
+    "min_width": 320,
+    "min_height": 480
+  },
+  "scenes": [
+    "ambient",
+    "focus",
+    "activity",
+    "attention",
+    "settings"
+  ],
+  "configurable": [
+    "accent_color",
+    "brightness",
+    "animation_speed",
+    "motion_enabled",
+    "visual_density",
+    "idle_timeout",
+    "night_mode"
+  ],
+  "motion_profile": "phosphor_default"
+}

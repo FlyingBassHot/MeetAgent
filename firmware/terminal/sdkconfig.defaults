@@ -1,0 +1,24 @@
+# MeetAgent Terminal — ESP-IDF defaults
+#
+# Target board: Waveshare ESP32-S3-Touch-LCD-3.5B.
+# Select the target once with: idf.py set-target esp32s3
+#
+# GPIO/LCD/touch/backlight assignments are intentionally NOT defined here:
+# they must come from the board schematic and a verified BSP.
+# These values are starting points, not verified hardware settings.
+
+# PSRAM: confirm the package variant (N16R8 / octal) against the board label
+# before flashing. Wrong PSRAM mode can prevent boot.
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
+CONFIG_FREERTOS_HZ=1000
+CONFIG_COMPILER_OPTIMIZATION_SIZE=y
+CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE=y
+
+# 16 MB flash is the common Waveshare variant; verify before flashing.
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+
+# LVGL 8.3 is pinned by components/espui/idf_component.yml.
+CONFIG_LV_COLOR_DEPTH_16=y

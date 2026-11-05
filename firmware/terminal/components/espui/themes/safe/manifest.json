@@ -1,0 +1,26 @@
+{
+  "theme_id": "safe_fallback",
+  "name": "Safe Fallback",
+  "version": "1.0.0",
+  "api_version": 1,
+  "renderer_id": "builtin.label",
+  "display": {
+    "orientation": "portrait",
+    "min_width": 320,
+    "min_height": 480
+  },
+  "scenes": [
+    "ambient",
+    "focus",
+    "activity",
+    "attention",
+    "settings"
+  ],
+  "configurable": [
+    "brightness",
+    "motion_enabled",
+    "visual_density",
+    "night_mode"
+  ],
+  "motion_profile": "motion_none"
+}
