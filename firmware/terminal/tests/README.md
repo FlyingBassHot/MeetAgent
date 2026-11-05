@@ -7,6 +7,7 @@ firmware can be compiled.
 ```bash
 cd firmware/terminal/tests/host
 make test      # build + run (ASan/UBSan, -Werror)
+make preview STATE=working FRAMES=3 DELAY=300  # print ASCII frames
 make syntax    # syntax/type-check every firmware C file with stubs
 make clean
 ```
@@ -20,8 +21,13 @@ Compiled into the test binary:
 - `runtime/animation_scheduler.c`, `asset_manager.c`, `memory_manager.c`,
   `scene_manager.c`, `theme_manager.c`, `theme_registry.c`
 - `themes/*` (descriptors and manifests; their render ops are not executed)
+- `themes/terminal_aesthetic/renderers/ascii_renderer.c`
+- `themes/terminal_aesthetic/renderers/ascii_canvas.c`
 - `protocol/protocol.c`
 - `state/state_adapter.c`
+
+The ASCII preview CLI (`ascii_preview.c`) links only the ASCII module, ViewModel,
+Motion and Animation Scheduler; it does not need ESP-IDF or LVGL.
 
 Excluded from the test binary (need FreeRTOS/LVGL):
 
@@ -35,6 +41,13 @@ for host checks. They are never part of the firmware build.
 `stubs/espui_runtime_stub.c` provides context accessors for the theme objects
 so descriptors can be linked without the real UI task. Theme render ops are
 never called in host tests.
+
+ASCII preview examples:
+
+```bash
+make preview STATE=all FRAMES=1
+make preview STATE=approval FRAMES=3 DELAY=300
+```
 
 ## Adding tests
 

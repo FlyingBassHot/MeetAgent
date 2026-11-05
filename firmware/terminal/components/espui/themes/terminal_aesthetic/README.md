@@ -20,12 +20,15 @@ theme. It validates the theme pipeline before E3 implements the real renderer.
 
 ## E3 plan
 
-1. Implement `builtin.ascii_terminal` (character grid + partial refresh).
-2. Change `renderer_id` in the C manifest and `manifest.json`.
-3. Move startup/status/scene rendering to the ASCII renderer.
-4. Add motion profiles and the six states: idle / working / completed /
-   approval / error / offline.
-5. Add theme fonts and density settings.
+- [x] E3a: pure-logic ASCII renderer (character grid, density field, geometry,
+  six states, motion profiles, completed pulse, scheduler/scene bindings).
+  See `renderers/` and `docs/ASCII_RENDERER.md`.
+- [ ] E3b: implement `builtin.ascii_terminal` LVGL character-grid widget and
+  partial refresh.
+- [ ] Change `renderer_id` in the C manifest and `manifest.json`.
+- [ ] Move startup/status/scene rendering to the ASCII renderer.
+- [ ] Add theme fonts and density settings.
+- [ ] Wire the ASCII renderer into the live theme UI Task.
 
 The theme id and tokens should remain stable so saved settings continue to
 work across the renderer swap.

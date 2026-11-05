@@ -255,4 +255,5 @@ espui_theme_manager_apply(&manager, "terminal_aesthetic",
 - ViewModel 驱动的状态文字
 - 安全主题保底
 
-它不是 E3 的动画主题；E3 将替换为字符网格、六态动画和完整场景布局。详见 `components/espui/themes/terminal_aesthetic/README.md`。
+它不是 E3 的动画主题；E3 将替换为字符网格、六态动画和完整场景布局。E3a 的纯逻辑 ASCII Renderer 已放在
+`components/espui/themes/terminal_aesthetic/renderers/`，详见 `docs/ASCII_RENDERER.md`。

@@ -5,7 +5,7 @@
 ```text
 ┌────────────────────────────────────────────────────┐
 │ Theme Implementations                              │
-│   safe / terminal_aesthetic (E2 mock)              │
+│   safe / terminal_aesthetic (E2 mock + E3a ASCII)  │
 ├────────────────────────────────────────────────────┤
 │ Theme System                                       │
 │   Theme API · Manifest · Tokens · Registry         │
@@ -68,6 +68,35 @@ UI Task                      唯一允许操作 LVGL / Theme 的线程
 1. 网络/状态任务只投递完整 ViewModel 副本；不直接调用 Theme 或 LVGL。
 2. `espui_view_model_copy_business()` 只替换业务态（Node/Agent/Session/Attention），设备态（亮度、动画开关、当前主题）由 UI Core 持有。
 3. Theme 只看到 ViewModel；不需要知道数据来自 Snapshot、Event 还是 Mock。
+
+### 2.1 E3a ASCII 帧生成
+
+```text
+ViewModel + Scene
+      │
+      ▼
+Visual State Resolver（离线/审批/错误/完成/工作/待机）
+      │
+      ▼
+Motion Profile（speed / density / amplitude）
+      │
+      ▼
+Animation Scheduler（10–15 FPS、暂停、调速）
+      │
+      ▼
+ASCII Renderer（固定字符网格 + 密度场 + 几何）
+      │
+      ▼
+espui_ascii_frame_t（cells / intensity / color）
+      │
+      ▼
+E3b LVGL 字符网格 widget（尚未实现）
+```
+
+- 纯逻辑模块位于 `themes/terminal_aesthetic/renderers/`，不依赖 LVGL/FreeRTOS。
+- 固定 80×40 上限，默认 60×22；单帧约 9.4 KB，无每帧分配。
+- Completed 使用有限脉冲；Offline phase 不推进，帧静止。
+- `apply_view_model()` 负责状态解析并立即重绘；Scheduler 负责定期推进。
 
 ## 3. 线程模型
 
@@ -169,11 +198,12 @@ apply(theme_id)
 
 真实板级 BSP 接入时，只替换 `hal/` 与 `main` 的 board bundle，不修改 Theme 或 UI Core。
 
-## 8. E2 的刻意简化
+## 8. E2 / E3a 的刻意简化
 
-- Terminal Aesthetic 仍是 **label 渲染的 Mock**，不是 E3 的 ASCII Renderer。
-- 字体缩放字段存在但 Renderer 暂不处理；E3 接入字体资源后生效。
+- E2 的 `terminal_theme.c` 仍是 **label 渲染的 Mock**；E3a 的 ASCII 帧生成已独立完成，E3b 再接入 LVGL 字符网格。
+- 字体缩放字段存在但 Renderer 暂不处理；E3b 接入字体资源后生效。
 - 主题为单实例静态状态；不支持同一主题多实例。
 - Settings Storage 尚未实现；Manifest 的 `configurable` 位已经保留。
 - Asset / Memory 模块提供有界记账，不实现动态加载或分配器。
-- 动画调度器已实现调速/暂停/追帧上限，但 E2 主题的 `on_tick` 为空，不启动 E3 动画。
+- 动画调度器已实现调速/暂停/追帧上限；E3a 的 ASCII Renderer 可以绑定到它，但主题尚未在 UI Task 内绑定。
+- ASCII Renderer 的 `scene` 参数保留给 E3b 的场景化布局；当前只影响调用方，不改变状态优先级。

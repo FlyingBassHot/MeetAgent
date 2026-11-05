@@ -24,6 +24,8 @@ idf_component_register(
         "themes/builtin_themes.c"
         "themes/safe/safe_theme.c"
         "themes/terminal_aesthetic/terminal_theme.c"
+        "themes/terminal_aesthetic/renderers/ascii_canvas.c"
+        "themes/terminal_aesthetic/renderers/ascii_renderer.c"
 
         "hal/board_stub.c"
         "hal/display_stub.c"
@@ -37,6 +39,7 @@ idf_component_register(
         "runtime"
         "hal"
         "themes"
+        "themes/terminal_aesthetic/renderers"
     PRIV_REQUIRES
         esp_timer
         lvgl

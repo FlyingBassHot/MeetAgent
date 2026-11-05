@@ -21,6 +21,7 @@ CFLAGS=(
     -I"${ESPUI}/runtime"
     -I"${ESPUI}/hal"
     -I"${ESPUI}/themes"
+    -I"${ESPUI}/themes/terminal_aesthetic/renderers"
     -I"${COMPONENTS}/protocol/include"
     -I"${COMPONENTS}/state/include"
     -I"${COMPONENTS}/networking/include"

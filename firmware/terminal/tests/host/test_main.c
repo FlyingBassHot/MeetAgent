@@ -2,6 +2,7 @@
 
 #include "test_assert.h"
 
+void test_ascii_renderer_run(void);
 void test_builtin_themes_run(void);
 void test_manifest_run(void);
 void test_motion_profiles_run(void);
@@ -18,6 +19,7 @@ int g_test_failures = 0;
 int main(void)
 {
     printf("MeetAgent Terminal host tests\n");
+    RUN(test_ascii_renderer_run);
     RUN(test_builtin_themes_run);
     RUN(test_manifest_run);
     RUN(test_motion_profiles_run);

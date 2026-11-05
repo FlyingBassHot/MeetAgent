@@ -23,6 +23,7 @@ INC := -Istubs \
        -I$(ESPUI)/runtime \
        -I$(ESPUI)/hal \
        -I$(ESPUI)/themes \
+       -I$(ESPUI)/themes/terminal_aesthetic/renderers \
        -I$(COMPONENTS)/protocol/include \
        -I$(COMPONENTS)/state/include \
        -I$(COMPONENTS)/networking/include
@@ -33,7 +34,8 @@ ALL_ESPUI_SRCS := \
 	$(wildcard $(ESPUI)/runtime/*.c) \
 	$(wildcard $(ESPUI)/themes/*.c) \
 	$(wildcard $(ESPUI)/themes/safe/*.c) \
-	$(wildcard $(ESPUI)/themes/terminal_aesthetic/*.c)
+	$(wildcard $(ESPUI)/themes/terminal_aesthetic/*.c) \
+	$(wildcard $(ESPUI)/themes/terminal_aesthetic/renderers/*.c)
 
 # The UI task and LVGL renderer need FreeRTOS/LVGL; they are covered by the
 # syntax-check target instead of the pure-logic test binary.
@@ -48,7 +50,21 @@ TEST_SRCS := $(wildcard test_*.c) stubs/espui_runtime_stub.c
 BUILD_DIR := build
 TEST_BIN := $(BUILD_DIR)/espui_tests
 
-.PHONY: all test syntax clean
+ASCII_PREVIEW_SRCS := \
+	ascii_preview.c \
+	$(ESPUI)/themes/terminal_aesthetic/renderers/ascii_canvas.c \
+	$(ESPUI)/themes/terminal_aesthetic/renderers/ascii_renderer.c \
+	$(ESPUI)/theme_api/espui_motion.c \
+	$(ESPUI)/theme_api/espui_types.c \
+	$(ESPUI)/theme_api/espui_util.c \
+	$(ESPUI)/core/espui_view_model.c \
+	$(ESPUI)/runtime/animation_scheduler.c
+PREVIEW_BIN := $(BUILD_DIR)/ascii_preview
+STATE ?= all
+FRAMES ?= 2
+DELAY ?= 400
+
+.PHONY: all test syntax preview clean
 
 all: test
 
@@ -56,6 +72,13 @@ test: $(TEST_BIN)
 	./$(TEST_BIN)
 
 $(TEST_BIN): $(PURE_SRCS) $(TEST_SRCS)
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) $(INC) $^ -o $@
+
+preview: $(PREVIEW_BIN)
+	./$(PREVIEW_BIN) $(STATE) $(FRAMES) $(DELAY)
+
+$(PREVIEW_BIN): $(ASCII_PREVIEW_SRCS)
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) $(INC) $^ -o $@
 

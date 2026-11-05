@@ -6,16 +6,18 @@
 
 ## 当前状态
 
-已完成 E0 / E1 / E2 的**最小框架**：
+已完成 E0 / E1 / E2 的最小框架，以及 E3a 的纯逻辑 ASCII Renderer：
 
 - E0：ESPUI 分层、Theme API、Manifest、ViewModel、Scene Manager、HAL 边界、工程骨架
 - E1：ESP-IDF 工程骨架、LVGL 渲染器接入点、HAL 接口、UI Task + 事件队列、Theme Registry、安全主题
 - E2：Manifest 校验、Design Tokens、Scene Manager、Motion Scheduler、两个内置主题、主题切换与回退
+- E3a：字符网格、glyph ramp 密度场、ASCII Geometry、六态 Motion、Completed 有限脉冲、Scheduler/Scene 绑定、host CLI
 
 已验证：
 
-- 主机测试：`620 checks, 0 failure(s)`（ASan/UBSan + `-Werror`）
-- 主机语法检查：31 个固件 C 文件全部通过（ESP-IDF / FreeRTOS / LVGL stub）
+- 主机测试：`805 checks, 0 failure(s)`（ASan/UBSan + `-Werror`）
+- 主机语法检查：33 个固件 C 文件全部通过（ESP-IDF / FreeRTOS / LVGL stub）
+- E3a 帧预览：`make preview STATE=working FRAMES=3 DELAY=300`
 - **未验证**：没有安装 ESP-IDF，因此没有执行 `idf.py build`，没有链接 LVGL，也没有真机显示
 
 当前机器环境：
@@ -62,6 +64,7 @@ idf.py -p /dev/ttyACM0 flash monitor
 ```bash
 cd firmware/terminal/tests/host
 make test      # 纯逻辑单元测试（ASan/UBSan）
+make preview STATE=working FRAMES=3 DELAY=300  # 打印 ASCII 帧
 make syntax    # 所有固件 C 文件的 ESP-IDF stub 语法检查
 make clean
 ```
@@ -78,6 +81,9 @@ make clean
 - Motion Scheduler 调速、暂停、追帧上限
 - Asset Registry、Memory Budget
 - Protocol 状态映射、Snapshot → ViewModel、事件接口 stub
+- ASCII Renderer：glyph ramp、密度场、几何、六态解析、Motion 缩放、Completed 脉冲、Offline 静止
+- Animation Scheduler 绑定、Scene Manager → Attention 状态联动
+- 多帧确定性快照、Canvas 裁剪与文本/几何分层
 
 ## 目录
 
@@ -94,7 +100,9 @@ firmware/terminal/
 │   │   ├── runtime/        # Theme Manager / Scene Manager / Animation / Assets / Memory / LVGL Renderer
 │   │   ├── themes/
 │   │   │   ├── safe/       # 安全回退主题
-│   │   │   └── terminal_aesthetic/  # E2 Mock（E3 换成 ASCII Renderer）
+│   │   │   └── terminal_aesthetic/
+│   │   │       ├── terminal_theme.c         # E2 Mock（E3b 接 LVGL 字符网格）
+│   │   │       └── renderers/               # E3a 纯逻辑 ASCII Renderer + Canvas
 │   │   └── hal/            # Display / Touch / Input / Power / Board 接口与 headless stub
 │   ├── protocol/           # V2.1 协议 C 类型 + JSON stub
 │   ├── state/              # Snapshot → ViewModel 适配器 + Mock 状态源
@@ -109,11 +117,13 @@ firmware/terminal/
 - `docs/THEME_API.md`：Theme API / Manifest / Tokens / Renderer 规范
 - `docs/VIEWMODEL.md`：ViewModel 维度、容量、所有权与状态适配
 - `docs/HARDWARE.md`：HAL 契约、stub 板、待确认硬件项
+- `docs/ASCII_RENDERER.md`：E3a 字符网格、几何、六态 Motion、CLI 与集成
 - `docs/BUILD_STATUS.md`：本次构建/测试结果、阻塞与下一步
 
 ## 未实现（明确不在本次范围）
 
-- E3 Terminal Aesthetic：ASCII Renderer、字符网格、六态动画、Ambient / Focus / Activity / Attention 完整布局
+- E3b：把 ASCII 帧接到 LVGL 字符网格 widget、字体/颜色 Token 映射、局部刷新
+- E3 剩余：Focus / Activity / Settings 完整场景布局、文本打字/滚动动效、真机 FPS/内存验收
 - E4 真实 Node：Wi-Fi 配网、mDNS、HTTP 配对、WSS、hello/welcome/snapshot/event/command、心跳与重连
 - E5：主题设置持久化、亮度/夜间模式、低功耗、OTA
 - 语音 / STT、本地 AI、完整聊天、文件浏览、长历史
