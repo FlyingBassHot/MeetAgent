@@ -168,6 +168,7 @@ type Welcome struct {
 	ClientID      string    `json:"client_id"`
 	ClientType    string    `json:"client_type"`
 	Token         string    `json:"token,omitempty"`
+	Permissions   []string  `json:"permissions,omitempty"`
 	Node          NodeInfo  `json:"node"`
 	Snapshot      Snapshot  `json:"snapshot"`
 	ServerTime    time.Time `json:"server_time"`

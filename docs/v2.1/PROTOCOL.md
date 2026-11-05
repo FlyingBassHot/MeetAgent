@@ -115,6 +115,7 @@ Node 回复 `welcome`：
     "client_id": "cli_...",
     "client_type": "terminal",
     "token": "仅首次配对返回",
+    "permissions": ["session.read", "session.control", "permission.respond"],
     "node": { "...": "NodeInfo" },
     "snapshot": { "...": "Snapshot" },
     "server_time": "2026-11-05T12:00:00Z"

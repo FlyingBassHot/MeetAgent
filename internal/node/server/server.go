@@ -486,6 +486,7 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 		ClientID:      client.ClientID,
 		ClientType:    client.Type,
 		Token:         issuedToken,
+		Permissions:   append([]string(nil), client.Permissions...),
 		Node:          s.node,
 		Snapshot:      snapshot,
 		ServerTime:    time.Now().UTC(),
