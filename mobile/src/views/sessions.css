@@ -1,0 +1,32 @@
+.sessions__tools {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.chip__count {
+  margin-left: 3px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--faint);
+  font-size: 10px;
+}
+
+.chip--active .chip__count {
+  background: rgba(91, 147, 255, 0.22);
+  color: var(--accent-strong);
+}
+
+.session-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 9px;
+}
+
+@media (min-width: 760px) {
+  .session-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

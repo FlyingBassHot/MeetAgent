@@ -1,0 +1,32 @@
+.settings-card {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+
+.settings-card + .settings-card {
+  margin-top: 12px;
+}
+
+.settings-modes {
+  display: flex;
+  gap: 7px;
+}
+
+.settings-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.settings-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+}
+
+@media (min-width: 900px) {
+  .settings-card {
+    max-width: 760px;
+  }
+}

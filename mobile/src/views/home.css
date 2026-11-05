@@ -1,0 +1,64 @@
+.empty-inline {
+  background: var(--surface);
+  border-style: dashed;
+}
+
+.session-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 9px;
+}
+
+.agent-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 9px;
+}
+
+.agent {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.agent__name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.agent__name strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.agent__name span {
+  font-size: 10px;
+}
+
+.agent__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.node-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.node-foot__right {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+@media (min-width: 720px) {
+  .session-grid,
+  .agent-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

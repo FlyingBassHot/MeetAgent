@@ -1,0 +1,55 @@
+.back-link {
+  align-self: flex-start;
+  color: var(--muted);
+}
+
+.session-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.session-bar__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  min-width: 0;
+}
+
+.session-bar__meta .mono {
+  overflow-wrap: anywhere;
+}
+
+.local-prompts {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.local-prompt {
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.local-prompt__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 3px;
+}
+
+.local-prompt p {
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.session-bar + .section,
+.section + .section {
+  margin-top: 18px;
+}

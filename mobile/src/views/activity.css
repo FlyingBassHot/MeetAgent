@@ -1,0 +1,13 @@
+.activity__count {
+  margin-left: 3px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--faint);
+  font-size: 10px;
+}
+
+.chip--active .activity__count {
+  background: rgba(91, 147, 255, 0.22);
+  color: var(--accent-strong);
+}
