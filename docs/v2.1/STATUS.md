@@ -6,8 +6,8 @@
 |---|---|---|---|---|
 | Core / Node | 主会话 | M0 + M1 | 可运行 | M3 真实双端集成 |
 | Protocol v2 | 主会话 | M0 | 完成 | 随实现补兼容测试 |
-| Mobile | omp | M2 | 进行中 | 完成四页 + Mock，再切真实 Node |
-| Terminal / ESPUI | pi | E0–E2 | 进行中 | 无 ESP-IDF，先完成代码与 host tests |
+| Mobile | omp | M2 | 完成（Mock；真实 Node 握手已验证） | M3 真实 Prompt/审批 |
+| Terminal / ESPUI | pi | E0–E2 | 完成（host tests 620/620，31 files syntax） | 安装 ESP-IDF 后板级编译 |
 | Cloud relay | 主会话 | 可选 | 保留 V1 实现 | M6 再验证混合模式 |
 
 ## 已完成
@@ -22,6 +22,8 @@
 - Adapter Manifest + Mock Adapter + `cmd/simulator`
 - mDNS `_meetagent._tcp`（avahi-browse 实测）
 - 测试：`go test ./... -race -count=1` 通过
+- Mobile：`npm run typecheck` / `npm run build` 通过；390/1440 截图
+- Terminal：host tests 620/620；syntax 31/31；ESP-IDF 未安装
 
 ## 真实联调（主会话）
 

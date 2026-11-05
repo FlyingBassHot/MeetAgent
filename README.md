@@ -4,7 +4,7 @@
 
 **Node-Centric · Multi-Client · Plugin-Based · LAN First · Cloud Optional**
 
-当前状态：**V2.1 架构重构进行中**。Node 独立服务、V2.1 客户端协议、配对、事件中心和 Mock Adapter 已落地；Mobile 与 ESP32 Terminal 正在并行开发。
+当前状态：**V2.1 大框架已落地**。Node 独立服务、V2.1 客户端协议、配对、事件中心、Mock Adapter 和协议模拟器已完成；Mobile M2（Mock）与 Terminal E0–E2（host tests）已完成，下一步进入真实 OpenCode 双端集成。
 
 > 设计文档：
 > - [`MeetAgentV2.1.md`](./MeetAgentV2.1.md) — 总体架构、双客户端、南向插件、阶段计划
@@ -46,10 +46,10 @@ Mobile (Vue + Capacitor)        ESP32 Terminal (ESP-IDF + LVGL)
 
 | 模块 | 目录 | 状态 |
 |---|---|---|
-| Core / Node | `cmd/node`, `internal/`, `pkg/`, `configs/` | M0/M1 进行中 |
+| Core / Node | `cmd/node`, `internal/`, `pkg/`, `configs/` | M0/M1 完成 |
 | Node 模拟器 | `cmd/simulator` | 可用 |
-| Mobile | `mobile/` | 并行开发中 |
-| ESP32 Terminal / ESPUI | `firmware/terminal/` | 并行开发中 |
+| Mobile | `mobile/` | M2 完成（Mock + 真实 Node 握手已验证） |
+| ESP32 Terminal / ESPUI | `firmware/terminal/` | E0–E2 完成（host tests 620/620） |
 | V1 Cloud / Web Console | `cmd/cloud`, `web/test-client` | 归档参考 |
 
 ---
@@ -172,10 +172,10 @@ make run-cloud        # 旧 V1 Cloud（可选）
 
 | 阶段 | 内容 | 状态 |
 |---|---|---|
-| M0 | 协议、Adapter Manifest、Mock、Simulator | 基本完成 |
-| M1 | Node Standalone、配对、Client Registry、Snapshot/Event/Command | 进行中 |
-| M2 | Mobile + Terminal 并行开发 | 进行中 |
-| M3 | 真实 OpenCode 双端集成 | 待开始 |
+| M0 | 协议、Adapter Manifest、Mock、Simulator | 完成 |
+| M1 | Node Standalone、配对、Client Registry、Snapshot/Event/Command | 完成 |
+| M2 | Mobile M2 + Terminal E0–E2 | 完成（Mock / host tests） |
+| M3 | 真实 OpenCode 双端集成 | 下一步 |
 | M4 | 双端一致性与稳定性 | 待开始 |
 | M5 | Mobile 远程（Tailscale/Capacitor） | 待开始 |
 | M6 | 语音/STT、Cloud Relay、第二 Adapter、OTA | 暂缓 |
