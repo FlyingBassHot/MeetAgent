@@ -66,17 +66,54 @@ export class WsClient implements ClientTransport {
   private heartbeatTimer: number | null = null;
   private beatNonce = '';
   private beatSentAt = 0;
+  private networkBound = false;
+  private offlineSuspended = false;
+
+  private readonly handleNetworkOffline = (): void => {
+    this.offlineSuspended = true;
+    this.clearTimers();
+    this.rejectPending(new Error('网络离线'));
+    const socket = this.socket;
+    this.socket = null;
+    if (socket) {
+      socket.onopen = null;
+      socket.onmessage = null;
+      socket.onclose = null;
+      socket.onerror = null;
+      if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
+        socket.close(4002, 'network_offline');
+      }
+    }
+    this.setPhase('offline', '网络离线');
+  };
+
+  private readonly handleNetworkOnline = (): void => {
+    if (this.intentionalClose || !this.config || !this.offlineSuspended) return;
+    this.offlineSuspended = false;
+    this.clearTimers();
+    this.attempt = 0;
+    this.openSocket();
+  };
 
   connect(config: ClientConfig): void {
     this.config = config;
     this.sequence = config.lastSequence;
     this.attempt = 0;
     this.intentionalClose = false;
+    this.bindNetwork();
+    if (!navigator.onLine) {
+      this.offlineSuspended = true;
+      this.setPhase('offline', '网络离线');
+      return;
+    }
+    this.offlineSuspended = false;
     this.openSocket();
   }
 
   disconnect(): void {
     this.intentionalClose = true;
+    this.offlineSuspended = false;
+    this.unbindNetwork();
     this.clearTimers();
     this.rejectPending(new Error('连接已断开'));
     const socket = this.socket;
@@ -134,6 +171,12 @@ export class WsClient implements ClientTransport {
   private openSocket(): void {
     const config = this.config;
     if (!config || this.intentionalClose) return;
+    if (this.offlineSuspended || !navigator.onLine) {
+      this.offlineSuspended = true;
+      this.setPhase('offline', '网络离线');
+      return;
+    }
+    const secure = config.baseUrl.trim().toLowerCase().startsWith('https');
     this.setPhase(this.attempt === 0 ? 'connecting' : 'reconnecting');
 
     let socket: WebSocket;
@@ -160,7 +203,13 @@ export class WsClient implements ClientTransport {
 
     socket.onerror = () => {
       if (this.socket !== socket) return;
-      this.emitError('socket_error', 'WebSocket 连接异常', false);
+      this.emitError(
+        'socket_error',
+        secure
+          ? 'WebSocket 连接异常，请检查网络或证书信任'
+          : 'WebSocket 连接异常',
+        false,
+      );
     };
 
     socket.onclose = (event: CloseEvent) => {
@@ -169,8 +218,14 @@ export class WsClient implements ClientTransport {
       this.clearHandshakeTimers();
       this.rejectPending(new Error('连接已断开'));
       if (this.intentionalClose) return;
+      if (!navigator.onLine) {
+        this.offlineSuspended = true;
+        this.setPhase('offline', '网络离线');
+        return;
+      }
       const reason = event.reason ? `：${event.reason}` : '';
-      this.scheduleReconnect(`连接中断${reason}`);
+      const hint = secure ? '（若为自签证书，请先在系统中信任）' : '';
+      this.scheduleReconnect(`连接中断${reason}${hint}`);
     };
   }
 
@@ -300,6 +355,8 @@ export class WsClient implements ClientTransport {
 
   private fatal(code: string, message: string): void {
     this.intentionalClose = true;
+    this.offlineSuspended = false;
+    this.unbindNetwork();
     this.clearTimers();
     this.rejectPending(new Error(message));
     this.emitError(code, message, true);
@@ -314,6 +371,11 @@ export class WsClient implements ClientTransport {
 
   private scheduleReconnect(detail: string): void {
     if (this.intentionalClose) return;
+    if (!navigator.onLine || this.offlineSuspended) {
+      this.offlineSuspended = true;
+      this.setPhase('offline', '网络离线');
+      return;
+    }
     this.attempt += 1;
     const delay = Math.min(1000 * 2 ** (this.attempt - 1), MAX_RECONNECT_DELAY_MS);
     this.setPhase('reconnecting', `${detail}，${Math.round(delay / 1000)} 秒后重连`);
@@ -370,6 +432,20 @@ export class WsClient implements ClientTransport {
       window.clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
+  }
+
+  private bindNetwork(): void {
+    if (this.networkBound) return;
+    window.addEventListener('offline', this.handleNetworkOffline);
+    window.addEventListener('online', this.handleNetworkOnline);
+    this.networkBound = true;
+  }
+
+  private unbindNetwork(): void {
+    if (!this.networkBound) return;
+    window.removeEventListener('offline', this.handleNetworkOffline);
+    window.removeEventListener('online', this.handleNetworkOnline);
+    this.networkBound = false;
   }
 
   private rejectPending(error: Error): void {

@@ -3,12 +3,15 @@ import { computed } from 'vue';
 import { NAV_ITEMS } from '@/app/nav';
 import { shortId } from '@/domain/format';
 import { useConnectionStore } from '@/stores/connection';
+import { useNetworkStore } from '@/stores/network';
 import { useNodeStore } from '@/stores/node';
 import ConnectionBadge from './ConnectionBadge.vue';
 import MockBadge from './MockBadge.vue';
 import NavIcon from './NavIcon.vue';
+import StatusPill from './StatusPill.vue';
 
 const connection = useConnectionStore();
+const network = useNetworkStore();
 const nodeStore = useNodeStore();
 
 const nodeName = computed(() => nodeStore.node?.name ?? 'MeetAgent Node');
@@ -49,9 +52,14 @@ const isMock = computed(() => connection.mode === 'mock');
         </div>
         <div class="topbar__status">
           <MockBadge v-if="isMock" />
-          <ConnectionBadge />
+          <StatusPill v-if="!network.online" label="网络离线" tone="danger" />
+          <ConnectionBadge v-else />
         </div>
       </header>
+
+      <div v-if="!network.online" class="network-banner">
+        网络离线：已暂停 Node 自动重连；恢复网络后将立即重连。
+      </div>
 
       <main class="page">
         <RouterView />
@@ -71,3 +79,21 @@ const isMock = computed(() => connection.mode === 'mock');
     </nav>
   </div>
 </template>
+
+<style scoped>
+.network-banner {
+  margin: 12px 16px 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(244, 119, 119, 0.3);
+  border-radius: var(--radius-sm);
+  background: var(--danger-soft);
+  color: var(--danger-fg);
+  font-size: 12px;
+}
+
+@media (min-width: 900px) {
+  .network-banner {
+    margin: 16px 32px 0;
+  }
+}
+</style>

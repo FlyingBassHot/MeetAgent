@@ -211,7 +211,7 @@ watch(
         </dl>
       </div>
       <p v-if="mode === 'live'" class="small muted connect__note">
-        Token 由 Node 配对返回，Web 原型暂存 localStorage；Capacitor 版本将迁移到系统安全存储。
+        WSS 使用 TLS；自签证书请先在系统/浏览器中信任（浏览器不会暴露证书细节）。Token 暂存 localStorage。
       </p>
     </form>
   </div>

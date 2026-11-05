@@ -1,8 +1,9 @@
-# MeetAgent Mobile（V2.1 / M2）
+# MeetAgent Mobile（V2.1 / M5a）
 
 MeetAgent V2.1 的移动端 Web 原型，后续由 Capacitor 打包为 Android / iOS 应用。
 
-当前里程碑为 M2：在 Node 尚未提供稳定服务前，先用本地 `MockClient` 打通连接、状态同步、Session 交互、审批与事件流，同时保留与真实 Node 一致的 `WsClient` 协议实现。
+当前进度：M5a 远程连接基础（网络状态、WSS/TLS、自签证书诊断与 Tailscale 部署文档）。
+Mock、局域网 Node、自签 WSS Node 共用同一套 `ClientTransport` 与协议类型。
 
 ## 技术栈
 
@@ -66,6 +67,7 @@ mobile/
 ├── tsconfig.json
 ├── vite.config.ts
 ├── README.md
+├── docs/REMOTE.md            # Tailscale / WSS / 证书 / Capacitor 说明
 └── src/
     ├── app/
     │   ├── nav.ts              # 底部/侧边导航
@@ -156,10 +158,24 @@ ClientTransport
 - Node 重启恢复：受控重启 Node 后，两端自动重连，Snapshot 恢复 41 个 Session；事件序号重置为 46，UI 未报告序号缺口；测试 Session 状态为 idle
 - 全程仅对测试 Session `ses_e5a1c7989ffefcU1XdrTiq6WXX` 发送 Prompt，未触碰主会话 `ses_e5e6e776fffeeeCdeah5WtPEhJ`
 
+## M5a 远程连接与网络切换
+
+详见 [`docs/REMOTE.md`](docs/REMOTE.md)：Tailscale、反向代理 WSS、证书信任与 Capacitor 环境说明。
+
+已验证：
+
+- 网络状态：监听 `window online/offline`；离线时顶部显示「网络离线」并全局提示，暂停 WebSocket 与指数退避重试
+- 恢复网络：取消旧退避计时并立即重连（实测 6 ms 内恢复在线），不会与原有重连叠加
+- 连接诊断（Settings）：显示 `navigator.onLine`、WebSocket scheme（`ws` / `wss`）、连接阶段、RTT 与最后错误
+- WSS/TLS：使用自签证书 Node `https://127.0.0.1:8789`，Chromium `--ignore-certificate-errors` 下完成配对、Snapshot、Prompt 与事件流；客户端派生 `wss://127.0.0.1:8789/ws`
+- TLS Mock Node：Agent `TLS Mock`、Session `tls-session`，Prompt 与事件正常
+- 证书失败提示：未信任证书的浏览器无法完成 HTTPS 配对或 WSS 握手；UI 显示通用提示“自签证书请先在系统/浏览器中信任（浏览器不会暴露证书细节）”
+- 未触碰 `8787` 真实 Node 与 OpenCode 主会话
+
 ## 尚未实现（后续里程碑）
 
-- Capacitor Android / iOS 打包、Keychain / Keystore、APNs / FCM
-- mDNS 自动发现、Tailscale / VPN 状态展示
+- Capacitor Android / iOS 打包、Keychain / Keystore、APNs / FCM（本机无 Android SDK / adb / Xcode）
+- Tailscale 实网部署与多网络切换（仅提供部署文档）
 - 语音 / STT
 - 通知的更细粒度策略（仅审批提醒基础已预留）
 - 跨设备客户端身份与权限管理（当前每个设备/Profile 独立配对）
@@ -214,12 +230,26 @@ M4 截图位于 `/tmp/opencode/meetagent-mobile-live/`：
 - `m4-permission-cleared-b-390.png`（A 批准后 B pending 消失）
 - `m4-node-restart-c1.png` / `m4-node-restart-c2.png`（Node 重启后两端恢复）
 
+M5a 截图位于 `/tmp/opencode/meetagent-mobile-live/`：
+
+- `m5-tls-home-390.png`
+- `m5-tls-sessions-390.png`
+- `m5-tls-session-detail-390.png`
+- `m5-tls-prompt-390.png`
+- `m5-tls-diagnostics-390.png`（wss、navigator.onLine、最后错误）
+- `m5-network-offline-390.png`（网络离线提示）
+- `m5-network-recovered-390.png`（恢复后在线）
+- `m5-tls-cert-error-390.png`（自签证书未信任的配对提示）
+- `m5-tls-wss-error-390.png`（WSS 握手失败提示）
+
 ## 已知限制
 
 - Web 原型的 Token 存在 `localStorage`，不等同于安全存储。
 - 单连接守卫使用 Web Locks + BroadcastChannel，作用范围为同 Origin、同浏览器 Profile；不同 Profile / 不同设备使用独立 Token，可同时在线。
 - 接管依赖旧标签页响应 BroadcastChannel；旧标签页被浏览器冻结且不响应时，接管会在 6 秒后失败并提示，避免强制抢占造成双连接。
 - Web Locks 不可用的环境退化为允许连接；Capacitor 单 WebView 场景不受影响。
+- 自签证书只用于本机测试；正式远程部署需使用受信任 CA 或 Tailscale 证书。浏览器不会向页面暴露证书细节，UI 只能给出通用信任提示。
+- 开发模式使用 Vite HMR 时，长时间断网可能让开发服务器连接丢失并触发页面重载；生产构建与 Capacitor 不受此影响。
 - 真实 Node 需要允许 `http://localhost:5174` / `http://localhost:4173` 的 CORS 来源；WSS 证书需浏览器信任。
 - 浏览器通知依赖用户授权；部分移动浏览器要求 Service Worker 才能展示系统通知。
 - Mock 心跳、RTT 与回复均为本地模拟值，不能作为真实 Agent 性能依据。

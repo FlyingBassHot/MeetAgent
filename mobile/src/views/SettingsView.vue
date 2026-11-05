@@ -11,6 +11,7 @@ import { useUiStore } from '@/stores/ui';
 import PageHeader from '@/components/PageHeader.vue';
 import ConnectionBadge from '@/components/ConnectionBadge.vue';
 import NodeInfoCard from '@/components/NodeInfoCard.vue';
+import ConnectionDiagnostics from '@/components/ConnectionDiagnostics.vue';
 
 const router = useRouter();
 const preferences = usePreferencesStore();
@@ -131,6 +132,7 @@ function clearToken(): void {
     </section>
 
     <NodeInfoCard />
+    <ConnectionDiagnostics />
 
     <section class="card card--pad settings-card">
       <div class="section__head">
@@ -143,7 +145,7 @@ function clearToken(): void {
         <dt>设备 Token</dt>
         <dd class="mono">{{ preferences.tokenPreview }}</dd>
         <dt>已授权权限</dt>
-        <dd>{{ connection.grantedPermissions.join('、') || '由 Node 在 welcome 中管理' }}</dd>
+        <dd>{{ connection.grantedPermissions.join('、') || '—' }}</dd>
       </dl>
       <div class="settings-chips">
         <span v-for="capability in DEFAULT_CAPABILITIES" :key="capability" class="pill small mono">
@@ -184,12 +186,12 @@ function clearToken(): void {
         <span class="small muted mono">v{{ CLIENT_VERSION }}</span>
       </div>
       <p class="small muted">
-        MeetAgent Mobile Web 原型（V2.1 / M2）。页面与通信层分离，Mock 与真实 Node 共用同一协议客户端；
-        当前不包含语音、推送与原生打包。
+        MeetAgent Mobile Web 原型（V2.1 / M5a）。页面与通信层分离，Mock、局域网 Node 与自签 WSS Node
+        共用同一协议客户端；当前不包含语音、推送与原生打包。
       </p>
       <div class="settings-foot small muted">
         <span>协议 schema v1</span>
-        <span>目标 Node 8787</span>
+        <span>地址支持 ws / wss</span>
         <span class="mono">{{ shortId(connection.clientId ?? undefined, 8) }}</span>
       </div>
     </section>

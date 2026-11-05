@@ -38,6 +38,7 @@ export const useConnectionStore = defineStore('connection', () => {
   const phase = ref<ConnectionPhase>('idle');
   const mode = ref<ClientMode>(preferences.settings.mode);
   const error = ref<string | null>(null);
+  const lastError = ref<string | null>(null);
   const detail = ref('尚未连接');
   const rttMs = ref<number | null>(null);
   const serverTime = ref<string | null>(null);
@@ -113,10 +114,17 @@ export const useConnectionStore = defineStore('connection', () => {
           lastConnectedAt.value = new Date().toISOString();
           clearConnectionErrors();
         }
-        if (event.phase === 'error' && event.detail) error.value = event.detail;
+        if (event.phase === 'error' && event.detail) {
+          error.value = event.detail;
+          lastError.value = event.detail;
+        }
+        if (event.phase === 'reconnecting' && event.detail) {
+          lastError.value = event.detail;
+        }
         break;
       case 'welcome':
         clientId.value = event.welcome.client_id;
+        grantedPermissions.value = event.welcome.permissions ?? [];
         nodeStore.applyWelcome(event.welcome);
         transport?.setLastSequence(nodeStore.lastSequence);
         if (event.welcome.token) preferences.setToken(event.welcome.token);
@@ -150,6 +158,7 @@ export const useConnectionStore = defineStore('connection', () => {
         break;
       case 'error':
         error.value = event.message;
+        lastError.value = event.message;
         if (event.fatal) {
           phase.value = 'error';
           tabGuard.release();
@@ -171,6 +180,7 @@ export const useConnectionStore = defineStore('connection', () => {
     if (targetMode === 'live' && !token && pairingCode.length === 0) {
       phase.value = 'error';
       error.value = '需要配对码或 Token 才能连接真实 Node';
+      lastError.value = error.value;
       ui.push(error.value, 'danger');
       return;
     }
@@ -226,6 +236,7 @@ export const useConnectionStore = defineStore('connection', () => {
           tabBlocked.value = false;
           phase.value = 'error';
           error.value = message;
+          lastError.value = message;
           ui.push(message, 'danger');
           return;
         }
@@ -310,6 +321,7 @@ export const useConnectionStore = defineStore('connection', () => {
     phase,
     mode,
     error,
+    lastError,
     detail,
     rttMs,
     serverTime,

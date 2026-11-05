@@ -3,10 +3,13 @@ import { onMounted } from 'vue';
 import ToastHost from '@/components/ToastHost.vue';
 import TabGuardOverlay from '@/components/TabGuardOverlay.vue';
 import { useConnectionStore } from '@/stores/connection';
+import { useNetworkStore } from '@/stores/network';
 
 const connection = useConnectionStore();
+const network = useNetworkStore();
 
 onMounted(() => {
+  network.init();
   connection.bootstrap();
 });
 </script>

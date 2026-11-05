@@ -122,6 +122,7 @@ export interface Welcome {
   client_id: string;
   client_type?: ClientType;
   token?: string;
+  permissions?: string[];
   node: NodeInfo;
   snapshot: Snapshot;
   server_time: string;
