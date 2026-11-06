@@ -185,9 +185,11 @@ ClientTransport
 - `npm run build && npx cap add android && npx cap sync android`
 - JDK 21 + Android SDK 35 + Gradle 8.11.1 + AGP 8.7.2 执行 `./gradlew assembleDebug`
 - `BUILD SUCCESSFUL`，Debug APK：`android/app/build/outputs/apk/debug/app-debug.apk`
-  - 大小 **4,155,286 bytes（约 4.0 MB）**
-  - SHA-256 `c0348dd2add2863cb958377641909b680e143105aee4d205dc2f6c4df0edc6f2`
+  - 大小 **4,230,914 bytes（约 4.1 MB）**
+  - SHA-256 `b8fbdc243d45251c0e98e542282e9e1e23b12aa0e2f289bfa1c9d93195cceec4`
 - APK `assets/capacitor.config.json` 已确认包含 `"androidScheme": "http"`、`"cleartext": true`
+- 真机（HBN-AL00 / USB）安装验证：配对真实 Node `http://100.69.235.2:8787` 成功，Home 恢复 41 个 Session；测试 Session `ses_e5a1c7989ffefcU1XdrTiq6WXX` 发送 Prompt 并收到真实回复，状态 `running → idle`；未触碰主会话
+- 真机修复：旧 WebView 缺少 `Promise.withResolvers`，已在 `src/main.ts` 增加 polyfill，重新打包安装后连接成功
 - aapt 检查：`package=com.flyingbasshot.meetagent`、`versionCode=1`、`versionName=1.0`、`minSdk=23`、`targetSdk=35`
 - Debug 专用明文配置：`android/app/src/debug/AndroidManifest.xml` + `network_security_config.xml`，允许 LAN / Tailscale `100.64.0.0/10` 的 HTTP/WS 调试
 - `.gitignore` 已忽略 `local.properties`、`.gradle/`、`build/`、`app/build/` 与 APK
@@ -265,6 +267,13 @@ M5a 截图位于 `/tmp/opencode/meetagent-mobile-live/`：
 - `m5-tls-cert-error-390.png`（自签证书未信任的配对提示）
 - `m5-tls-wss-error-390.png`（WSS 握手失败提示）
 
+M5b 真机截图位于 `/tmp/opencode/meetagent-mobile-android/`：
+
+- `06-home-real.png`（真实 Node Home）
+- `07-sessions-real.png`（41 个 Session）
+- `08-target-session-real.png`（测试 Session 详情）
+- `11-prompt-response.png`（Prompt 回复与状态回传）
+
 ## 已知限制
 
 - Web 原型的 Token 存在 `localStorage`，不等同于安全存储。
@@ -273,7 +282,7 @@ M5a 截图位于 `/tmp/opencode/meetagent-mobile-live/`：
 - Web Locks 不可用的环境退化为允许连接；Capacitor 单 WebView 场景不受影响。
 - 自签证书只用于本机测试；正式远程部署需使用受信任 CA 或 Tailscale 证书。浏览器不会向页面暴露证书细节，UI 只能给出通用信任提示。
 - Android Debug 包允许明文 HTTP/WS，仅用于 LAN / Tailscale 开发；Release 包必须使用 HTTPS/WSS。
-- 本机无连接设备/模拟器，APK 未安装运行；未配置 Release 签名与 iOS 工程。
+- Android 真机已验证配对与 Prompt；Interrupt、审批、断网恢复、网络切换尚未在真机验证；未配置 Release 签名与 iOS 工程。
 - 开发模式使用 Vite HMR 时，长时间断网可能让开发服务器连接丢失并触发页面重载；生产构建与 Capacitor 不受此影响。
 - 真实 Node 需要允许 `http://localhost:5174` / `http://localhost:4173` 的 CORS 来源；WSS 证书需浏览器信任。
 - 浏览器通知依赖用户授权；部分移动浏览器要求 Service Worker 才能展示系统通知。

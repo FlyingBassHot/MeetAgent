@@ -127,8 +127,8 @@ sdkVersion:'23'
 targetSdkVersion:'35'
 application-label:'MeetAgent Mobile'
 APK: mobile/android/app/build/outputs/apk/debug/app-debug.apk
-大小: 4,155,286 bytes（约 4.0 MB）
-SHA-256: c0348dd2add2863cb958377641909b680e143105aee4d205dc2f6c4df0edc6f2
+大小: 4,230,914 bytes（约 4.1 MB）
+SHA-256: b8fbdc243d45251c0e98e542282e9e1e23b12aa0e2f289bfa1c9d93195cceec4
 ```
 
 ## 5. Gradle 网络问题
@@ -164,7 +164,41 @@ touch "$DIST/gradle-8.11.1-all.zip.ok"
 - Android 的 network security config 不能直接表达 CIDR；debug 采用全局允许明文，正式包必须改回 HTTPS/WSS，不能把该配置带入 release。
 - Token 当前仍存在 WebView localStorage；Capacitor 正式版应迁移到 Android Keystore（通过自定义插件或安全存储插件）。
 
-## 7. 签名与发布
+## 7. 真机验证（2026-11-06）
+
+设备与网络：
+
+- `adb` 设备：`2NP0224717021762`（HBN-AL00，USB authorized）
+- 手机 Tailscale：`hbn-al00` / `100.87.152.120`
+- Node：`http://100.69.235.2:8787`（真实 OpenCode Agent）
+- App：`com.flyingbasshot.meetagent`，Debug APK
+
+结果：
+
+- 配对成功，Home 展示真实 Node `developer-machine` 与 41 个 Session
+- Sessions 列表与测试 Session `ses_e5a1c7989ffefcU1XdrTiq6WXX` 详情正常打开
+- 在测试 Session 发送 Prompt，收到真实 Agent 回复，Session 状态 `running → idle`
+- 未向主会话 `ses_e5e6e776fffeeeCdeah5WtPEhJ` 发送任何 Prompt
+- 真机截图：`/tmp/opencode/meetagent-mobile-android/`
+  - `06-home-real.png`
+  - `07-sessions-real.png`
+  - `08-target-session-real.png`
+  - `11-prompt-response.png`
+
+真机修复：
+
+- 旧版 Android WebView（Chrome < 119）没有 `Promise.withResolvers`，点击连接时报：
+  `E/Capacitor/Console ... TypeError: Promise.withResolvers is not a function`
+- 已在 `src/main.ts` 增加运行时 polyfill，重新 `npm run build` / `cap sync` / `assembleDebug` / `adb install -r` 后连接成功
+- 修复后 logcat 无 Capacitor JS Console 异常
+
+未在真机验证：
+
+- Interrupt、权限审批、断网恢复
+- 切换 Wi-Fi / Tailscale 网络
+- Release 签名、系统通知、Keystore
+
+## 8. 签名与发布
 
 - Debug APK 使用 Android debug keystore，仅用于内部测试，不能发布。
 - Release 需要独立 keystore：
@@ -184,9 +218,10 @@ keytool -genkeypair -v \
   - 关闭 debug 的 cleartext 配置；
   - 在真机或 Firebase Test Lab 上跑安装与连接冒烟。
 
-## 8. 本机未验证
+## 9. 本机未验证
 
-- 无 adb 设备/模拟器：未执行 `adb install`、启动 Activity 或真机联调。
+- 已安装 Debug APK 并完成配对/Prompt 真机验证；未验证 Interrupt、审批、断网恢复。
 - 未构建 Release APK，未配置发布签名。
 - 未验证 Android Keystore、系统通知、FCM、后台保活。
-- 未验证 Tailscale Android 客户端实际网络切换。
+- 未验证 Tailscale Android 客户端在 Wi-Fi/蜂窝之间的实际切换。
+- 未在 iOS 上打包或运行。
