@@ -309,6 +309,9 @@ func TestAdminClientListAndRevoke(t *testing.T) {
 	if len(list.Clients) != 1 || list.Clients[0].ClientID != paired.ClientID {
 		t.Fatalf("clients = %+v", list.Clients)
 	}
+	if list.Clients[0].Online {
+		t.Fatal("paired but not connected client should be offline")
+	}
 
 	patchBody := strings.NewReader(`{"permissions":["session.read"]}`)
 	patchReq, _ := http.NewRequest(http.MethodPatch, ts.URL+"/api/v2/clients/"+paired.ClientID, patchBody)
@@ -350,7 +353,10 @@ func TestPrivateOriginAllowed(t *testing.T) {
 	if !isPrivateHost("192.168.1.10") || !isPrivateHost("10.0.0.5") || !isPrivateHost("localhost") || !isPrivateHost("desk.local") {
 		t.Fatal("expected private hosts to be allowed")
 	}
-	if isPrivateHost("evil.example.com") || isPrivateHost("8.8.8.8") {
+	if !isPrivateHost("100.69.235.2") {
+		t.Fatal("expected Tailscale CGNAT address to be allowed")
+	}
+	if isPrivateHost("evil.example.com") || isPrivateHost("8.8.8.8") || isPrivateHost("100.128.0.1") {
 		t.Fatal("public host must not be treated as private")
 	}
 }

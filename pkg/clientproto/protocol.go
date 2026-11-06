@@ -340,6 +340,7 @@ type ClientInfo struct {
 	Version      string     `json:"client_version,omitempty"`
 	Capabilities []string   `json:"capabilities,omitempty"`
 	Permissions  []string   `json:"permissions,omitempty"`
+	Online       bool       `json:"online"`
 	CreatedAt    time.Time  `json:"created_at"`
 	LastSeen     *time.Time `json:"last_seen,omitempty"`
 }

@@ -106,6 +106,7 @@ func (c *clientConn) readPump() {
 			return
 		}
 		c.lastSeen = time.Now().UTC()
+		c.server.pairing.Touch(c.id, c.lastSeen)
 		var env clientproto.Envelope
 		if err := json.Unmarshal(raw, &env); err != nil {
 			c.sendError("bad_message", "invalid JSON envelope")

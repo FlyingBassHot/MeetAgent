@@ -196,6 +196,16 @@ func (m *Manager) Authenticate(token string) (*Client, error) {
 	return &copy, nil
 }
 
+// Touch updates a paired client's last-seen timestamp in memory.
+func (m *Manager) Touch(clientID string, at time.Time) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if client, ok := m.clients[clientID]; ok {
+		value := at.UTC()
+		client.LastSeen = &value
+	}
+}
+
 // Revoke removes one client identity. Existing connections are closed by the
 // Node server when it observes the revoke; this method only updates storage.
 func (m *Manager) Revoke(clientID string) bool {

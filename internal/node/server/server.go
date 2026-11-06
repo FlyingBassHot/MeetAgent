@@ -350,6 +350,7 @@ func (s *Server) handleClients(w http.ResponseWriter, r *http.Request) {
 			Version:      client.Version,
 			Capabilities: append([]string(nil), client.Capabilities...),
 			Permissions:  append([]string(nil), client.Permissions...),
+			Online:       s.clientOnline(client.ClientID),
 			CreatedAt:    client.CreatedAt,
 			LastSeen:     client.LastSeen,
 		})
@@ -418,6 +419,13 @@ func (s *Server) adminAuthorized(r *http.Request) bool {
 		return false
 	}
 	return subtle.ConstantTimeCompare([]byte(strings.TrimSpace(value[7:])), []byte(s.opts.AdminToken)) == 1
+}
+
+func (s *Server) clientOnline(clientID string) bool {
+	s.clientsMu.Lock()
+	defer s.clientsMu.Unlock()
+	_, ok := s.clients[clientID]
+	return ok
 }
 
 func (s *Server) disconnectClient(clientID string) {
@@ -707,6 +715,10 @@ func isPrivateHost(host string) bool {
 	ip := net.ParseIP(host)
 	if ip == nil {
 		return false
+	}
+	if v4 := ip.To4(); v4 != nil && v4[0] == 100 && v4[1] >= 64 && v4[1] <= 127 {
+		// Tailscale uses the 100.64.0.0/10 shared address range.
+		return true
 	}
 	return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast()
 }

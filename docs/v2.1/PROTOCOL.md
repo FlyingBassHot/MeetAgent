@@ -75,7 +75,7 @@ Token 只保存哈希；设备端必须安全保存（Mobile 用 Keychain/Keysto
 
 `server.admin_token` 非空时启用：
 
-- `GET /api/v2/clients`：列出已配对客户端（不含 Token 哈希）
+- `GET /api/v2/clients`：列出已配对客户端（不含 Token 哈希），含 `online` 与 `last_seen`
 - `PATCH /api/v2/clients/{client_id}`：更新该客户端的权限（如 `{"permissions":["session.read"]}`），并关闭其在线连接以便重连后生效
 - `DELETE /api/v2/clients/{client_id}`：撤销客户端并关闭其在线连接
 
@@ -286,7 +286,7 @@ WebSocket 层也可使用 ping/pong；JSON 心跳用于 UI 显示 RTT。
 ## 8. 局域网访问
 
 - Node 默认监听 `0.0.0.0:8787`，同一 Wi-Fi 下的手机可访问
-- `server.allow_lan_origins: true`（默认）允许私有网段 / `.local` / localhost 的 CORS Origin
+- `server.allow_lan_origins: true`（默认）允许私有网段、Tailscale CGNAT `100.64.0.0/10`、`.local`、localhost 的 CORS Origin
 - 公网部署请关闭该选项，并把具体域名加入 `server.allowed_origins`
 - 本地可用自签证书验证 WSS；simulator 支持 `-insecure`，仅限本机测试
 
