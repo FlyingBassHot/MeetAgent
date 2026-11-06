@@ -181,9 +181,13 @@ ClientTransport
 
 - `npm install` 安装 Capacitor Core / CLI / Android **7.6.10**
 - `capacitor.config.ts`：`com.flyingbasshot.meetagent` / `MeetAgent Mobile` / `webDir: dist`
+- Debug 开发配置：`server.androidScheme: "http"` + `server.cleartext: true`，避免 WebView 从 `https://localhost` 访问 `http://100.x:8787` 的混合内容问题；Release 必须改回 https 并移除 cleartext
 - `npm run build && npx cap add android && npx cap sync android`
 - JDK 21 + Android SDK 35 + Gradle 8.11.1 + AGP 8.7.2 执行 `./gradlew assembleDebug`
-- `BUILD SUCCESSFUL`，Debug APK：`android/app/build/outputs/apk/debug/app-debug.apk`（约 4.0 MB）
+- `BUILD SUCCESSFUL`，Debug APK：`android/app/build/outputs/apk/debug/app-debug.apk`
+  - 大小 **4,155,286 bytes（约 4.0 MB）**
+  - SHA-256 `c0348dd2add2863cb958377641909b680e143105aee4d205dc2f6c4df0edc6f2`
+- APK `assets/capacitor.config.json` 已确认包含 `"androidScheme": "http"`、`"cleartext": true`
 - aapt 检查：`package=com.flyingbasshot.meetagent`、`versionCode=1`、`versionName=1.0`、`minSdk=23`、`targetSdk=35`
 - Debug 专用明文配置：`android/app/src/debug/AndroidManifest.xml` + `network_security_config.xml`，允许 LAN / Tailscale `100.64.0.0/10` 的 HTTP/WS 调试
 - `.gitignore` 已忽略 `local.properties`、`.gradle/`、`build/`、`app/build/` 与 APK

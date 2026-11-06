@@ -61,10 +61,17 @@ const config: CapacitorConfig = {
   appId: 'com.flyingbasshot.meetagent',
   appName: 'MeetAgent Mobile',
   webDir: 'dist',
+  // 仅 Android 真机开发联调；Release 必须改回 https 并移除 cleartext。
+  server: {
+    androidScheme: 'http',
+    cleartext: true,
+  },
 };
 
 export default config;
 ```
+
+`androidScheme: 'http'` 让 WebView 以 `http://localhost` 加载页面，避免默认 `https://localhost` 访问 `http://100.x:8787` 时被混合内容策略拦截；否则 UI 会把请求失败误报为 CORS。
 
 `android/local.properties` 指向本机 SDK（不要提交）：
 
@@ -119,7 +126,9 @@ package: name='com.flyingbasshot.meetagent' versionCode='1' versionName='1.0'
 sdkVersion:'23'
 targetSdkVersion:'35'
 application-label:'MeetAgent Mobile'
-APK: mobile/android/app/build/outputs/apk/debug/app-debug.apk（约 4.0 MB）
+APK: mobile/android/app/build/outputs/apk/debug/app-debug.apk
+大小: 4,155,286 bytes（约 4.0 MB）
+SHA-256: c0348dd2add2863cb958377641909b680e143105aee4d205dc2f6c4df0edc6f2
 ```
 
 ## 5. Gradle 网络问题
@@ -147,11 +156,11 @@ touch "$DIST/gradle-8.11.1-all.zip.ok"
 ## 6. 连接后端与明文流量
 
 - 正式远程：使用 `https://<host>`，客户端自动派生 `wss://<host>/ws`。**Release 构建必须使用 HTTPS/WSS。**
-- Debug 构建已允许明文 HTTP/WS，用于本机、LAN 与 Tailscale：
-  - `android/app/src/debug/AndroidManifest.xml`：`android:usesCleartextTraffic="true"`，并引用 debug 专用 network security config
-  - `android/app/src/debug/res/xml/network_security_config.xml`：`cleartextTrafficPermitted="true"`
-  - Tailscale 网段为 `100.64.0.0/10`，例如 `http://100.69.235.2:8787` / `ws://100.69.235.2:8787/ws` 可在 debug 包访问
-  - 这些文件只进入 debug variant；`release` 使用平台默认（禁止 cleartext）
+- 当前 Debug 同时开启：
+  - `capacitor.config.ts` → `server.androidScheme: "http"`、`server.cleartext: true`（APK 内 `assets/capacitor.config.json` 可验证）
+  - `android/app/src/debug/AndroidManifest.xml` → `android:usesCleartextTraffic="true"` 与 debug network security config
+  - Tailscale 网段 `100.64.0.0/10`，例如 `http://100.69.235.2:8787` / `ws://100.69.235.2:8787/ws`
+  - Release 必须改回 `androidScheme: "https"`、删除 `cleartext`，并使用 HTTPS/WSS；不要携带 debug 配置发布。
 - Android 的 network security config 不能直接表达 CIDR；debug 采用全局允许明文，正式包必须改回 HTTPS/WSS，不能把该配置带入 release。
 - Token 当前仍存在 WebView localStorage；Capacitor 正式版应迁移到 Android Keystore（通过自定义插件或安全存储插件）。
 
