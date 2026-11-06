@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug builds only: permit cleartext HTTP/WS for LAN and Tailscale 100.64.0.0/10.
+     Release builds use the platform default (cleartext blocked) and must use HTTPS/WSS. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

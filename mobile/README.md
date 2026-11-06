@@ -1,9 +1,9 @@
-# MeetAgent Mobile（V2.1 / M5a）
+# MeetAgent Mobile（V2.1 / M5b）
 
 MeetAgent V2.1 的移动端 Web 原型，后续由 Capacitor 打包为 Android / iOS 应用。
 
-当前进度：M5a 远程连接基础（网络状态、WSS/TLS、自签证书诊断与 Tailscale 部署文档）。
-Mock、局域网 Node、自签 WSS Node 共用同一套 `ClientTransport` 与协议类型。
+当前进度：M5b Android Debug APK 构建完成（Capacitor 7.6.10 + JDK 21 + SDK 35）。
+Web、Mock、局域网 Node、自签 WSS Node 与 Android WebView 共用同一套 `ClientTransport` 与协议类型。
 
 ## 技术栈
 
@@ -66,8 +66,11 @@ mobile/
 ├── package.json
 ├── tsconfig.json
 ├── vite.config.ts
+├── capacitor.config.ts       # appId / appName / webDir
 ├── README.md
 ├── docs/REMOTE.md            # Tailscale / WSS / 证书 / Capacitor 说明
+├── docs/ANDROID.md           # Android SDK / Gradle / APK / 签名说明
+├── android/                  # Capacitor Android 工程
 └── src/
     ├── app/
     │   ├── nav.ts              # 底部/侧边导航
@@ -172,9 +175,25 @@ ClientTransport
 - 证书失败提示：未信任证书的浏览器无法完成 HTTPS 配对或 WSS 握手；UI 显示通用提示“自签证书请先在系统/浏览器中信任（浏览器不会暴露证书细节）”
 - 未触碰 `8787` 真实 Node 与 OpenCode 主会话
 
+## M5b Capacitor Android
+
+已验证：
+
+- `npm install` 安装 Capacitor Core / CLI / Android **7.6.10**
+- `capacitor.config.ts`：`com.flyingbasshot.meetagent` / `MeetAgent Mobile` / `webDir: dist`
+- `npm run build && npx cap add android && npx cap sync android`
+- JDK 21 + Android SDK 35 + Gradle 8.11.1 + AGP 8.7.2 执行 `./gradlew assembleDebug`
+- `BUILD SUCCESSFUL`，Debug APK：`android/app/build/outputs/apk/debug/app-debug.apk`（约 4.0 MB）
+- aapt 检查：`package=com.flyingbasshot.meetagent`、`versionCode=1`、`versionName=1.0`、`minSdk=23`、`targetSdk=35`
+- Debug 专用明文配置：`android/app/src/debug/AndroidManifest.xml` + `network_security_config.xml`，允许 LAN / Tailscale `100.64.0.0/10` 的 HTTP/WS 调试
+- `.gitignore` 已忽略 `local.properties`、`.gradle/`、`build/`、`app/build/` 与 APK
+
+未连接设备/模拟器，因此未执行安装与真机运行。
+
 ## 尚未实现（后续里程碑）
 
-- Capacitor Android / iOS 打包、Keychain / Keystore、APNs / FCM（本机无 Android SDK / adb / Xcode）
+- Android Release 签名与渠道发布、iOS 打包
+- Keychain / Keystore、APNs / FCM
 - Tailscale 实网部署与多网络切换（仅提供部署文档）
 - 语音 / STT
 - 通知的更细粒度策略（仅审批提醒基础已预留）
@@ -249,6 +268,8 @@ M5a 截图位于 `/tmp/opencode/meetagent-mobile-live/`：
 - 接管依赖旧标签页响应 BroadcastChannel；旧标签页被浏览器冻结且不响应时，接管会在 6 秒后失败并提示，避免强制抢占造成双连接。
 - Web Locks 不可用的环境退化为允许连接；Capacitor 单 WebView 场景不受影响。
 - 自签证书只用于本机测试；正式远程部署需使用受信任 CA 或 Tailscale 证书。浏览器不会向页面暴露证书细节，UI 只能给出通用信任提示。
+- Android Debug 包允许明文 HTTP/WS，仅用于 LAN / Tailscale 开发；Release 包必须使用 HTTPS/WSS。
+- 本机无连接设备/模拟器，APK 未安装运行；未配置 Release 签名与 iOS 工程。
 - 开发模式使用 Vite HMR 时，长时间断网可能让开发服务器连接丢失并触发页面重载；生产构建与 Capacitor 不受此影响。
 - 真实 Node 需要允许 `http://localhost:5174` / `http://localhost:4173` 的 CORS 来源；WSS 证书需浏览器信任。
 - 浏览器通知依赖用户授权；部分移动浏览器要求 Service Worker 才能展示系统通知。
