@@ -118,6 +118,10 @@ func (s *Server) handleCommand(c *clientConn, cmd clientproto.Command) clientpro
 		if !s.beginPermission(payload.PermissionID) {
 			return finish(commandFailure(cmd, protocol.StatusRejected, "permission has already been handled"))
 		}
+		if !s.hub.HasPendingPermission(payload.PermissionID) {
+			s.finishPermission(payload.PermissionID, false)
+			return finish(commandFailure(cmd, protocol.StatusRejected, "permission is not pending or has expired"))
+		}
 		ctx, cancel := context.WithTimeout(context.Background(), s.opts.CommandTimeout)
 		err := s.manager.RespondPermission(ctx, cmd.AgentID, cmd.SessionID, payload.PermissionID, decision, payload.Message)
 		cancel()

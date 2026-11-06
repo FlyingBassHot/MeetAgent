@@ -120,6 +120,7 @@ type ServerConfig struct {
 	EventTTL           Duration `yaml:"event_ttl"`
 	SnapshotEvents     int      `yaml:"snapshot_events"`
 	PairingTTL         Duration `yaml:"pairing_ttl"`
+	PermissionTTL      Duration `yaml:"permission_ttl"`
 	PairingStore       string   `yaml:"pairing_store"`
 	AdminToken         string   `yaml:"admin_token"`
 	DefaultPermissions []string `yaml:"default_permissions"`
@@ -192,6 +193,7 @@ func Default() Config {
 			EventTTL:           Duration(time.Hour),
 			SnapshotEvents:     100,
 			PairingTTL:         Duration(10 * time.Minute),
+			PermissionTTL:      Duration(10 * time.Minute),
 			PairingStore:       "./data/paired-clients.json",
 			AdminToken:         "",
 			DefaultPermissions: []string{"session.read", "session.control", "permission.respond"},
@@ -309,6 +311,9 @@ func (c *Config) validateServer() error {
 	}
 	if c.Server.PairingTTL.Std() <= 0 {
 		return fmt.Errorf("server.pairing_ttl must be positive")
+	}
+	if c.Server.PermissionTTL.Std() <= 0 {
+		return fmt.Errorf("server.permission_ttl must be positive")
 	}
 	if c.Server.CommandTimeout.Std() <= 0 {
 		return fmt.Errorf("server.command_timeout must be positive")

@@ -54,6 +54,7 @@ server:
   event_buffer: 1000
   event_ttl: 1h
   snapshot_events: 100
+  permission_ttl: 10m
   pairing_ttl: 10m
   admin_token: "dev-admin-token-change-me"
   pairing_store: "./data/paired-clients.json"

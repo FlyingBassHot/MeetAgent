@@ -258,6 +258,7 @@ permission.requested / permission.resolved
 - `command_id` 幂等；重复提交返回同一结果
 - 同一 Session 的并发控制由 Node/Adapter 负责
 - 多客户端审批只有一个最终有效决策；Node 对同一 `permission_id` 的并发/重复决策直接拒绝
+- Node 为未提供 `expires_at` 的权限请求补充默认过期时间（`server.permission_ttl`，默认 10 分钟）；过期后决策返回 `rejected`
 - 命令超时默认 15 秒（由 Node 配置）
 
 ## 6. 心跳

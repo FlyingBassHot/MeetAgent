@@ -51,6 +51,7 @@ func run() error {
 
 	nodeInfo := server.NodeInfo(cfg.Node.ID, cfg.Node.Name)
 	hub := eventhub.New(nodeInfo, manager, cfg.Server.EventBuffer, cfg.Server.EventTTL.Std(), logger)
+	hub.SetPermissionTTL(cfg.Server.PermissionTTL.Std())
 	manager.Start(ctx)
 	defer func() {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

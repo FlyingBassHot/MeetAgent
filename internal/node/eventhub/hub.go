@@ -5,6 +5,7 @@ package eventhub
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"sync"
 	"time"
@@ -28,11 +29,12 @@ type ManifestSource interface {
 
 // Hub owns the Node event sequence and subscriptions.
 type Hub struct {
-	nodeID   string
-	nodeInfo clientproto.NodeInfo
-	source   Source
-	cache    *eventcache.Cache
-	logger   *slog.Logger
+	nodeID        string
+	nodeInfo      clientproto.NodeInfo
+	source        Source
+	cache         *eventcache.Cache
+	logger        *slog.Logger
+	permissionTTL time.Duration
 
 	mu      sync.Mutex
 	nextSub int
@@ -49,14 +51,34 @@ func New(nodeInfo clientproto.NodeInfo, source Source, capacity int, ttl time.Du
 		capacity = 1000
 	}
 	return &Hub{
-		nodeID:   nodeInfo.NodeID,
-		nodeInfo: nodeInfo,
-		source:   source,
-		cache:    eventcache.New(capacity, ttl),
-		logger:   logger,
-		v2:       make(map[int]chan clientproto.Event),
-		raw:      make(map[int]chan protocol.AgentEvent),
+		nodeID:        nodeInfo.NodeID,
+		nodeInfo:      nodeInfo,
+		source:        source,
+		cache:         eventcache.New(capacity, ttl),
+		logger:        logger,
+		permissionTTL: 10 * time.Minute,
+		v2:            make(map[int]chan clientproto.Event),
+		raw:           make(map[int]chan protocol.AgentEvent),
 	}
+}
+
+// SetPermissionTTL configures the default expiry added to permission requests
+// that do not provide one. Zero keeps the 10 minute default.
+func (h *Hub) SetPermissionTTL(ttl time.Duration) {
+	if ttl > 0 {
+		h.permissionTTL = ttl
+	}
+}
+
+// HasPendingPermission reports whether a permission ID is still pending and
+// not expired in the current cache.
+func (h *Hub) HasPendingPermission(permissionID string) bool {
+	for _, permission := range h.cache.PendingPermissions(nil) {
+		if permission.PermissionID == permissionID {
+			return true
+		}
+	}
+	return false
 }
 
 // Run consumes adapter events until ctx is canceled.
@@ -75,6 +97,7 @@ func (h *Hub) Run(ctx context.Context) {
 }
 
 func (h *Hub) publish(event protocol.AgentEvent) {
+	event = h.stampPermission(event)
 	event = h.cache.Append(h.nodeID, event)
 	clientEvent := clientproto.EventFromAgent(h.nodeID, event)
 
@@ -94,6 +117,26 @@ func (h *Hub) publish(event protocol.AgentEvent) {
 			h.logger.Debug("raw event dropped by full buffer", "subscription", id, "event_id", event.EventID)
 		}
 	}
+}
+
+func (h *Hub) stampPermission(event protocol.AgentEvent) protocol.AgentEvent {
+	if event.EventType != protocol.EventPermissionRequested || len(event.Payload) == 0 {
+		return event
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(event.Payload, &payload); err != nil {
+		return event
+	}
+	if value, ok := payload["expires_at"].(string); ok && value != "" {
+		return event
+	}
+	payload["expires_at"] = time.Now().UTC().Add(h.permissionTTL).Format(time.RFC3339Nano)
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return event
+	}
+	event.Payload = raw
+	return event
 }
 
 // Snapshot builds the current full state.

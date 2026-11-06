@@ -117,6 +117,7 @@ server:
   enabled: true
   addr: "0.0.0.0:8787"
   pairing_ttl: 10m
+  permission_ttl: 10m
   pairing_store: "./data/paired-clients.json"
   allow_lan_origins: true
   mdns: true

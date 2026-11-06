@@ -61,3 +61,34 @@ func TestHubSequenceSnapshotAndReplay(t *testing.T) {
 		t.Fatalf("missed = %+v", missed)
 	}
 }
+
+func TestPermissionRequestGetsExpiryAndExpires(t *testing.T) {
+	source := &fakeSource{events: make(chan protocol.AgentEvent, 4), agents: nil}
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	hub := New(clientproto.NodeInfo{NodeID: "node-test", Name: "Test"}, source, 20, time.Minute, logger)
+	hub.SetPermissionTTL(50 * time.Millisecond)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go hub.Run(ctx)
+	time.Sleep(10 * time.Millisecond)
+
+	source.events <- protocol.AgentEvent{
+		EventType: protocol.EventPermissionRequested,
+		Payload:   []byte(`{"permission_id":"per-1","description":"read secret.env"}`),
+	}
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		snapshot := hub.Snapshot(10)
+		if len(snapshot.PendingPermissions) == 1 && snapshot.PendingPermissions[0].ExpiresAt != nil {
+			if !hub.HasPendingPermission("per-1") {
+				t.Fatal("permission should be pending before expiry")
+			}
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	time.Sleep(80 * time.Millisecond)
+	if hub.HasPendingPermission("per-1") {
+		t.Fatal("permission should expire")
+	}
+}
