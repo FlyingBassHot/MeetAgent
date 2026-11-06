@@ -121,6 +121,8 @@ server:
   pairing_store: "./data/paired-clients.json"
   allow_lan_origins: true
   mdns: true
+  rate_limit_per_second: 100
+  rate_limit_burst: 200
 
 cloud:
   enabled: false

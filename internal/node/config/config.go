@@ -127,6 +127,8 @@ type ServerConfig struct {
 	MDNS               *bool    `yaml:"mdns"`
 	CommandTimeout     Duration `yaml:"command_timeout"`
 	ReadTimeout        Duration `yaml:"read_timeout"`
+	RateLimitPerSecond int      `yaml:"rate_limit_per_second"`
+	RateLimitBurst     int      `yaml:"rate_limit_burst"`
 }
 
 // IsEnabled reports whether the local server should start (default true).
@@ -200,6 +202,8 @@ func Default() Config {
 			MDNS:               boolPtr(true),
 			CommandTimeout:     Duration(15 * time.Second),
 			ReadTimeout:        Duration(90 * time.Second),
+			RateLimitPerSecond: 100,
+			RateLimitBurst:     200,
 		},
 		Cloud: CloudConfig{
 			Enabled:           boolPtr(false),
@@ -320,6 +324,9 @@ func (c *Config) validateServer() error {
 	}
 	if c.Server.ReadTimeout.Std() <= 0 {
 		return fmt.Errorf("server.read_timeout must be positive")
+	}
+	if c.Server.RateLimitPerSecond < 0 || c.Server.RateLimitBurst < 0 {
+		return fmt.Errorf("server.rate_limit_per_second and rate_limit_burst must not be negative")
 	}
 	if (c.Server.TLSCert == "") != (c.Server.TLSKey == "") {
 		return fmt.Errorf("server.tls_cert and server.tls_key must be set together")

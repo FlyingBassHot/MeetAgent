@@ -49,6 +49,8 @@ type Options struct {
 	MDNS               bool
 	CommandTimeout     time.Duration
 	ReadTimeout        time.Duration
+	RateLimitPerSecond float64
+	RateLimitBurst     int
 }
 
 func (o Options) withDefaults() Options {
@@ -496,6 +498,7 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 		send:     make(chan []byte, 256),
 		done:     make(chan struct{}),
 		lastSeen: time.Now().UTC(),
+		limiter:  newTokenBucket(s.opts.RateLimitPerSecond, s.opts.RateLimitBurst),
 	}
 	s.replaceClient(cc)
 

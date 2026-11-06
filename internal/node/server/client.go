@@ -23,6 +23,7 @@ type clientConn struct {
 	once sync.Once
 
 	lastSeen time.Time
+	limiter  *tokenBucket
 }
 
 func (c *clientConn) close() {
@@ -114,6 +115,10 @@ func (c *clientConn) readPump() {
 		}
 		if err := env.Validate(); err != nil {
 			c.sendError("bad_message", err.Error())
+			continue
+		}
+		if !c.limiter.allow(time.Now()) {
+			c.sendError("rate_limited", "inbound message rate exceeded")
 			continue
 		}
 		switch env.Type {
