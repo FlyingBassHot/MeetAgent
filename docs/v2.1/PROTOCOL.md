@@ -301,7 +301,7 @@ WebSocket 层也可使用 ping/pong；JSON 心跳用于 UI 显示 RTT。
 
 ## 10. 审计
 
-Node 以结构化 `audit` 日志记录关键动作：客户端配对、认证失败、断开、权限更新、撤销、命令最终状态（client_id / command_id / type / agent_id / session_id / status / duration_ms）。日志不包含 Token 或配对码。
+Node 以结构化 `audit` 日志记录关键动作：客户端配对、连接/重连（含 last_sequence 与 replay_truncated）、认证失败、断开、权限更新、撤销、命令最终状态（client_id / command_id / type / agent_id / session_id / status / duration_ms）。日志不包含 Token 或配对码。
 
 ## 11. 安全
 

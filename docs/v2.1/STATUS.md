@@ -1,12 +1,12 @@
 # MeetAgent V2.1 状态板
 
-更新时间：2026-11-05
+更新时间：2026-11-06
 
 | 模块 | 负责人 | 当前阶段 | 状态 | 下一步 |
 |---|---|---|---|---|
-| Core / Node | 主会话 | M0 + M1 + M4 Core | 完成 | M5 远程/Cloud 增强 |
+| Core / Node | 主会话 | M0 + M1 + M4 Core | 完成；审计/限流/重连边界加固 | M6 可选增强 |
 | Protocol v2 | 主会话 | M0 | 完成 | 随实现补兼容测试 |
-| Mobile | omp | M4 + M5a + M5b | 完成（Tailscale、WSS/TLS、Android debug APK） | iOS/Release/真机安装 |
+| Mobile | omp | M4 + M5a + M5b | 完成（Tailscale、WSS/TLS、Android 真机配对/Prompt/事件/node 重启恢复） | iOS/Release |
 | Terminal / ESPUI | pi | E0–E2 + E3a | 暂停（host tests 805/805，33 files syntax） | 等 ESP32 真机 + ESP-IDF |
 | Cloud relay | 主会话 | 可选 | 保留 V1 实现 | M6 再验证混合模式 |
 
@@ -37,12 +37,13 @@
 - Tailscale：`100.69.235.2` 已登录；Mobile 通过 `http://100.69.235.2:5174` 连接 `http://100.69.235.2:8787`，配对/Snapshot 成功；CORS 已允许 100.64/10
 - 客户端在线状态：`/api/v2/clients` 返回 `online` 与最近活动时间，心跳/命令会刷新 last_seen
 - 权限过期：无 `expires_at` 的 permission.requested 自动补充 10 分钟默认过期；过期/重复决策被 Node 拒绝
-- 审计：配对/认证失败/断开/撤销/权限更新/命令终态写入结构化 audit 日志，不记录 Token
+- 审计：配对/连接/重连（含 last_sequence、replay_truncated）/认证失败/断开/撤销/权限更新/命令终态写入结构化 audit 日志，不记录 Token
 - 限流：单客户端入站令牌桶（100/s、burst 200），超限返回 `rate_limited`；`cmd/node` 已从配置接线
 - 重连边界：先订阅后生成 Snapshot，消除握手期事件丢失；缓存淘汰/TTL/Node 重启时 `welcome.replay_truncated=true`，不再返回部分补发事件
 - Node 重启恢复：同一配对存储下，旧 `last_sequence` 重连得到新序号 Snapshot，后续事件从新序号连续递增（集成测试）
 - Tailscale：100.69.235.2 登录；Mobile 通过 Tailscale IP 配对并读取真实 Snapshot（CORS 已允许 100.64/10）
-- Android：JDK 21 + Android SDK 35；Capacitor 7.6.10；Gradle 8.11.1 Debug APK 4.0 MB（package com.flyingbasshot.meetagent）
+- Android：JDK 21 + Android SDK 35；Capacitor 7.6.10；Gradle 8.11.1 Debug APK 4,155,286 bytes（package com.flyingbasshot.meetagent）
+- Android 真机（HBN-AL00 / 2NP0224717021762）：USB ADB 已授权；Tailscale `100.69.235.2:8787` 配对成功；真实测试 Session `ses_e5a1c7989ffefcU1XdrTiq6WXX` 发出 Prompt，收到 `message.completed` 与 running→idle 状态；Node 重启后客户端自动重连并应用新 Snapshot
 - `make dev-tls`：本地自签证书生成脚本（data/ 已忽略）
 - M4 Core：双客户端同时收到同一 Prompt 事件；同一 permission 只允许一个最终决策；按 last_sequence 补发事件；PATCH 可独立配置客户端权限（集成测试）
 - M4 Mobile：单标签页 Web Locks 守卫 + 接管；两个独立 client 跨端事件/Interrupt/审批一致；Node 受控重启后 Snapshot 恢复、序号重置不报缺口

@@ -501,6 +501,9 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 		limiter:  newTokenBucket(s.opts.RateLimitPerSecond, s.opts.RateLimitBurst),
 	}
 	s.replaceClient(cc)
+	if issuedToken != "" {
+		s.audit("client.paired", "client_id", client.ClientID, "client_type", client.Type, "name", client.Name)
+	}
 
 	// Subscribe before taking the snapshot. Any event published during the
 	// handshake is then either part of the snapshot or buffered on the live
@@ -524,6 +527,12 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 		cc.close()
 		return
 	}
+	s.audit("client.connected",
+		"client_id", client.ClientID,
+		"client_type", client.Type,
+		"last_sequence", hello.LastSequence,
+		"replay_truncated", truncated,
+	)
 	if truncated {
 		s.audit("client.replay_truncated",
 			"client_id", client.ClientID,

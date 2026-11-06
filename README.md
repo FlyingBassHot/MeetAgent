@@ -4,7 +4,7 @@
 
 **Node-Centric · Multi-Client · Plugin-Based · LAN First · Cloud Optional**
 
-当前状态：**V2.1 大框架已落地**。Node 独立服务、V2.1 客户端协议、配对、事件中心、Mock Adapter 和协议模拟器已完成；Mobile M2（Mock）与 Terminal E0–E2（host tests）已完成，下一步进入真实 OpenCode 双端集成。
+当前状态：**V2.1 核心链路已贯通**。Node 独立服务、V2.1 客户端协议、配对、事件中心、命令/权限、审计与限流已完成；Mobile 已完成 OpenCode 真实 Session、Tailscale 与 Android debug APK 真机验证（配对、Prompt、事件回传、Node 重启恢复）。Terminal 等待 ESP32 硬件与 ESP-IDF，暂停在 E3a。
 
 > 设计文档：
 > - [`MeetAgentV2.1.md`](./MeetAgentV2.1.md) — 总体架构、双客户端、南向插件、阶段计划
@@ -35,7 +35,7 @@ Mobile (Vue + Capacitor)        ESP32 Terminal (ESP-IDF + LVGL)
 ```
 
 - **Node** 是核心：Agent 接入、Session、事件、命令、权限、配对、客户端注册
-- **Mobile** 是完整远程入口：LAN 直连，M4 已通过多客户端/重启恢复验证，下一步 Tailscale/Capacitor
+- **Mobile** 是完整远程入口：LAN/Tailscale 直连，M4 多客户端与 Node 重启恢复已验证，Capacitor Android debug APK 已完成真机配对与 Prompt 回传
 - **Terminal** 是局域网常驻终端：E0–E3a 已完成，硬件/ESP-IDF 到位前暂停
 - **Cloud** 不再是必需项；旧 Cloud 代码保留为可选 relay
 - **Adapter** 通过统一 Manifest/Capability 接入，OpenCode 只是第一个 Adapter
@@ -46,9 +46,9 @@ Mobile (Vue + Capacitor)        ESP32 Terminal (ESP-IDF + LVGL)
 
 | 模块 | 目录 | 状态 |
 |---|---|---|
-| Core / Node | `cmd/node`, `internal/`, `pkg/`, `configs/` | M0/M1 完成 |
+| Core / Node | `cmd/node`, `internal/`, `pkg/`, `configs/` | M0/M1/M4 完成；审计、限流、重连边界加固 |
 | Node 模拟器 | `cmd/simulator` | 可用 |
-| Mobile | `mobile/` | M5b 完成（Web + Capacitor Android debug APK） |
+| Mobile | `mobile/` | M5b 完成；Tailscale + Android 真机配对/Prompt/事件已验证 |
 | ESP32 Terminal / ESPUI | `firmware/terminal/` | E0–E2 + E3a 完成；等待真机/ESP-IDF，暂停 |
 | V1 Cloud / Web Console | `cmd/cloud`, `web/test-client` | 归档参考 |
 
@@ -202,10 +202,8 @@ make run-cloud        # 旧 V1 Cloud（可选）
 | M1 | Node Standalone、配对、Client Registry、Snapshot/Event/Command | 完成 |
 | M2 | Mobile M2 + Terminal E0–E2 | 完成（Mock / host tests） |
 | M3 | 真实 OpenCode 集成 | Mobile 完成；Terminal 待真机 |
-| M4 | 双端一致性与稳定性 | Core + Mobile 完成；Terminal 暂停 |
-| M5 | Mobile 远程（Tailscale/Capacitor） | 完成（Tailscale 实网 + WSS/TLS + Android debug APK；iOS/Release 待环境） |
-| M4 | 双端一致性与稳定性 | 待开始 |
-| M5 | Mobile 远程（Tailscale/Capacitor） | 待开始 |
+| M4 | 双端一致性与稳定性 | Core + Mobile 完成；Node 重启/缓存截断/握手补发边界已加固；Terminal 暂停 |
+| M5 | Mobile 远程（Tailscale/Capacitor） | 完成（Tailscale 实网 + WSS/TLS + Android debug APK 真机验证；iOS/Release 待环境） |
 | M6 | 语音/STT、Cloud Relay、第二 Adapter、OTA | 暂缓 |
 
 > 语音/STT 按当前要求暂缓。ESP32 硬件未到、ESP-IDF 未安装，Terminal 暂停在 E3a；Node 与 Mobile 继续推进，Mobile 已完成 M4、M5a/M5b（Tailscale、WSS/TLS、网络切换、诊断、Android debug APK）。
