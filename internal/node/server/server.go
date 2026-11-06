@@ -502,28 +502,40 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 	}
 	s.replaceClient(cc)
 
+	// Subscribe before taking the snapshot. Any event published during the
+	// handshake is then either part of the snapshot or buffered on the live
+	// channel, so it cannot fall into the gap between the two.
+	missed, truncated, events, unsubscribe := s.hub.Subscribe(hello.LastSequence, 256)
+	defer unsubscribe()
+
 	snapshot := s.hub.Snapshot(s.opts.SnapshotEvents)
 	welcome := clientproto.Welcome{
-		SchemaVersion: clientproto.Version,
-		ClientID:      client.ClientID,
-		ClientType:    client.Type,
-		Token:         issuedToken,
-		Permissions:   append([]string(nil), client.Permissions...),
-		Node:          s.node,
-		Snapshot:      snapshot,
-		ServerTime:    time.Now().UTC(),
+		SchemaVersion:   clientproto.Version,
+		ClientID:        client.ClientID,
+		ClientType:      client.Type,
+		Token:           issuedToken,
+		Permissions:     append([]string(nil), client.Permissions...),
+		Node:            s.node,
+		Snapshot:        snapshot,
+		ReplayTruncated: truncated,
+		ServerTime:      time.Now().UTC(),
 	}
 	if !s.writeDirect(cc, clientproto.TypeWelcome, welcome) {
 		cc.close()
 		return
 	}
-
-	missed, events, unsubscribe := s.hub.Subscribe(hello.LastSequence, 256)
-	defer unsubscribe()
-	for _, event := range missed {
-		if !s.writeDirect(cc, clientproto.TypeEvent, event) {
-			cc.close()
-			return
+	if truncated {
+		s.audit("client.replay_truncated",
+			"client_id", client.ClientID,
+			"last_sequence", hello.LastSequence,
+			"snapshot_last_sequence", snapshot.LastSequence,
+		)
+	} else {
+		for _, event := range missed {
+			if !s.writeDirect(cc, clientproto.TypeEvent, event) {
+				cc.close()
+				return
+			}
 		}
 	}
 

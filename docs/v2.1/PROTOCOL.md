@@ -118,10 +118,13 @@ Node 回复 `welcome`：
     "permissions": ["session.read", "session.control", "permission.respond"],
     "node": { "...": "NodeInfo" },
     "snapshot": { "...": "Snapshot" },
+    "replay_truncated": false,
     "server_time": "2026-11-05T12:00:00Z"
   }
 }
 ```
+
+`replay_truncated` 为 `true` 时，Node 无法完整补发 `hello.last_sequence` 之后的事件（缓存淘汰、TTL 过期或 Node 重启导致序号重置）。此时 Node 不发送部分补发事件，客户端必须以 `snapshot` 为准重建状态。
 
 握手失败返回 `error` 并关闭连接。
 
@@ -281,8 +284,9 @@ WebSocket 层也可使用 ping/pong；JSON 心跳用于 UI 显示 RTT。
 
 1. 客户端重新连接并发送 `hello`，带 `last_sequence`
 2. Node 返回 `welcome` + 最新 Snapshot
-3. Node 补发 `sequence > last_sequence` 的事件；如果超出缓存范围，客户端以 Snapshot 为准
-4. 客户端清空本地旧状态，应用 Snapshot，再应用补发事件
+3. Node 补发 `sequence > last_sequence` 的事件；无法完整补发时 `welcome.replay_truncated = true`，且不发送部分补发事件
+4. 客户端清空本地旧状态，应用 Snapshot；`replay_truncated = false` 时再应用补发事件
+5. Node 在生成 Snapshot 前先建立订阅，握手期间产生的事件不会丢失
 
 ## 8. 局域网访问
 

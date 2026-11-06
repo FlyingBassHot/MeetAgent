@@ -85,6 +85,8 @@ func run() error {
 			MDNS:               cfg.Server.MDNSEnabled(),
 			CommandTimeout:     cfg.Server.CommandTimeout.Std(),
 			ReadTimeout:        cfg.Server.ReadTimeout.Std(),
+			RateLimitPerSecond: float64(cfg.Server.RateLimitPerSecond),
+			RateLimitBurst:     cfg.Server.RateLimitBurst,
 		}, cfg.Node.ID, cfg.Node.Name, manager, hub, pairingManager, logger)
 		go func() {
 			errCh <- nodeServer.Run(runCtx)

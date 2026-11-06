@@ -38,7 +38,9 @@
 - 客户端在线状态：`/api/v2/clients` 返回 `online` 与最近活动时间，心跳/命令会刷新 last_seen
 - 权限过期：无 `expires_at` 的 permission.requested 自动补充 10 分钟默认过期；过期/重复决策被 Node 拒绝
 - 审计：配对/认证失败/断开/撤销/权限更新/命令终态写入结构化 audit 日志，不记录 Token
-- 限流：单客户端入站令牌桶（100/s、burst 200），超限返回 `rate_limited`
+- 限流：单客户端入站令牌桶（100/s、burst 200），超限返回 `rate_limited`；`cmd/node` 已从配置接线
+- 重连边界：先订阅后生成 Snapshot，消除握手期事件丢失；缓存淘汰/TTL/Node 重启时 `welcome.replay_truncated=true`，不再返回部分补发事件
+- Node 重启恢复：同一配对存储下，旧 `last_sequence` 重连得到新序号 Snapshot，后续事件从新序号连续递增（集成测试）
 - Tailscale：100.69.235.2 登录；Mobile 通过 Tailscale IP 配对并读取真实 Snapshot（CORS 已允许 100.64/10）
 - Android：JDK 21 + Android SDK 35；Capacitor 7.6.10；Gradle 8.11.1 Debug APK 4.0 MB（package com.flyingbasshot.meetagent）
 - `make dev-tls`：本地自签证书生成脚本（data/ 已忽略）

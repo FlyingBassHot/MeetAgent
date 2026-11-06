@@ -30,7 +30,7 @@ func TestHubSequenceSnapshotAndReplay(t *testing.T) {
 	defer cancel()
 	go hub.Run(ctx)
 
-	_, live, unsubscribe := hub.Subscribe(0, 10)
+	_, _, live, unsubscribe := hub.Subscribe(0, 10)
 	defer unsubscribe()
 
 	for i := 1; i <= 3; i++ {
@@ -55,10 +55,53 @@ func TestHubSequenceSnapshotAndReplay(t *testing.T) {
 		t.Fatalf("snapshot events = %d, want 3", len(snapshot.Events))
 	}
 
-	missed, _, unsubscribe2 := hub.Subscribe(1, 10)
+	missed, truncated, _, unsubscribe2 := hub.Subscribe(1, 10)
 	defer unsubscribe2()
+	if truncated {
+		t.Fatal("replay should not be truncated")
+	}
 	if len(missed) != 2 || missed[0].Sequence != 2 || missed[1].Sequence != 3 {
 		t.Fatalf("missed = %+v", missed)
+	}
+}
+
+func TestSubscribeReportsTruncatedReplay(t *testing.T) {
+	source := &fakeSource{events: make(chan protocol.AgentEvent, 8)}
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	hub := New(clientproto.NodeInfo{NodeID: "node-test", Name: "Test"}, source, 3, time.Minute, logger)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go hub.Run(ctx)
+
+	for i := 0; i < 5; i++ {
+		source.events <- protocol.AgentEvent{EventType: protocol.EventAgentStatusChanged}
+	}
+	deadline := time.Now().Add(time.Second)
+	for hub.Snapshot(1).LastSequence < 5 && time.Now().Before(deadline) {
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	missed, truncated, _, unsubscribe := hub.Subscribe(1, 10)
+	defer unsubscribe()
+	if !truncated {
+		t.Fatal("expected truncated replay after cache eviction")
+	}
+	if len(missed) != 0 {
+		t.Fatalf("truncated replay should not return partial events: %+v", missed)
+	}
+}
+
+func TestSubscribeReportsTruncatedAfterSequenceReset(t *testing.T) {
+	source := &fakeSource{events: make(chan protocol.AgentEvent, 1)}
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	hub := New(clientproto.NodeInfo{NodeID: "node-test", Name: "Test"}, source, 10, time.Minute, logger)
+
+	// A fresh process has no events yet; a client still holding a sequence from
+	// the previous process must fall back to the snapshot.
+	missed, truncated, _, unsubscribe := hub.Subscribe(42, 10)
+	defer unsubscribe()
+	if !truncated || len(missed) != 0 {
+		t.Fatalf("truncated=%v missed=%+v, want truncated with no replay", truncated, missed)
 	}
 }
 

@@ -179,7 +179,12 @@ func (h *Hub) Snapshot(snapshotEvents int) clientproto.Snapshot {
 // Subscribe registers a V2 event subscriber. It returns events missed after
 // lastSequence (only when lastSequence > 0; a fresh client gets the Snapshot),
 // a live channel and an unsubscribe function.
-func (h *Hub) Subscribe(lastSequence uint64, buffer int) ([]clientproto.Event, <-chan clientproto.Event, func()) {
+//
+// When the requested sequence can no longer be replayed (cache eviction, TTL
+// expiry or a Node restart that reset the sequence), truncated is true and
+// missed is empty: the caller must treat the accompanying Snapshot as the
+// source of truth instead of applying a partial replay.
+func (h *Hub) Subscribe(lastSequence uint64, buffer int) (missed []clientproto.Event, truncated bool, events <-chan clientproto.Event, cancel func()) {
 	if buffer <= 0 {
 		buffer = 128
 	}
@@ -191,15 +196,25 @@ func (h *Hub) Subscribe(lastSequence uint64, buffer int) ([]clientproto.Event, <
 	id := h.nextSub
 	h.v2[id] = channel
 
-	var missed []clientproto.Event
 	if lastSequence > 0 {
-		events, _, _ := h.cache.Since(map[string]uint64{h.nodeID: lastSequence}, nil, 1000)
-		missed = make([]clientproto.Event, 0, len(events))
-		for _, event := range events {
-			missed = append(missed, clientproto.EventFromAgent(h.nodeID, event))
+		latest := h.cache.NodeSequences(h.nodeID)
+		if lastSequence > latest {
+			// The Node restarted and its sequence reset, or the client claims a
+			// sequence this process never produced.
+			truncated = true
+		} else {
+			retained, _, outOfRange := h.cache.Since(map[string]uint64{h.nodeID: lastSequence}, nil, 0)
+			if len(outOfRange) > 0 {
+				truncated = true
+			} else {
+				missed = make([]clientproto.Event, 0, len(retained))
+				for _, event := range retained {
+					missed = append(missed, clientproto.EventFromAgent(h.nodeID, event))
+				}
+			}
 		}
 	}
-	cancel := func() {
+	cancel = func() {
 		h.mu.Lock()
 		if current, ok := h.v2[id]; ok && current == channel {
 			delete(h.v2, id)
@@ -207,7 +222,7 @@ func (h *Hub) Subscribe(lastSequence uint64, buffer int) ([]clientproto.Event, <
 		}
 		h.mu.Unlock()
 	}
-	return missed, channel, cancel
+	return missed, truncated, channel, cancel
 }
 
 // SubscribeRaw registers a raw event subscriber for the optional Cloud relay.

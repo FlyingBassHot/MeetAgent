@@ -164,14 +164,19 @@ func ValidClientType(clientType string) bool {
 // Welcome is returned after a successful handshake. Token is only present when
 // the client paired during this connection.
 type Welcome struct {
-	SchemaVersion int       `json:"schema_version"`
-	ClientID      string    `json:"client_id"`
-	ClientType    string    `json:"client_type"`
-	Token         string    `json:"token,omitempty"`
-	Permissions   []string  `json:"permissions,omitempty"`
-	Node          NodeInfo  `json:"node"`
-	Snapshot      Snapshot  `json:"snapshot"`
-	ServerTime    time.Time `json:"server_time"`
+	SchemaVersion int      `json:"schema_version"`
+	ClientID      string   `json:"client_id"`
+	ClientType    string   `json:"client_type"`
+	Token         string   `json:"token,omitempty"`
+	Permissions   []string `json:"permissions,omitempty"`
+	Node          NodeInfo `json:"node"`
+	Snapshot      Snapshot `json:"snapshot"`
+	// ReplayTruncated is true when the Node cannot replay every event after the
+	// client's hello.last_sequence (cache eviction, TTL expiry or a Node
+	// restart). The client must reset to Snapshot instead of applying a partial
+	// replay.
+	ReplayTruncated bool      `json:"replay_truncated,omitempty"`
+	ServerTime      time.Time `json:"server_time"`
 }
 
 // NodeInfo describes the Node a client is attached to.
