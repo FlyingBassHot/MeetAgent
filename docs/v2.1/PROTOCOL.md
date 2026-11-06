@@ -291,7 +291,11 @@ WebSocket 层也可使用 ping/pong；JSON 心跳用于 UI 显示 RTT。
 - 公网部署请关闭该选项，并把具体域名加入 `server.allowed_origins`
 - 本地可用自签证书验证 WSS；simulator 支持 `-insecure`，仅限本机测试
 
-## 9. 安全
+## 9. 审计
+
+Node 以结构化 `audit` 日志记录关键动作：客户端配对、认证失败、断开、权限更新、撤销、命令最终状态（client_id / command_id / type / agent_id / session_id / status / duration_ms）。日志不包含 Token 或配对码。
+
+## 10. 安全
 
 - LAN 内也建议启用 WSS；至少公网必须 TLS
 - 配对码 TTL 10 分钟；Token 只返回一次

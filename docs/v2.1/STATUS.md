@@ -37,6 +37,7 @@
 - Tailscale：`100.69.235.2` 已登录；Mobile 通过 `http://100.69.235.2:5174` 连接 `http://100.69.235.2:8787`，配对/Snapshot 成功；CORS 已允许 100.64/10
 - 客户端在线状态：`/api/v2/clients` 返回 `online` 与最近活动时间，心跳/命令会刷新 last_seen
 - 权限过期：无 `expires_at` 的 permission.requested 自动补充 10 分钟默认过期；过期/重复决策被 Node 拒绝
+- 审计：配对/认证失败/断开/撤销/权限更新/命令终态写入结构化 audit 日志，不记录 Token
 - Tailscale：100.69.235.2 登录；Mobile 通过 Tailscale IP 配对并读取真实 Snapshot（CORS 已允许 100.64/10）
 - Android：JDK 21 + Android SDK 35；Capacitor 7.6.10；Gradle 8.11.1 Debug APK 4.0 MB（package com.flyingbasshot.meetagent）
 - `make dev-tls`：本地自签证书生成脚本（data/ 已忽略）

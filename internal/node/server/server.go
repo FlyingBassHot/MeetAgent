@@ -265,6 +265,13 @@ func (s *Server) pairingCodeLogger(stop <-chan struct{}) {
 	}
 }
 
+func (s *Server) audit(event string, attrs ...any) {
+	args := make([]any, 0, len(attrs)+2)
+	args = append(args, "event", event)
+	args = append(args, attrs...)
+	s.logger.Info("audit", args...)
+}
+
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"status":  "ok",
@@ -309,6 +316,7 @@ func (s *Server) handlePair(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), status)
 		return
 	}
+	s.audit("client.paired", "client_id", client.ClientID, "client_type", client.Type, "name", client.Name)
 	writeJSON(w, http.StatusOK, clientproto.PairResult{
 		SchemaVersion: clientproto.Version,
 		ClientID:      client.ClientID,
@@ -375,6 +383,7 @@ func (s *Server) handleClientByID(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.disconnectClient(clientID)
+		s.audit("client.revoked", "client_id", clientID)
 		writeJSON(w, http.StatusOK, map[string]any{"revoked": clientID})
 	case http.MethodPatch:
 		var body struct {
@@ -394,6 +403,7 @@ func (s *Server) handleClientByID(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.disconnectClient(clientID)
+		s.audit("client.permissions_updated", "client_id", clientID, "permissions", strings.Join(client.Permissions, ","))
 		writeJSON(w, http.StatusOK, clientproto.ClientInfo{
 			ClientID:     client.ClientID,
 			Name:         client.Name,
@@ -464,6 +474,7 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 	client, issuedToken, err := s.authenticateHello(hello)
 	if err != nil {
 		s.logger.Warn("client authentication failed", "error", err, "client_type", hello.ClientType)
+		s.audit("client.auth_failed", "client_type", hello.ClientType, "error", err.Error())
 		code := "auth_failed"
 		if errors.Is(err, pairing.ErrExpiredCode) {
 			code = "pairing_expired"
@@ -522,6 +533,7 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 	cc.close()
 	s.unregisterClient(cc)
 	s.logger.Info("client disconnected", "client_id", client.ClientID)
+	s.audit("client.disconnected", "client_id", client.ClientID)
 }
 
 func (s *Server) authenticateHello(hello clientproto.Hello) (pairing.Client, string, error) {

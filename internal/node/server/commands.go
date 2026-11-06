@@ -25,6 +25,16 @@ func (s *Server) handleCommand(c *clientConn, cmd clientproto.Command) clientpro
 		result.DurationMS = time.Since(started).Milliseconds()
 		result.CompletedAt = time.Now().UTC()
 		s.commands.put(key, result)
+		s.audit("command.finished",
+			"client_id", c.id,
+			"command_id", cmd.CommandID,
+			"type", cmd.Type,
+			"agent_id", cmd.AgentID,
+			"session_id", cmd.SessionID,
+			"status", string(result.Status),
+			"duration_ms", result.DurationMS,
+			"error", result.Error,
+		)
 		return result
 	}
 
