@@ -73,21 +73,7 @@ func run() error {
 		if err != nil {
 			return err
 		}
-		nodeServer := server.New(server.Options{
-			Addr:               cfg.Server.Addr,
-			TLSCert:            cfg.Server.TLSCert,
-			TLSKey:             cfg.Server.TLSKey,
-			AllowedOrigins:     cfg.Server.AllowedOrigins,
-			DisallowLANOrigins: !cfg.Server.LANOriginAllowed(),
-			SnapshotEvents:     cfg.Server.SnapshotEvents,
-			PairingTTL:         cfg.Server.PairingTTL.Std(),
-			AdminToken:         cfg.Server.AdminToken,
-			MDNS:               cfg.Server.MDNSEnabled(),
-			CommandTimeout:     cfg.Server.CommandTimeout.Std(),
-			ReadTimeout:        cfg.Server.ReadTimeout.Std(),
-			RateLimitPerSecond: float64(cfg.Server.RateLimitPerSecond),
-			RateLimitBurst:     cfg.Server.RateLimitBurst,
-		}, cfg.Node.ID, cfg.Node.Name, manager, hub, pairingManager, logger)
+		nodeServer := server.New(serverOptions(cfg), cfg.Node.ID, cfg.Node.Name, manager, hub, pairingManager, logger)
 		go func() {
 			errCh <- nodeServer.Run(runCtx)
 		}()
@@ -113,6 +99,26 @@ func run() error {
 			return err
 		}
 		return nil
+	}
+}
+
+// serverOptions maps the shared config onto the local Node server. Keeping the
+// mapping in one place prevents config fields silently not reaching the server.
+func serverOptions(cfg config.Config) server.Options {
+	return server.Options{
+		Addr:               cfg.Server.Addr,
+		TLSCert:            cfg.Server.TLSCert,
+		TLSKey:             cfg.Server.TLSKey,
+		AllowedOrigins:     cfg.Server.AllowedOrigins,
+		DisallowLANOrigins: !cfg.Server.LANOriginAllowed(),
+		SnapshotEvents:     cfg.Server.SnapshotEvents,
+		PairingTTL:         cfg.Server.PairingTTL.Std(),
+		AdminToken:         cfg.Server.AdminToken,
+		MDNS:               cfg.Server.MDNSEnabled(),
+		CommandTimeout:     cfg.Server.CommandTimeout.Std(),
+		ReadTimeout:        cfg.Server.ReadTimeout.Std(),
+		RateLimitPerSecond: float64(cfg.Server.RateLimitPerSecond),
+		RateLimitBurst:     cfg.Server.RateLimitBurst,
 	}
 }
 

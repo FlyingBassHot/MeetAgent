@@ -231,6 +231,56 @@ func TestValidateTrimsAndDeduplicatesActions(t *testing.T) {
 	}
 }
 
+func TestValidateTLSRequiresCertAndKey(t *testing.T) {
+	for _, setup := range []struct {
+		name string
+		cert string
+		key  string
+		ok   bool
+	}{
+		{name: "plain", ok: true},
+		{name: "pair", cert: "data/tls/cert.pem", key: "data/tls/key.pem", ok: true},
+		{name: "cert only", cert: "data/tls/cert.pem"},
+		{name: "key only", key: "data/tls/key.pem"},
+	} {
+		t.Run(setup.name, func(t *testing.T) {
+			cfg := Default()
+			cfg.Server.TLSCert = setup.cert
+			cfg.Server.TLSKey = setup.key
+			err := cfg.Validate()
+			if setup.ok && err != nil {
+				t.Fatalf("Validate: %v", err)
+			}
+			if !setup.ok && (err == nil || !strings.Contains(err.Error(), "must be set together")) {
+				t.Fatalf("expected tls pair error, got %v", err)
+			}
+		})
+	}
+}
+
+func TestValidateRejectsNegativeRateLimit(t *testing.T) {
+	for _, setup := range []struct {
+		name  string
+		rate  int
+		burst int
+	}{
+		{name: "negative rate", rate: -1},
+		{name: "negative burst", burst: -1},
+	} {
+		t.Run(setup.name, func(t *testing.T) {
+			cfg := Default()
+			cfg.Server.RateLimitPerSecond = setup.rate
+			cfg.Server.RateLimitBurst = setup.burst
+			if err := cfg.Validate(); err == nil {
+				t.Fatal("expected negative rate limit error")
+			}
+		})
+	}
+	if Default().Server.RateLimitPerSecond != 100 || Default().Server.RateLimitBurst != 200 {
+		t.Fatalf("default rate limit = %d/%d, want 100/200", Default().Server.RateLimitPerSecond, Default().Server.RateLimitBurst)
+	}
+}
+
 func TestValidateRequiresPositiveHeartbeat(t *testing.T) {
 	cfg := Default()
 	cfg.Node.Token = "token"
