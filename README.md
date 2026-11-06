@@ -48,7 +48,7 @@ Mobile (Vue + Capacitor)        ESP32 Terminal (ESP-IDF + LVGL)
 |---|---|---|
 | Core / Node | `cmd/node`, `internal/`, `pkg/`, `configs/` | M0/M1 完成 |
 | Node 模拟器 | `cmd/simulator` | 可用 |
-| Mobile | `mobile/` | M3 完成（真实 Node：Prompt / Interrupt / 审批 / 重连） |
+| Mobile | `mobile/` | M5b 完成（Web + Capacitor Android debug APK） |
 | ESP32 Terminal / ESPUI | `firmware/terminal/` | E0–E2 + E3a 完成；等待真机/ESP-IDF，暂停 |
 | V1 Cloud / Web Console | `cmd/cloud`, `web/test-client` | 归档参考 |
 
@@ -201,9 +201,9 @@ make run-cloud        # 旧 V1 Cloud（可选）
 | M2 | Mobile M2 + Terminal E0–E2 | 完成（Mock / host tests） |
 | M3 | 真实 OpenCode 集成 | Mobile 完成；Terminal 待真机 |
 | M4 | 双端一致性与稳定性 | Core + Mobile 完成；Terminal 暂停 |
-| M5 | Mobile 远程（Tailscale/Capacitor） | M5a 完成（网络/WSS/TLS/诊断）；原生与 Tailscale 实网待环境 |
+| M5 | Mobile 远程（Tailscale/Capacitor） | 完成（Tailscale 实网 + WSS/TLS + Android debug APK；iOS/Release 待环境） |
 | M4 | 双端一致性与稳定性 | 待开始 |
 | M5 | Mobile 远程（Tailscale/Capacitor） | 待开始 |
 | M6 | 语音/STT、Cloud Relay、第二 Adapter、OTA | 暂缓 |
 
-> 语音/STT 按当前要求暂缓。ESP32 硬件未到、ESP-IDF 未安装，Terminal 暂停在 E3a；Node 与 Mobile 继续推进，Mobile 已完成 M4 与 M5a（网络切换、WSS/TLS、诊断、远程部署文档）。
+> 语音/STT 按当前要求暂缓。ESP32 硬件未到、ESP-IDF 未安装，Terminal 暂停在 E3a；Node 与 Mobile 继续推进，Mobile 已完成 M4、M5a/M5b（Tailscale、WSS/TLS、网络切换、诊断、Android debug APK）。

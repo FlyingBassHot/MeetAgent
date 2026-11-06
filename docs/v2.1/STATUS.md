@@ -6,7 +6,7 @@
 |---|---|---|---|---|
 | Core / Node | 主会话 | M0 + M1 + M4 Core | 完成 | M5 远程/Cloud 增强 |
 | Protocol v2 | 主会话 | M0 | 完成 | 随实现补兼容测试 |
-| Mobile | omp | M4 + M5a | 完成（网络切换、WSS/TLS、诊断、远程文档） | Tailscale 实网 / Capacitor |
+| Mobile | omp | M4 + M5a + M5b | 完成（Tailscale、WSS/TLS、Android debug APK） | iOS/Release/真机安装 |
 | Terminal / ESPUI | pi | E0–E2 + E3a | 暂停（host tests 805/805，33 files syntax） | 等 ESP32 真机 + ESP-IDF |
 | Cloud relay | 主会话 | 可选 | 保留 V1 实现 | M6 再验证混合模式 |
 
@@ -37,6 +37,8 @@
 - Tailscale：`100.69.235.2` 已登录；Mobile 通过 `http://100.69.235.2:5174` 连接 `http://100.69.235.2:8787`，配对/Snapshot 成功；CORS 已允许 100.64/10
 - 客户端在线状态：`/api/v2/clients` 返回 `online` 与最近活动时间，心跳/命令会刷新 last_seen
 - 权限过期：无 `expires_at` 的 permission.requested 自动补充 10 分钟默认过期；过期/重复决策被 Node 拒绝
+- Tailscale：100.69.235.2 登录；Mobile 通过 Tailscale IP 配对并读取真实 Snapshot（CORS 已允许 100.64/10）
+- Android：JDK 21 + Android SDK 35；Capacitor 7.6.10；Gradle 8.11.1 Debug APK 4.0 MB（package com.flyingbasshot.meetagent）
 - `make dev-tls`：本地自签证书生成脚本（data/ 已忽略）
 - M4 Core：双客户端同时收到同一 Prompt 事件；同一 permission 只允许一个最终决策；按 last_sequence 补发事件；PATCH 可独立配置客户端权限（集成测试）
 - M4 Mobile：单标签页 Web Locks 守卫 + 接管；两个独立 client 跨端事件/Interrupt/审批一致；Node 受控重启后 Snapshot 恢复、序号重置不报缺口
