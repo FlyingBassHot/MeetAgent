@@ -196,6 +196,21 @@ meetagent_event_sequence
 meetagent_command_results_total{status="completed"}
 ```
 
+### 生产 TLS（反向代理）
+
+公网部署时让 Caddy/Nginx 终止 TLS，Node 只监听 loopback：
+
+```yaml
+server:
+  addr: "127.0.0.1:8787"
+  allow_lan_origins: false
+  allowed_origins:
+    - "https://meetagent.example.com"
+  admin_token: "replace-with-a-long-random-token"
+```
+
+仓库提供 Caddy 示例 [`deploy/caddy/Caddyfile.example`](./deploy/caddy/Caddyfile.example)；Caddy 会自动签发/续期证书，并把 HTTPS/WSS 反向代理到 `127.0.0.1:8787`。Mobile 填写 `https://meetagent.example.com` 即可自动使用 `wss://`。
+
 ## 协议与安全
 
 - 客户端先通过 6 位配对码换取独立 Token；Token 只保存 SHA-256 哈希

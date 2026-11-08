@@ -1,0 +1,9 @@
+# MeetAgent Node behind Caddy.
+#
+# Replace meetagent.example.com with your DNS name. Caddy obtains and renews
+# the certificate automatically. Node itself stays on loopback and continues to
+# serve plain HTTP/WS; clients use HTTPS/WSS through this proxy.
+meetagent.example.com {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:8787
+}
