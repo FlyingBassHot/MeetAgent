@@ -6,7 +6,7 @@
 |---|---|---|---|---|
 | Core / Node | 主会话 | M0 + M1 + M4 Core | 完成；审计/限流/重连边界加固 | M6 可选增强 |
 | Protocol v2 | 主会话 | M0 | 完成 | 随实现补兼容测试 |
-| Mobile | omp | M5b + UX P0 | P0 信息层级完成（概览/会话/聊天式详情/动态/统一开发者信息） | UX P1 原生交互、iOS/Release |
+| Mobile | omp | M5b + UX P0/P1 | P1 原生交互完成（触感/键盘/返回键/下拉刷新/Sheet/ActionSheet） | UX P2 视觉打磨、iOS/Release |
 | Terminal / ESPUI | pi | E0–E2 + E3a + LCD-4 BSP | 官方 BSP 3.0.0 + 480×480 构建通过（app 502 KB） | LCD-4 实物显示/触摸验收 |
 | Cloud relay | 主会话 | 可选 | 保留 V1 实现 | M6 再验证混合模式 |
 
@@ -47,7 +47,8 @@
 - Android：JDK 21 + Android SDK 35；Capacitor 7.6.10 + `@capacitor/network` 7.0.4；Debug APK 4,260,002 bytes，SHA-256 `bbc8f06e16451080ef8469d98e4f0b153a08a0e95b1ddeaf185111e183b4bd27`（package com.flyingbasshot.meetagent）
 - Android 真机（HBN-AL00 / 2NP0224717021762）：USB ADB 已授权；Tailscale `100.69.235.2:8787` 配对成功，Home 恢复 41 个真实 Session；测试 Session 完成 Prompt、Interrupt、权限「允许一次」、断网离线提示与恢复重连；Node 重启后自动应用新 Snapshot
 - Android 真机修复：旧 WebView 缺少 `Promise.withResolvers`，已在 `mobile/src/main.ts` 增加 polyfill，并重新构建/安装 APK
-- Mobile UX P0：Home 压缩为概览/活跃会话/最近动态；Sessions 去除 ID/路径；详情改为聊天流 + 底部输入；Activity 改「动态」并按天分组；技术信息统一进 Settings → 开发者信息；新 APK 4,259,671 bytes，SHA-256 `a1987c31a7d0d9aa4bdfdb2cd7bf5d5de4105e11706edf0cc290b362dde38be2`
+- Mobile UX P0：Home 压缩为概览/活跃会话/最近动态；Sessions 去除 ID/路径；详情改为聊天流 + 底部输入；Activity 改「动态」并按天分组；技术信息统一进 Settings → 开发者信息
+- Mobile UX P1：Capacitor Haptics/Keyboard/App/StatusBar；下拉刷新（snapshot envelope）；AppSheet/ActionSheet；返回键分层；键盘避让；页面过渡与滚动恢复；新 APK 4,380,775 bytes，SHA-256 `b8fbd8765add0dc7e970b8ae675ee7c4ed70de2f81b2e34eabb069d97af32d87`
 - `make dev-tls`：本地自签证书生成脚本（data/ 已忽略）
 - M4 Core：双客户端同时收到同一 Prompt 事件；同一 permission 只允许一个最终决策；按 last_sequence 补发事件；PATCH 可独立配置客户端权限（集成测试）
 - M4 Mobile：单标签页 Web Locks 守卫 + 接管；两个独立 client 跨端事件/Interrupt/审批一致；Node 受控重启后 Snapshot 恢复、序号重置不报缺口
