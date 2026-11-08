@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 import type { PermissionDecision } from '@/domain/protocol';
 import { groupEventsByDay, isImportantEvent } from '@/domain/activity';
 import { useCommandsStore } from '@/stores/commands';
+import { useConnectionStore } from '@/stores/connection';
 import { useNodeStore } from '@/stores/node';
 import { usePreferencesStore } from '@/stores/preferences';
 import PageHeader from '@/components/PageHeader.vue';
@@ -10,14 +11,17 @@ import PermissionCard from '@/components/PermissionCard.vue';
 import EventRow from '@/components/EventRow.vue';
 import EmptyState from '@/components/EmptyState.vue';
 import BottomSheet from '@/components/BottomSheet.vue';
+import PageSkeleton from '@/components/PageSkeleton.vue';
 
 type ActivityFilter = 'important' | 'approvals' | 'sessions' | 'agents' | 'tools' | 'all';
 
+const connection = useConnectionStore();
 const nodeStore = useNodeStore();
 const commands = useCommandsStore();
 const preferences = usePreferencesStore();
 const filter = ref<ActivityFilter>('important');
 const filterOpen = ref(false);
+const loading = computed(() => !nodeStore.hasSnapshot && connection.isBusy);
 
 const pendingViews = computed(() =>
   nodeStore.pendingPermissions.map((permission) => ({
@@ -94,6 +98,8 @@ function respond(permissionId: string, decision: PermissionDecision): void {
       </template>
     </PageHeader>
 
+    <PageSkeleton v-if="loading" :rows="5" />
+    <template v-else>
     <div v-if="nodeStore.sequenceGap" class="banner banner--danger">
       事件序号不连续，请在设置中重新连接以刷新。
     </div>
@@ -136,6 +142,7 @@ function respond(permissionId: string, decision: PermissionDecision): void {
           />
         </div>
       </section>
+    </template>
     </template>
 
     <BottomSheet :open="filterOpen" title="筛选动态" @close="filterOpen = false">

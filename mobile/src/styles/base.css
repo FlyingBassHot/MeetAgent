@@ -54,10 +54,27 @@ body {
   font-size: 15px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: contain;
   background-image:
     radial-gradient(680px 380px at 12% -8%, rgba(91, 147, 255, 0.11), transparent 70%),
     radial-gradient(520px 320px at 92% 4%, rgba(62, 207, 148, 0.07), transparent 72%);
   background-attachment: fixed;
+}
+
+body.keyboard-open .tabbar {
+  display: none;
+}
+
+body.keyboard-open .page {
+  padding-bottom: calc(12px + env(safe-area-inset-bottom));
+}
+
+body.keyboard-open .session {
+  min-height: calc(100dvh - 90px);
+}
+
+body.keyboard-open .session > .composer {
+  bottom: 0 !important;
 }
 
 #app {

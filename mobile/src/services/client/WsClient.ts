@@ -9,7 +9,7 @@ import type {
   Welcome,
 } from '@/domain/protocol';
 import { CLIENT_TYPE, CLIENT_VERSION, SCHEMA_VERSION, isRecord, isTerminalStatus } from '@/domain/protocol';
-import { parseEnvelope, commandEnvelope, heartbeatEnvelope, newCommandId, newMessageId } from './envelope';
+import { parseEnvelope, commandEnvelope, heartbeatEnvelope, snapshotEnvelope, newCommandId, newMessageId } from './envelope';
 import type {
   ClientConfig,
   ClientTransport,
@@ -24,6 +24,13 @@ const COMMAND_TIMEOUT_MS = 15_000;
 const AUTH_TIMEOUT_MS = 10_000;
 const HEARTBEAT_INTERVAL_MS = 10_000;
 const MAX_RECONNECT_DELAY_MS = 15_000;
+const SNAPSHOT_TIMEOUT_MS = 8_000;
+
+interface SnapshotWaiter {
+  resolve: () => void;
+  reject: (error: Error) => void;
+  timer: number;
+}
 
 const FATAL_ERROR_CODES: Record<string, true> = {
   unauthorized: true,
@@ -58,6 +65,7 @@ export class WsClient implements ClientTransport {
   private socket: WebSocket | null = null;
   private listeners = new Set<TransportListener>();
   private pending = new Map<string, PendingCommand>();
+  private snapshotWaiters = new Set<SnapshotWaiter>();
   private config: ClientConfig | null = null;
   private sequence = 0;
   private attempt = 0;
@@ -133,6 +141,31 @@ export class WsClient implements ClientTransport {
 
   setLastSequence(sequence: number): void {
     this.sequence = Math.max(this.sequence, sequence);
+  }
+
+  refreshSnapshot(): Promise<void> {
+    const socket = this.socket;
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      return Promise.reject(new Error('尚未连接 Node'));
+    }
+    const { promise, resolve, reject } = Promise.withResolvers<void>();
+    const waiter: SnapshotWaiter = {
+      resolve,
+      reject,
+      timer: window.setTimeout(() => {
+        this.snapshotWaiters.delete(waiter);
+        reject(new Error('刷新快照超时'));
+      }, SNAPSHOT_TIMEOUT_MS),
+    };
+    this.snapshotWaiters.add(waiter);
+    try {
+      socket.send(JSON.stringify(snapshotEnvelope()));
+    } catch (err) {
+      window.clearTimeout(waiter.timer);
+      this.snapshotWaiters.delete(waiter);
+      reject(err instanceof Error ? err : new Error('刷新快照失败'));
+    }
+    return promise;
   }
 
   subscribe(listener: TransportListener): () => void {
@@ -302,10 +335,18 @@ export class WsClient implements ClientTransport {
   }
 
   private handleSnapshot(payload: unknown): void {
-    if (!isRecord(payload)) return;
+    if (!isRecord(payload)) {
+      this.rejectSnapshotWaiters(new Error('Node 返回的 snapshot 格式错误'));
+      return;
+    }
     const snapshot = payload as unknown as Snapshot;
     this.sequence = Math.max(this.sequence, snapshot.last_sequence ?? 0);
     this.emit({ kind: 'snapshot', snapshot });
+    for (const waiter of this.snapshotWaiters) {
+      window.clearTimeout(waiter.timer);
+      waiter.resolve();
+    }
+    this.snapshotWaiters.clear();
   }
 
   private handleEvent(payload: unknown): void {
@@ -347,6 +388,7 @@ export class WsClient implements ClientTransport {
     const error = payload as unknown as ErrorPayload;
     const code = typeof error.code === 'string' ? error.code : 'node_error';
     const message = typeof error.message === 'string' ? error.message : 'Node 返回错误';
+    this.rejectSnapshotWaiters(new Error(message));
     if (FATAL_ERROR_CODES[code]) {
       this.fatal(code, message);
       return;
@@ -458,6 +500,15 @@ export class WsClient implements ClientTransport {
       pending.reject(error);
     }
     this.pending.clear();
+    this.rejectSnapshotWaiters(error);
+  }
+
+  private rejectSnapshotWaiters(error: Error): void {
+    for (const waiter of this.snapshotWaiters) {
+      window.clearTimeout(waiter.timer);
+      waiter.reject(error);
+    }
+    this.snapshotWaiters.clear();
   }
 
   private setPhase(phase: ConnectionPhase, detail?: string): void {

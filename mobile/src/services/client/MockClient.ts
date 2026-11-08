@@ -59,8 +59,10 @@ export class MockClient implements ClientTransport {
   private sessionVersion = new Map<string, number>();
   private activeMessages = new Map<string, string>();
   private messageCounter = 0;
+  private connected = false;
 
   connect(_config: ClientConfig): void {
+    this.connected = true;
     this.emit({ kind: 'phase', phase: 'connecting', detail: '正在启动本地 Mock Node' });
     this.later(() => {
       this.emit({ kind: 'phase', phase: 'authenticating', detail: 'Mock 握手（无需配对码）' });
@@ -84,12 +86,36 @@ export class MockClient implements ClientTransport {
   }
 
   disconnect(): void {
+    this.connected = false;
     this.clearTimers();
     this.emit({ kind: 'phase', phase: 'offline', detail: 'Mock 连接已断开' });
   }
 
   setLastSequence(sequence: number): void {
     this.state.lastSequence = Math.max(this.state.lastSequence, sequence);
+  }
+
+  refreshSnapshot(): Promise<void> {
+    if (!this.connected) return Promise.reject(new Error('Mock 连接已断开'));
+    const { promise, resolve, reject } = Promise.withResolvers<void>();
+    let settled = false;
+    const customTimeout = window.setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      reject(new Error('刷新快照超时'));
+    }, 3000);
+    this.later(() => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(customTimeout);
+      if (!this.connected) {
+        reject(new Error('Mock 连接已断开'));
+        return;
+      }
+      this.emit({ kind: 'snapshot', snapshot: snapshotFromState(this.state) });
+      resolve();
+    }, 480);
+    return promise;
   }
 
   subscribe(listener: TransportListener): () => void {

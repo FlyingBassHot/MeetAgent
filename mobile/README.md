@@ -1,8 +1,8 @@
 # MeetAgent Mobile（V2.1 / M5b）
 
-MeetAgent V2.1 的移动端 Web 原型，后续由 Capacitor 打包为 Android / iOS 应用。
+MeetAgent V2.1 的移动端 Web 原型，由 Capacitor 打包为 Android 应用。
 
-当前进度：M5b Android Debug APK 构建完成（Capacitor 7.6.10 + JDK 21 + SDK 35）。
+当前进度：P0 UX + **P1 原生交互完成**（Capacitor 7.6.10 + JDK 21 + SDK 35）。
 Web、Mock、局域网 Node、自签 WSS Node 与 Android WebView 共用同一套 `ClientTransport` 与协议类型。
 
 ## 技术栈
@@ -11,7 +11,8 @@ Web、Mock、局域网 Node、自签 WSS Node 与 Android WebView 共用同一�
 - Pinia + Vue Router（hash 模式）
 - 原生 CSS + CSS 变量，暗色主题
 - 不引入 UI 组件库、Tailwind 或 CSS-in-JS
-- Capacitor 只保留 Platform Adapter 抽象，未打包原生工程
+- Capacitor 7 Android 工程；原生能力通过 `services/native` 适配，组件不直接调用插件
+- `@capacitor/network`、`@capacitor/haptics`、`@capacitor/keyboard`、`@capacitor/app`、`@capacitor/status-bar`
 
 ## 快速开始
 
@@ -82,6 +83,7 @@ mobile/
     │   ├── client/             # ClientTransport / WsClient / MockClient
     │   ├── connectivity/       # Web Locks 单连接守卫 + BroadcastChannel 接管
     │   ├── mock/scenario.ts    # 可复现的 Mock Node 数据
+    │   ├── native/             # 触感、返回键、键盘、状态栏
     │   ├── platform/           # browser / capacitor 平台抽象
     │   └── storage/            # 偏好与 Token（localStorage）
     ├── stores/                 # connection / node / commands / preferences / ui
@@ -114,7 +116,7 @@ ClientTransport
 ## 协议实现（对应 `docs/v2.1/PROTOCOL.md`）
 
 - 握手：`hello` → `welcome`，支持 Token、配对码与 `last_sequence`
-- 状态：`welcome.snapshot` 全量覆盖本地状态；`snapshot` 消息同样处理
+- 状态：`welcome.snapshot` 全量覆盖本地状态；下拉刷新通过 `snapshot` envelope 请求最新 Snapshot
 - 事件：按 `sequence` 去重，检测序号缺口并在 UI 提示；忽略未知事件类型
 - 命令：`ping`、`node.status`、`session.list`、`session.prompt`、`session.interrupt`、`permission.respond`；Node 对 Session 级命令强制要求同时携带 `agent_id` 与 `session_id`
 - 结果：`command.result`；15 秒超时、连接断开时拒绝在途命令
@@ -185,8 +187,8 @@ ClientTransport
 - `npm run build && npx cap add android && npx cap sync android`
 - JDK 21 + Android SDK 35 + Gradle 8.11.1 + AGP 8.7.2 执行 `./gradlew assembleDebug`
 - `BUILD SUCCESSFUL`，Debug APK：`android/app/build/outputs/apk/debug/app-debug.apk`
-  - 大小 **4,259,671 bytes（约 4.1 MB）**
-  - SHA-256 `a1987c31a7d0d9aa4bdfdb2cd7bf5d5de4105e11706edf0cc290b362dde38be2`
+  - 大小 **4,380,775 bytes（约 4.2 MB）**
+  - SHA-256 `b8fbd8765add0dc7e970b8ae675ee7c4ed70de2f81b2e34eabb069d97af32d87`
 - APK `assets/capacitor.config.json` 已确认包含 `"androidScheme": "http"`、`"cleartext": true`
 - 真机（HBN-AL00 / USB）验证：
   - 配对真实 Node `http://100.69.235.2:8787`，Home 恢复 41 个 Session
@@ -202,7 +204,7 @@ ClientTransport
 - Debug 专用明文配置：`android/app/src/debug/AndroidManifest.xml` + `network_security_config.xml`，允许 LAN / Tailscale `100.64.0.0/10` 的 HTTP/WS 调试
 - `.gitignore` 已忽略 `local.properties`、`.gradle/`、`build/`、`app/build/` 与 APK
 
-未连接设备/模拟器，因此未执行安装与真机运行。
+- 已在真机（HBN-AL00 / USB）安装 Debug APK 并完成连接、Prompt、Interrupt、审批与离线恢复验证
 
 ## P0 UX 改造
 
@@ -241,6 +243,68 @@ Android 真机 P0 截图位于 `/tmp/opencode/meetagent-mobile-android/`：
 - `89-p0-session-menu.png`
 - `95-final-empty-composer.png`
 - `96-final-activity-cn.png`
+
+## P1 原生交互
+
+Capacitor 7 插件：
+
+- `@capacitor/haptics` 7.0.5
+- `@capacitor/keyboard` 7.0.6
+- `@capacitor/app` 7.1.2
+- `@capacitor/status-bar` 7.0.6
+
+实现：
+
+- Haptics：Prompt 成功、审批允许/拒绝、Interrupt、下拉刷新成功使用 Light 触感；命令/刷新失败使用 Error 通知；滚动不触发
+- 下拉刷新：概览 / 会话 / 动态支持，阈值 70px，显示「下拉刷新 / 松开刷新 / 正在刷新…」；离线或非 online 状态不触发；完成后恢复 scrollY
+- Snapshot 刷新：`connection.refreshSnapshot()` → WsClient 发送 `snapshot` envelope，MockClient 返回本地 Snapshot；8 秒超时
+- BottomSheet：遮罩淡入、面板上滑、body 滚动锁、安全区、Android 返回键关闭；统一为 `AppSheet`
+- Session 详情：⋯ 改为底部 ActionSheet；Interrupt 进入二次确认 ActionSheet；复制会话 ID / 原始事件保留
+- Android 返回键：Sheet/菜单优先关闭 → 详情/开发者 `router.back()` → 根 Tab 退出 App
+- 键盘：`KeyboardResize.Native`，输入条随 WebView resize 上移；键盘打开时隐藏 TabBar；滚动页面自动收起键盘
+- StatusBar：深色背景 `#0b0d10` + 浅色图标；Android `styles.xml` 同步启动/导航栏底色
+- 页面切换：详情/开发者页轻量 slide，Tab 无整页动画；路由级滚动位置记忆（after-enter 恢复）
+- 加载：Home/Sessions/Activity 在未拿到 Snapshot 且连接中显示 skeleton；下拉刷新使用轻量指示器
+
+验证：
+
+```text
+npm run typecheck → 0 错误
+npm run build     → 155 modules, built successfully
+npx cap sync android → 5 plugins
+./gradlew assembleDebug → BUILD SUCCESSFUL
+```
+
+```text
+APK: android/app/build/outputs/apk/debug/app-debug.apk
+大小: 4,380,775 bytes
+SHA-256: b8fbd8765add0dc7e970b8ae675ee7c4ed70de2f81b2e34eabb069d97af32d87
+```
+
+真机（HBN-AL00 / USB）结果：
+
+- 真实 Node `http://100.69.235.2:8787`：下拉刷新发送 Snapshot 请求并恢复 41 个 Session
+- 离线：关闭 Wi-Fi/数据并停止 Tailscale，顶部显示「网络离线」，下拉不出现刷新指示
+- 恢复：重新启用网络与 Tailscale 后自动重连，状态回到「握手完成」
+- ActionSheet、筛选 BottomSheet、Interrupt 二次确认、返回键层级、键盘弹出/滚动收起均已验证
+- Haptics：`dumpsys vibrator_manager` 记录到 `com.flyingbasshot.meetagent` 的 TOUCH 振动（Light 50ms）
+- 滚动位置：动态页切换 Tab 前后截图一致；会话列表实时重排时按 scrollY 恢复
+- 仅使用测试 Session `ses_e5a1c7989ffefcU1XdrTiq6WXX`；未向主会话 `ses_e5e6e776fffeeeCdeah5WtPEhJ` 发送 Prompt
+- 测试期间 Tailscale 路由短暂中断；使用 `adb reverse` 完成真实 Node Snapshot 验证，随后已恢复 Tailscale 地址并移除 reverse
+
+P1 截图位于 `/tmp/opencode/meetagent-mobile-android/`：
+
+- `101-p1-home.png`
+- `111-p1-action-sheet.png`
+- `113-p1-keyboard.png`
+- `116-p1-interrupt-confirm.png`
+- `121-p1-live-pull.png`
+- `122-p1-live-pull-done.png`
+- `130-p1-filter-sheet.png`
+- `131-p1-offline.png`
+- `132-p1-offline-pull.png`
+- `133-p1-offline-recovered.png`
+- `134-p1-activity-scroll-before.png` / `135-p1-activity-scroll-after.png`
 
 ## 尚未实现（后续里程碑）
 

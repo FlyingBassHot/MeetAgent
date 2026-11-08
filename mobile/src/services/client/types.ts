@@ -48,6 +48,7 @@ export interface ClientTransport {
   connect(config: ClientConfig): void;
   disconnect(): void;
   setLastSequence(sequence: number): void;
+  refreshSnapshot(): Promise<void>;
   send(command: CommandRequest): Promise<CommandResult>;
   subscribe(listener: TransportListener): () => void;
 }

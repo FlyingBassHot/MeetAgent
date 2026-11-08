@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import type { PermissionDecision } from '@/domain/protocol';
+import type { ActionSheetAction } from '@/domain/action-sheet';
 import { sessionStatusLabel, sessionStatusTone } from '@/domain/labels';
 import { buildTimeline } from '@/domain/timeline';
 import { useCommandsStore } from '@/stores/commands';
@@ -13,6 +14,7 @@ import StatusPill from '@/components/StatusPill.vue';
 import PermissionCard from '@/components/PermissionCard.vue';
 import SessionTimeline from '@/components/SessionTimeline.vue';
 import PromptComposer from '@/components/PromptComposer.vue';
+import ActionSheet from '@/components/ActionSheet.vue';
 import EmptyState from '@/components/EmptyState.vue';
 
 const route = useRoute();
@@ -31,37 +33,32 @@ const timeline = computed(() => buildTimeline(nodeStore.sessionEvents(sessionId.
 const prompts = computed(() => commands.promptsFor(sessionId.value));
 const hasMessages = computed(() => timeline.value.length > 0 || prompts.value.length > 0);
 const draft = ref('');
-const menuOpen = ref(false);
-const confirmingInterrupt = ref(false);
-let interruptTimer: number | null = null;
+const actionsOpen = ref(false);
+const confirmOpen = ref(false);
 
 const title = computed(() => session.value?.title?.trim() || '会话详情');
 const canInterrupt = computed(
   () => session.value?.status === 'running' || session.value?.status === 'waiting',
 );
-
-function resetInterrupt(): void {
-  if (interruptTimer !== null) {
-    window.clearTimeout(interruptTimer);
-    interruptTimer = null;
-  }
-  confirmingInterrupt.value = false;
-}
-
-function onInterrupt(): void {
-  if (!canInterrupt.value || !connection.isOnline) return;
-  if (!confirmingInterrupt.value) {
-    confirmingInterrupt.value = true;
-    interruptTimer = window.setTimeout(() => {
-      confirmingInterrupt.value = false;
-      interruptTimer = null;
-    }, 3000);
-    return;
-  }
-  resetInterrupt();
-  menuOpen.value = false;
-  void commands.interrupt(sessionId.value);
-}
+const interruptHint = computed(() => {
+  if (!connection.isOnline) return '当前离线';
+  if (!canInterrupt.value) return '当前会话未运行';
+  return undefined;
+});
+const actions = computed<ActionSheetAction[]>(() => [
+  {
+    key: 'interrupt',
+    label: '中断运行',
+    tone: 'danger',
+    disabled: interruptHint.value !== undefined,
+    description: interruptHint.value,
+  },
+  { key: 'copy', label: '复制会话 ID' },
+  { key: 'raw', label: '打开原始事件' },
+]);
+const confirmActions: ActionSheetAction[] = [
+  { key: 'confirm', label: '确认中断', tone: 'danger' },
+];
 
 async function copySessionId(): Promise<void> {
   try {
@@ -70,13 +67,30 @@ async function copySessionId(): Promise<void> {
   } catch {
     ui.push('复制失败，请重试', 'warning');
   }
-  menuOpen.value = false;
 }
 
 function openRawEvents(): void {
   preferences.patch({ showRawEvents: true });
-  menuOpen.value = false;
   void router.push('/activity');
+}
+
+function selectAction(key: string): void {
+  actionsOpen.value = false;
+  if (key === 'interrupt') {
+    confirmOpen.value = true;
+    return;
+  }
+  if (key === 'copy') {
+    void copySessionId();
+    return;
+  }
+  if (key === 'raw') openRawEvents();
+}
+
+function confirmInterrupt(): void {
+  confirmOpen.value = false;
+  if (!canInterrupt.value || !connection.isOnline) return;
+  void commands.interrupt(sessionId.value);
 }
 
 async function sendPrompt(): Promise<void> {
@@ -87,16 +101,6 @@ async function sendPrompt(): Promise<void> {
 function respond(permissionId: string, decision: PermissionDecision): void {
   void commands.respondPermission(permissionId, decision);
 }
-
-watch(menuOpen, (open) => {
-  if (!open) resetInterrupt();
-});
-
-watch(canInterrupt, (active) => {
-  if (!active) resetInterrupt();
-});
-
-onBeforeUnmount(resetInterrupt);
 </script>
 
 <template>
@@ -113,29 +117,27 @@ onBeforeUnmount(resetInterrupt);
         type="button"
         class="detail-nav__button"
         aria-label="更多操作"
-        @click="menuOpen = !menuOpen"
+        @click="actionsOpen = true"
       >
         ⋯
       </button>
     </header>
 
-    <div v-if="menuOpen" class="menu-backdrop" @click="menuOpen = false" />
-    <div v-if="menuOpen" class="detail-menu">
-      <button
-        type="button"
-        class="detail-menu__item detail-menu__item--danger"
-        :disabled="!canInterrupt || !connection.isOnline"
-        @click="onInterrupt"
-      >
-        {{ confirmingInterrupt ? '确认中断' : '中断运行' }}
-      </button>
-      <button type="button" class="detail-menu__item" @click="copySessionId">
-        复制会话 ID
-      </button>
-      <button type="button" class="detail-menu__item" @click="openRawEvents">
-        打开原始事件
-      </button>
-    </div>
+    <ActionSheet
+      :open="actionsOpen"
+      title="会话操作"
+      :actions="actions"
+      @close="actionsOpen = false"
+      @select="selectAction"
+    />
+    <ActionSheet
+      :open="confirmOpen"
+      title="中断运行？"
+      :description="`会话「${title}」的当前回复会停止，已产生的输出会保留。`"
+      :actions="confirmActions"
+      @close="confirmOpen = false"
+      @select="confirmInterrupt"
+    />
 
     <template v-if="session">
       <div v-if="!connection.isOnline" class="banner banner--danger">

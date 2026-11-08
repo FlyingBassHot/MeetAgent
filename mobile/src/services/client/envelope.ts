@@ -34,6 +34,14 @@ export function heartbeatEnvelope(nonce: string): Envelope {
   };
 }
 
+export function snapshotEnvelope(): Envelope {
+  return {
+    schema_version: SCHEMA_VERSION,
+    type: 'snapshot',
+    message_id: newMessageId(),
+  };
+}
+
 export function parseEnvelope(raw: string): Envelope | null {
   let parsed: unknown;
   try {

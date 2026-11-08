@@ -1,18 +1,22 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
+import { useConnectionStore } from '@/stores/connection';
 import { useNodeStore } from '@/stores/node';
 import PageHeader from '@/components/PageHeader.vue';
 import SessionCard from '@/components/SessionCard.vue';
 import EmptyState from '@/components/EmptyState.vue';
 import BottomSheet from '@/components/BottomSheet.vue';
+import PageSkeleton from '@/components/PageSkeleton.vue';
 
 type SessionFilter = 'all' | 'active' | 'waiting' | 'idle';
 
+const connection = useConnectionStore();
 const nodeStore = useNodeStore();
 const search = ref('');
 const searchOpen = ref(false);
 const filterOpen = ref(false);
 const filter = ref<SessionFilter>('all');
+const loading = computed(() => !nodeStore.hasSnapshot && connection.isBusy);
 
 const filters: Array<{ key: SessionFilter; label: string }> = [
   { key: 'all', label: '全部会话' },
@@ -71,6 +75,8 @@ function selectFilter(next: SessionFilter): void {
       </template>
     </PageHeader>
 
+    <PageSkeleton v-if="loading" :rows="5" :status="false" />
+    <template v-else>
     <input
       v-if="searchOpen"
       v-model="search"
@@ -92,6 +98,7 @@ function selectFilter(next: SessionFilter): void {
         :pending-count="nodeStore.pendingFor(session.session_id).length"
       />
     </div>
+    </template>
 
     <BottomSheet :open="filterOpen" title="筛选会话" @close="filterOpen = false">
       <div class="sessions__options">

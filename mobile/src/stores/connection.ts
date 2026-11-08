@@ -310,6 +310,21 @@ export const useConnectionStore = defineStore('connection', () => {
     return result;
   }
 
+  async function refreshSnapshot(): Promise<boolean> {
+    if (!transport || phase.value !== 'online') {
+      ui.push('当前未连接，无法刷新', 'warning');
+      return false;
+    }
+    try {
+      await transport.refreshSnapshot();
+      return true;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '刷新快照失败';
+      ui.push(message, 'danger');
+      return false;
+    }
+  }
+
   function respondPermission(permissionId: string, decision: PermissionDecision): Promise<CommandResult> {
     return sendCommand({
       type: 'permission.respond',
@@ -338,6 +353,7 @@ export const useConnectionStore = defineStore('connection', () => {
     takeover,
     bootstrap,
     sendCommand,
+    refreshSnapshot,
     respondPermission,
   };
 });

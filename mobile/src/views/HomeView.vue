@@ -9,6 +9,7 @@ import PageHeader from '@/components/PageHeader.vue';
 import SessionCard from '@/components/SessionCard.vue';
 import PermissionCard from '@/components/PermissionCard.vue';
 import EventRow from '@/components/EventRow.vue';
+import PageSkeleton from '@/components/PageSkeleton.vue';
 
 const connection = useConnectionStore();
 const nodeStore = useNodeStore();
@@ -32,6 +33,7 @@ const pendingViews = computed(() =>
 const recentEvents = computed(() =>
   nodeStore.recentEvents.filter(isImportantEvent).slice(0, 5),
 );
+const loading = computed(() => !nodeStore.hasSnapshot && connection.isBusy);
 
 function respond(permissionId: string, decision: PermissionDecision): void {
   void commands.respondPermission(permissionId, decision);
@@ -42,7 +44,9 @@ function respond(permissionId: string, decision: PermissionDecision): void {
   <div class="home">
     <PageHeader title="概览" />
 
-    <div v-if="connection.mode === 'mock'" class="banner">
+    <PageSkeleton v-if="loading" :rows="5" />
+    <template v-else>
+      <div v-if="connection.mode === 'mock'" class="banner">
       演示模式：以下 Agent、消息与审批均为本地 Mock 数据。
     </div>
     <div v-if="nodeStore.sequenceGap" class="banner banner--danger">
@@ -109,6 +113,7 @@ function respond(permissionId: string, decision: PermissionDecision): void {
         />
       </div>
     </section>
+    </template>
   </div>
 </template>
 

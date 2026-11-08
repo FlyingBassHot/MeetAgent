@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { useRoute } from 'vue-router';
+import { restoreScroll } from '@/app/scroll';
 import { NAV_ITEMS } from '@/app/nav';
 import { useConnectionStore } from '@/stores/connection';
 import { useNetworkStore } from '@/stores/network';
@@ -7,14 +9,25 @@ import { useNodeStore } from '@/stores/node';
 import ConnectionBadge from './ConnectionBadge.vue';
 import MockBadge from './MockBadge.vue';
 import NavIcon from './NavIcon.vue';
+import PullToRefresh from './PullToRefresh.vue';
 import StatusPill from './StatusPill.vue';
 
+const route = useRoute();
 const connection = useConnectionStore();
 const network = useNetworkStore();
 const nodeStore = useNodeStore();
 
 const nodeName = computed(() => nodeStore.node?.name ?? 'MeetAgent');
 const isMock = computed(() => connection.mode === 'mock');
+const pullEnabled = computed(
+  () =>
+    connection.isOnline &&
+    ['home', 'sessions', 'activity'].includes(String(route.name)),
+);
+
+function onPageEntered(): void {
+  restoreScroll(route.fullPath);
+}
 </script>
 
 <template>
@@ -51,7 +64,17 @@ const isMock = computed(() => connection.mode === 'mock');
       </div>
 
       <main class="page">
-        <RouterView />
+        <PullToRefresh :enabled="pullEnabled" :reset-key="route.fullPath">
+          <RouterView v-slot="{ Component, route: viewRoute }">
+            <Transition
+              :name="viewRoute.meta.transition === 'slide' ? 'page-slide' : 'page-none'"
+              mode="out-in"
+              @after-enter="onPageEntered"
+            >
+              <component :is="Component" :key="viewRoute.fullPath" />
+            </Transition>
+          </RouterView>
+        </PullToRefresh>
       </main>
     </div>
 
@@ -83,6 +106,31 @@ const isMock = computed(() => connection.mode === 'mock');
 @media (min-width: 900px) {
   .network-banner {
     margin: 16px 32px 0;
+  }
+}
+
+.page-slide-enter-active {
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.page-slide-leave-active {
+  transition: opacity 0.1s ease, transform 0.1s ease;
+}
+
+.page-slide-enter-from {
+  opacity: 0;
+  transform: translateX(14px);
+}
+
+.page-slide-leave-to {
+  opacity: 0;
+  transform: translateX(-8px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-slide-enter-active,
+  .page-slide-leave-active {
+    transition: none;
   }
 }
 </style>

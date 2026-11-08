@@ -1,8 +1,8 @@
-# MeetAgent Mobile Android 构建指南（M5b）
+# MeetAgent Mobile Android 构建指南（M5b + P1）
 
 > 目标：用 Capacitor 把 `mobile/dist` 打包成 Android Debug APK。
 > 本机已验证：JDK 21、Android SDK 35、Gradle 8.11.1、Capacitor 7.6.10。
-> 没有连接设备或模拟器，未执行安装与真机运行。
+> 已在 HBN-AL00（USB）安装并完成真机验证。
 
 ## 1. 版本与工具链
 
@@ -10,6 +10,10 @@
 |---|---|
 | Capacitor Core / CLI / Android | 7.6.10 |
 | @capacitor/network | 7.0.4 |
+| @capacitor/haptics | 7.0.5 |
+| @capacitor/keyboard | 7.0.6 |
+| @capacitor/app | 7.1.2 |
+| @capacitor/status-bar | 7.0.6 |
 | Java | OpenJDK 21.0.13 |
 | Android SDK Platform | android-35 |
 | Android Build Tools | 35.0.0 |
@@ -66,6 +70,12 @@ const config: CapacitorConfig = {
   server: {
     androidScheme: 'http',
     cleartext: true,
+  },
+  plugins: {
+    Keyboard: {
+      resize: 'native',
+      resizeOnFullScreen: true,
+    },
   },
 };
 
@@ -128,8 +138,8 @@ sdkVersion:'23'
 targetSdkVersion:'35'
 application-label:'MeetAgent Mobile'
 APK: mobile/android/app/build/outputs/apk/debug/app-debug.apk
-大小: 4,259,671 bytes（约 4.1 MB）
-SHA-256: a1987c31a7d0d9aa4bdfdb2cd7bf5d5de4105e11706edf0cc290b362dde38be2
+大小: 4,380,775 bytes（约 4.2 MB）
+SHA-256: b8fbd8765add0dc7e970b8ae675ee7c4ed70de2f81b2e34eabb069d97af32d87
 ```
 
 ## 5. Gradle 网络问题
@@ -227,7 +237,45 @@ P0 UX 真机检查（2026-11-08）：
   - `95-final-empty-composer.png`
   - `96-final-activity-cn.png`
 
-## 8. 签名与发布
+## 8. P1 原生交互真机验证（2026-11-08）
+
+插件接入：
+
+- `@capacitor/haptics`：Light（Prompt 成功、审批、Interrupt、下拉刷新成功）、Error（失败）
+- `@capacitor/keyboard`：`KeyboardResize.Native`，键盘出现时隐藏 TabBar，滚动自动收起
+- `@capacitor/app`：硬件返回键分层（Sheet → 详情/开发者 router.back → 根 Tab 退出）
+- `@capacitor/status-bar`：深色背景 `#0b0d10` + 浅色图标；启动/导航栏同步
+
+验证结果：
+
+- `npm run typecheck`、`npm run build`、`npx cap sync android`、`./gradlew assembleDebug` 全部通过
+- APK：`4,380,775 bytes` / SHA-256 `b8fbd8765add0dc7e970b8ae675ee7c4ed70de2f81b2e34eabb069d97af32d87`
+- 下拉刷新：真实 Node 发送 `snapshot` envelope，Home/Sessions/Activity 可用；阈值 70px；刷新指示器显示
+- 离线：关闭 Wi-Fi/数据 + 停止 Tailscale，显示「网络离线」；下拉不触发刷新
+- 恢复：启用 Wi-Fi/数据并启动 Tailscale，自动重连并恢复 Snapshot
+- ActionSheet：详情「⋯」、Interrupt 二次确认、筛选 BottomSheet；遮罩/动画/安全区正常
+- 返回键：关闭 Sheet、详情返回会话列表、根 Tab 退出 App
+- 键盘：输入条位于键盘上方，TabBar 隐藏；滚动页面后键盘收起
+- Haptics：`adb shell dumpsys vibrator_manager` 记录 `com.flyingbasshot.meetagent` TOUCH 50ms 振动
+- Tab 滚动位置：动态页切换前后截图一致；会话列表按 scrollY 恢复（实时重排导致内容偏移）
+- 仅使用测试 Session `ses_e5a1c7989ffefcU1XdrTiq6WXX`；未向主会话发送 Prompt
+- 真实 Node 联调期间 Tailscale 路由短暂中断；临时使用 `adb reverse` 完成 Snapshot 验证，随后恢复 `http://100.69.235.2:8787` 并移除 reverse
+
+截图：`/tmp/opencode/meetagent-mobile-android/`
+
+- `101-p1-home.png`
+- `111-p1-action-sheet.png`
+- `113-p1-keyboard.png`
+- `116-p1-interrupt-confirm.png`
+- `121-p1-live-pull.png`
+- `122-p1-live-pull-done.png`
+- `130-p1-filter-sheet.png`
+- `131-p1-offline.png`
+- `132-p1-offline-pull.png`
+- `133-p1-offline-recovered.png`
+- `134-p1-activity-scroll-before.png` / `135-p1-activity-scroll-after.png`
+
+## 9. 签名与发布
 
 - Debug APK 使用 Android debug keystore，仅用于内部测试，不能发布。
 - Release 需要独立 keystore：
@@ -247,9 +295,9 @@ keytool -genkeypair -v \
   - 关闭 debug 的 cleartext 配置；
   - 在真机或 Firebase Test Lab 上跑安装与连接冒烟。
 
-## 9. 本机未验证
+## 10. 本机未验证
 
-- 已安装 Debug APK 并完成配对、Prompt、Interrupt、权限审批、断网恢复真机验证。
+- 已完成 Debug APK 安装、连接、Prompt、Interrupt、权限审批与 P1 原生交互真机验证。
 - 未构建 Release APK，未配置发布签名。
 - 未验证 Android Keystore、系统通知、FCM、后台保活。
 - 未验证 Wi-Fi / 蜂窝 / Tailscale 之间的实际切换时延。

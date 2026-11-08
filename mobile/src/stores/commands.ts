@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import type { PermissionDecision } from '@/domain/protocol';
 import { commandStatusLabel, decisionLabel } from '@/domain/labels';
+import { impactLight, notifyError } from '@/services/native/haptics';
 import type { CommandRequest } from '@/services/client/types';
 import { useConnectionStore } from './connection';
 import { useNodeStore } from './node';
@@ -41,12 +42,15 @@ export const useCommandsStore = defineStore('commands', () => {
     try {
       const result = await connection.sendCommand(request);
       if (result.status === 'completed') {
+        impactLight();
         if (successMessage) ui.push(successMessage, 'success');
         return true;
       }
+      notifyError();
       ui.push(result.error ?? `命令${commandStatusLabel(result.status)}`, 'danger');
       return false;
     } catch (err) {
+      notifyError();
       const message = err instanceof Error ? err.message : '命令发送失败';
       ui.push(message, 'danger');
       return false;
@@ -58,6 +62,7 @@ export const useCommandsStore = defineStore('commands', () => {
   async function prompt(sessionId: string, text: string): Promise<boolean> {
     const trimmed = text.trim();
     if (trimmed.length === 0) {
+      notifyError();
       ui.push('Prompt 不能为空', 'warning');
       return false;
     }

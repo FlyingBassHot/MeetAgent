@@ -8,10 +8,11 @@ import ActivityView from '@/views/ActivityView.vue';
 import SettingsView from '@/views/SettingsView.vue';
 import DeveloperView from '@/views/DeveloperView.vue';
 import ConnectView from '@/views/ConnectView.vue';
+import { rememberScroll } from './scroll';
 
 const router = createRouter({
   history: createWebHashHistory(),
-  scrollBehavior: () => ({ top: 0 }),
+  scrollBehavior: () => false,
   routes: [
     {
       path: '/connect',
@@ -35,7 +36,7 @@ const router = createRouter({
           path: 'sessions/:sessionId',
           name: 'session-detail',
           component: SessionDetailView,
-          meta: { title: '会话详情' },
+          meta: { title: '会话详情', transition: 'slide' },
         },
         {
           path: 'activity',
@@ -53,7 +54,7 @@ const router = createRouter({
           path: 'settings/developer',
           name: 'settings-developer',
           component: DeveloperView,
-          meta: { title: '开发者信息' },
+          meta: { title: '开发者信息', transition: 'slide' },
         },
       ],
     },
@@ -61,7 +62,8 @@ const router = createRouter({
   ],
 });
 
-router.beforeEach((to) => {
+router.beforeEach((to, from) => {
+  if (from.name) rememberScroll(from.fullPath, window.scrollY);
   const connection = useConnectionStore();
   const requiresAuth = to.meta.requiresAuth !== false;
   if (requiresAuth && !connection.isOnline) {

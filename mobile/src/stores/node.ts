@@ -26,6 +26,7 @@ export const useNodeStore = defineStore('node', () => {
   const serverTime = ref<string | null>(null);
   const sequenceGap = ref(false);
   const connectedAt = ref<string | null>(null);
+  const hasSnapshot = ref(false);
 
   const agentById = computed<Record<string, AgentView>>(() => {
     const map: Record<string, AgentView> = {};
@@ -80,6 +81,7 @@ export const useNodeStore = defineStore('node', () => {
     serverTime.value = snapshot.server_time ?? null;
     sequenceGap.value = false;
     connectedAt.value = new Date().toISOString();
+    hasSnapshot.value = true;
   }
 
   function applyWelcome(welcome: Welcome): void {
@@ -250,6 +252,7 @@ export const useNodeStore = defineStore('node', () => {
     serverTime.value = null;
     sequenceGap.value = false;
     connectedAt.value = null;
+    hasSnapshot.value = false;
   }
 
   function sessionEvents(sessionId: string): ProtocolEvent[] {
@@ -276,6 +279,7 @@ export const useNodeStore = defineStore('node', () => {
     serverTime,
     sequenceGap,
     connectedAt,
+    hasSnapshot,
     agentById,
     sessionById,
     sessions,
