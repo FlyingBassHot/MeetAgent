@@ -8,8 +8,9 @@ WEB_DIR := web/test-client
 
 CLOUD_CONFIG ?= configs/cloud.yaml
 NODE_CONFIG ?= configs/node.yaml
+DOCKER ?= docker
 
-.PHONY: all build cloud node simulator test fmt vet clean run-cloud run-node run-node-mock simulator-run dev-tls install-service web-install web-dev web-build
+.PHONY: all build cloud node simulator test fmt vet clean run-cloud run-node run-node-mock simulator-run dev-tls install-service docker-build docker-up docker-down docker-logs web-install web-dev web-build
 
 all: build
 
@@ -61,6 +62,22 @@ dev-tls:
 ## install-service: install and start the Node as a systemd user service
 install-service:
 	./scripts/install-node-service.sh
+
+## docker-build: build the Node container image
+docker-build:
+	$(DOCKER) compose build
+
+## docker-up: start the Node container (stop meetagent-node.service first)
+docker-up:
+	$(DOCKER) compose up -d
+
+## docker-down: stop and remove the Node container
+docker-down:
+	$(DOCKER) compose down
+
+## docker-logs: follow Node container logs
+docker-logs:
+	$(DOCKER) compose logs -f node
 
 ## run-node-mock: start the Node with the mock Agent configuration
 run-node-mock:

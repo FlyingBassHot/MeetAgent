@@ -98,6 +98,23 @@ make run-node            # configs/node.yaml
 
 ---
 
+## Web 界面
+
+V2.1 的 Web 客户端就是 `mobile/` 里的 Vue 应用，和 Android App 共用同一套界面与协议：
+
+```bash
+cd mobile
+npm install
+npm run dev
+# 浏览器打开 http://127.0.0.1:5174
+```
+
+远程访问时可打开 `http://100.69.235.2:5174`（Node 已允许 Tailscale CORS）。连接页填写 Node 地址和配对码即可。
+
+> `web/test-client/` 是 V1 Cloud 调试控制台，仍然保留在仓库中，但只走旧的 Cloud 协议，**不连接 V2.1 Node**，仅作归档参考。
+
+---
+
 ## 配置
 
 ### `configs/node.yaml`
@@ -165,9 +182,9 @@ server:
 - Mobile 填写 `https://<主机>:8787`，客户端会自动使用 `wss://`
 - 公网部署请关闭 `allow_lan_origins`，只放行明确域名
 
-### 常驻运行
+### systemd user service（替代 Docker）
 
-开发时可以用 `make run-node`；需要长期在线时安装 systemd user service：
+开发时可以用 `make run-node`；不用 Docker 时可安装 systemd user service：
 
 ```bash
 make build
@@ -183,6 +200,33 @@ journalctl --user -u meetagent-node -f
 ```
 
 `install-service` 同时启用 linger，使服务在注销图形会话后仍保持运行。
+
+### Docker 部署（当前方式）
+
+Docker 与 systemd 二选一，不要同时启动（都会占用 `8787`）：
+
+```bash
+cp .env.example .env
+# 编辑 .env：OPENCODE_PASSWORD=$(opencode service get password)
+
+make docker-build
+# 如果已安装 systemd 服务，先停掉：
+sudo systemctl stop meetagent-node
+make docker-up
+docker compose ps
+make docker-logs
+```
+
+首次加入 `docker` 组后需要重新登录；未重新登录前可临时使用：
+
+```bash
+make docker-up DOCKER="sudo docker"
+```
+
+- `compose.yaml` 使用 `network_mode: host`：这样容器能访问宿主机 `127.0.0.1:49374` 的 OpenCode，mDNS 也能正常广播
+- `configs/node.yaml` 只读挂载，`./data` 持久化配对 Token
+- 容器内以 UID 1000 运行，`./data` 需要当前用户可写
+- 停止：`make docker-down`；数据保留在 `./data`
 
 Node 暴露 Prometheus 文本指标 `GET /metrics`（本机访问免认证；远程访问需要 `admin_token`）：
 

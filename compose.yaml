@@ -1,0 +1,22 @@
+name: meetagent
+
+services:
+  node:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: meetagent-node:2.1
+    container_name: meetagent-node
+    restart: unless-stopped
+    # Host networking is required for two reasons on Linux:
+    #   1. OpenCode normally listens on 127.0.0.1:49374 on the host.
+    #   2. mDNS advertisement does not cross the Docker bridge.
+    # If you switch to bridge networking, change the Node config base_url to
+    # host.docker.internal and make OpenCode listen on 0.0.0.0.
+    network_mode: host
+    environment:
+      OPENCODE_PASSWORD: ${OPENCODE_PASSWORD:-}
+    volumes:
+      - ./configs/node.yaml:/app/configs/node.yaml:ro
+      - ./data:/app/data
+    stop_grace_period: 15s

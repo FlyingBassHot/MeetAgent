@@ -1,0 +1,14 @@
+.git
+.github
+bin
+data
+mobile
+firmware
+web
+docs
+*.md
+*.log
+.env
+.env.*
+!/.env.example
+tmp

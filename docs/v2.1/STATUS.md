@@ -41,7 +41,7 @@
 - 限流：单客户端入站令牌桶（100/s、burst 200），超限返回 `rate_limited`；`cmd/node` 已从配置接线
 - 重连边界：先订阅后生成 Snapshot，消除握手期事件丢失；缓存淘汰/TTL/Node 重启时 `welcome.replay_truncated=true`，不再返回部分补发事件
 - Node 重启恢复：同一配对存储下，旧 `last_sequence` 重连得到新序号 Snapshot，后续事件从新序号连续递增（集成测试）
-- 运维：systemd user service `meetagent-node`（`Restart=always`、linger、密码从 `~/.config/meetagent/node.env` 读取）；`GET /metrics` 输出连接数、事件序号/缓存、命令结果等 Prometheus 指标
+- 运维：Docker 部署（`compose.yaml`，host network、`restart: unless-stopped`、配置/数据挂载、健康检查）已实测；systemd user service 保留为替代方案；`GET /metrics` 输出连接数、事件序号/缓存、命令结果等 Prometheus 指标
 - Tailscale：100.69.235.2 登录；Mobile 通过 Tailscale IP 配对并读取真实 Snapshot（CORS 已允许 100.64/10）
 - Android：JDK 21 + Android SDK 35；Capacitor 7.6.10；Gradle 8.11.1 Debug APK 4,230,914 bytes，SHA-256 `b8fbdc243d45251c0e98e542282e9e1e23b12aa0e2f289bfa1c9d93195cceec4`（package com.flyingbasshot.meetagent）
 - Android 真机（HBN-AL00 / 2NP0224717021762）：USB ADB 已授权；Tailscale `100.69.235.2:8787` 配对成功，Home 恢复 41 个真实 Session；真实测试 Session `ses_e5a1c7989ffefcU1XdrTiq6WXX` 发出 Prompt，收到 `message.completed` 与 running→idle 状态；Node 重启后客户端自动重连并应用新 Snapshot
