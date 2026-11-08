@@ -28,7 +28,10 @@ CFLAGS=(
     -I../../main
 )
 
-mapfile -t files < <(find "${COMPONENTS}" ../../main -name '*.c' | sort)
+# board_lcd4.c needs the managed Waveshare BSP/LVGL headers and is verified
+# by the real idf.py build instead of host stubs.
+mapfile -t files < <(find "${COMPONENTS}" ../../main -name '*.c' \
+    ! -path '*/main/board_lcd4.c' | sort)
 for file in "${files[@]}"; do
     echo "[syntax] ${file}"
     "${CC}" "${CFLAGS[@]}" "${file}"

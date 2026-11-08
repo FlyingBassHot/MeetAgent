@@ -94,7 +94,7 @@ E3b LVGL 字符网格 widget（尚未实现）
 ```
 
 - 纯逻辑模块位于 `themes/terminal_aesthetic/renderers/`，不依赖 LVGL/FreeRTOS。
-- 固定 80×40 上限，默认 60×22；单帧约 9.4 KB，无每帧分配。
+- 固定 80×40 上限，默认 60×30（480×480 目标）；默认单帧约 5.5 KB，无每帧分配。
 - Completed 使用有限脉冲；Offline phase 不推进，帧静止。
 - `apply_view_model()` 负责状态解析并立即重绘；Scheduler 负责定期推进。
 
@@ -197,6 +197,11 @@ apply(theme_id)
 - Board：把以上接口打包；ESPUI 不包含任何板级引脚。
 
 真实板级 BSP 接入时，只替换 `hal/` 与 `main` 的 board bundle，不修改 Theme 或 UI Core。
+
+LCD-4 V4 当前走官方 BSP：`main/board_lcd4.c` 把
+`bsp_display_start / bsp_display_lock / bsp_display_brightness_set /
+bsp_display_get_input_dev` 映射到 `espui_board_hal_t`。`espui_board_stub()`
+只保留给 host tests；它报告 480×480，但不驱动面板。
 
 ## 8. E2 / E3a 的刻意简化
 

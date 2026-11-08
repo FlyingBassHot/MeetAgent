@@ -7,10 +7,10 @@
 static espui_display_info_t display(void)
 {
     espui_display_info_t info = {
-        .panel_name = "test-panel",
-        .width = 320,
+        .panel_name = "test-panel-480",
+        .width = 480,
         .height = 480,
-        .orientation = ESPUI_ORIENTATION_PORTRAIT,
+        .orientation = ESPUI_ORIENTATION_ANY,
         .color_depth = 16,
         .supports_touch = true,
     };
@@ -37,6 +37,14 @@ static void assert_theme_usable(const espui_theme_descriptor_t *theme)
                        espui_manifest_validate(theme->manifest, &info));
     TEST_ASSERT_EQ_INT((int)ESPUI_SCENE_MASK_ALL,
                        (int)theme->manifest->scene_mask);
+
+    /* Old 320x480 layout must be rejected after the LCD-4 migration. */
+    espui_display_info_t small = display();
+    small.width = 320;
+    small.height = 480;
+    small.orientation = ESPUI_ORIENTATION_PORTRAIT;
+    TEST_ASSERT_EQ_INT(ESPUI_MANIFEST_BAD_DISPLAY,
+                       espui_manifest_validate(theme->manifest, &small));
 }
 
 static void test_builtin_registration(void)

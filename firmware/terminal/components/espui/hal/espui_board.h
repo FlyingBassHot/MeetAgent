@@ -22,9 +22,9 @@ typedef struct {
 } espui_board_hal_t;
 
 /*
- * Headless bring-up board: 320x480 portrait, RGB565, no panel flush, no GPIO.
- * It exists so the UI/theme pipeline can boot before real board support lands.
- * Replace it with a board-specific bundle; never edit themes for a new board.
+ * Headless board for host tests and board-independent bring-up: 480x480,
+ * RGB565, no panel flush, no local GPIO. The real LCD-4 V4 board uses the
+ * official Waveshare BSP through main/board_lcd4.c.
  */
 const espui_board_hal_t *espui_board_stub(void);
 

@@ -1,0 +1,4 @@
+## IDF Component Manager Manifest File
+dependencies:
+  idf: ">=5.4"
+  waveshare/esp32_s3_touch_lcd_4: "^3.0.0"

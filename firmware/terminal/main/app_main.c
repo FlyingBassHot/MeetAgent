@@ -2,7 +2,7 @@
  * MeetAgent Terminal entry point (E0/E1/E2 scaffold).
  *
  * Boot order:
- *   1. board HAL init (stub today)
+ *   1. board HAL init (Waveshare LCD-4 BSP)
  *   2. ESPUI init (renderer, theme registry, ViewModel, queues)
  *   3. ESPUI UI task
  *   4. mock state task (replaced by networking + state adapter in E4)
@@ -13,6 +13,7 @@
 
 #include "espui.h"
 #include "espui_board.h"
+#include "board_lcd4.h"
 #include "mock_state.h"
 #include "net_client.h"
 
@@ -66,7 +67,7 @@ static esp_err_t init_board(const espui_board_hal_t *board)
 
 void app_main(void)
 {
-    const espui_board_hal_t *board = espui_board_stub();
+    const espui_board_hal_t *board = espui_board_lcd4();
     esp_err_t err = init_board(board);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "board bring-up failed; stopping");
@@ -122,7 +123,7 @@ void app_main(void)
         ESP_LOGW(TAG, "mock state not started: %s", esp_err_to_name(err));
     }
 
-    ESP_LOGI(TAG, "terminal scaffold running (display stub, mock state)");
+    ESP_LOGI(TAG, "terminal scaffold running (LCD-4 BSP, mock state)");
     ESP_LOGI(TAG, "Wi-Fi/WSS/Node integration is E4 work; no network started");
     vTaskDelay(pdMS_TO_TICKS(10000));
 }

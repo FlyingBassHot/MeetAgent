@@ -20,8 +20,8 @@ static const espui_manifest_t s_manifest = {
     .renderer_id = "builtin.label",
     .display =
         {
-            .orientation = ESPUI_ORIENTATION_PORTRAIT,
-            .min_width = 320,
+            .orientation = ESPUI_ORIENTATION_ANY,
+            .min_width = 480,
             .min_height = 480,
         },
     .scene_mask = ESPUI_SCENE_MASK_ALL,
@@ -47,6 +47,8 @@ typedef struct {
     const espui_tokens_t *tokens;
     espui_ui_scene_t *scene;
     espui_ui_widget_t *background;
+    espui_ui_widget_t *core_panel;
+    espui_ui_widget_t *info_panel;
     espui_ui_widget_t *header;
     espui_ui_widget_t *scene_label;
     espui_ui_widget_t *core;
@@ -66,6 +68,13 @@ static void destroy_scene(void)
         s_state.renderer->scene_destroy(s_state.scene);
     }
     memset(&s_state, 0, sizeof(s_state));
+}
+
+static espui_ui_widget_t *make_rect(terminal_theme_state_t *state,
+                                    const espui_widget_spec_t *spec)
+{
+    return state->renderer->widget_create(state->scene, ESPUI_WIDGET_RECT,
+                                          spec);
 }
 
 static espui_ui_widget_t *make_widget(terminal_theme_state_t *state,
@@ -154,7 +163,7 @@ static esp_err_t terminal_init(const espui_context_t *ctx)
     espui_widget_spec_t background = {
         .x = 0,
         .y = 0,
-        .width = 320,
+        .width = 480,
         .height = 480,
         .fg_color = tokens->colors.background,
         .bg_color = tokens->colors.background,
@@ -170,11 +179,47 @@ static esp_err_t terminal_init(const espui_context_t *ctx)
         return ESP_ERR_NO_MEM;
     }
 
+    espui_widget_spec_t core_panel_spec = {
+        .x = 16,
+        .y = 92,
+        .width = 448,
+        .height = 224,
+        .fg_color = tokens->colors.surface,
+        .bg_color = tokens->colors.surface,
+        .transparent_bg = false,
+        .font_scale_percent = 100,
+        .align = ESPUI_TEXT_ALIGN_LEFT,
+        .visible = true,
+    };
+    s_state.core_panel = make_rect(&s_state, &core_panel_spec);
+    if (s_state.core_panel == NULL) {
+        destroy_scene();
+        return ESP_ERR_NO_MEM;
+    }
+
+    espui_widget_spec_t info_panel_spec = {
+        .x = 16,
+        .y = 326,
+        .width = 448,
+        .height = 96,
+        .fg_color = tokens->colors.surface,
+        .bg_color = tokens->colors.surface,
+        .transparent_bg = false,
+        .font_scale_percent = 100,
+        .align = ESPUI_TEXT_ALIGN_LEFT,
+        .visible = true,
+    };
+    s_state.info_panel = make_rect(&s_state, &info_panel_spec);
+    if (s_state.info_panel == NULL) {
+        destroy_scene();
+        return ESP_ERR_NO_MEM;
+    }
+
     espui_widget_spec_t header_spec = {
-        .x = 14,
-        .y = 14,
-        .width = 292,
-        .height = 22,
+        .x = 20,
+        .y = 18,
+        .width = 440,
+        .height = 28,
         .fg_color = tokens->colors.secondary,
         .transparent_bg = true,
         .font_scale_percent = 100,
@@ -182,10 +227,10 @@ static esp_err_t terminal_init(const espui_context_t *ctx)
         .visible = true,
     };
     espui_widget_spec_t scene_spec = {
-        .x = 14,
-        .y = 40,
-        .width = 292,
-        .height = 20,
+        .x = 20,
+        .y = 50,
+        .width = 440,
+        .height = 24,
         .fg_color = tokens->colors.muted,
         .transparent_bg = true,
         .font_scale_percent = 100,
@@ -193,10 +238,10 @@ static esp_err_t terminal_init(const espui_context_t *ctx)
         .visible = true,
     };
     espui_widget_spec_t core_spec = {
-        .x = 14,
+        .x = 24,
         .y = 104,
-        .width = 292,
-        .height = 160,
+        .width = 432,
+        .height = 200,
         .fg_color = tokens->colors.primary,
         .transparent_bg = true,
         .font_scale_percent = 100,
@@ -204,10 +249,10 @@ static esp_err_t terminal_init(const espui_context_t *ctx)
         .visible = true,
     };
     s_state.status_spec = (espui_widget_spec_t){
-        .x = 14,
-        .y = 292,
-        .width = 292,
-        .height = 34,
+        .x = 28,
+        .y = 334,
+        .width = 424,
+        .height = 40,
         .fg_color = tokens->colors.primary,
         .transparent_bg = true,
         .font_scale_percent = 120,
@@ -215,9 +260,9 @@ static esp_err_t terminal_init(const espui_context_t *ctx)
         .visible = true,
     };
     espui_widget_spec_t strip_spec = {
-        .x = 14,
-        .y = 356,
-        .width = 292,
+        .x = 28,
+        .y = 386,
+        .width = 424,
         .height = 24,
         .fg_color = tokens->colors.secondary,
         .transparent_bg = true,
@@ -226,10 +271,10 @@ static esp_err_t terminal_init(const espui_context_t *ctx)
         .visible = true,
     };
     espui_widget_spec_t footer_spec = {
-        .x = 14,
-        .y = 440,
-        .width = 292,
-        .height = 20,
+        .x = 20,
+        .y = 446,
+        .width = 440,
+        .height = 22,
         .fg_color = tokens->colors.muted,
         .transparent_bg = true,
         .font_scale_percent = 100,
@@ -250,7 +295,8 @@ static esp_err_t terminal_init(const espui_context_t *ctx)
         make_widget(&s_state, &footer_spec, "E2 MOCK // ASCII RENDERER E3");
     if (s_state.header == NULL || s_state.scene_label == NULL ||
         s_state.core == NULL || s_state.status == NULL ||
-        s_state.strip == NULL || s_state.footer == NULL) {
+        s_state.strip == NULL || s_state.footer == NULL ||
+        s_state.core_panel == NULL || s_state.info_panel == NULL) {
         destroy_scene();
         return ESP_ERR_NO_MEM;
     }

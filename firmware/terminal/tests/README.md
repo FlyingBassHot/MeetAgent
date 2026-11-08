@@ -29,6 +29,11 @@ Compiled into the test binary:
 The ASCII preview CLI (`ascii_preview.c`) links only the ASCII module, ViewModel,
 Motion and Animation Scheduler; it does not need ESP-IDF or LVGL.
 
+Excluded from the host syntax check (needs managed BSP/LVGL headers, verified
+by `idf.py build` instead):
+
+- `main/board_lcd4.c`
+
 Excluded from the test binary (need FreeRTOS/LVGL):
 
 - `core/espui.c` (UI task/runtime)

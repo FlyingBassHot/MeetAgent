@@ -141,7 +141,7 @@ int main(int argc, char **argv)
     espui_ascii_renderer_t renderer;
     espui_ascii_config_t config = {
         .cols = 60,
-        .rows = 22,
+        .rows = 30,
         .glyph_ramp = ESPUI_ASCII_DEFAULT_RAMP,
         .target_fps = 15,
         .completed_pulse_ms = 1200,

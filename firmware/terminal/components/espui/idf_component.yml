@@ -1,2 +1,4 @@
 dependencies:
-  lvgl/lvgl: "^8.3.0"
+  # Pinned to the LVGL version used by the official LCD-4 V4 example.
+  # Do not enable lv_demo_*; the terminal only needs labels/rects and default font.
+  lvgl/lvgl: "8.4.*"

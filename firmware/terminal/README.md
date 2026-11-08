@@ -16,9 +16,9 @@
 已验证：
 
 - **真实 ESP-IDF 构建**：ESP-IDF v5.4.4 + esp32s3 工具链 + LVGL 8.4.0，`idf.py build` 成功
-- 固件：`meetagent_terminal.bin` 253,152 bytes；app 分区剩余 84%
-- 主机测试：`805 checks, 0 failure(s)`（ASan/UBSan + `-Werror`）
-- 主机语法检查：33 个固件 C 文件全部通过（ESP-IDF / FreeRTOS / LVGL stub）
+- 固件：`meetagent_terminal.bin` 502,272 bytes；app 分区剩余 67%
+- 主机测试：`807 checks, 0 failure(s)`（ASan/UBSan + `-Werror`）
+- 主机语法检查：33 个固件 C 文件通过（board_lcd4.c 由真实 IDF 构建验证）
 - E3a 帧预览：`make preview STATE=working FRAMES=3 DELAY=300`
 - **未验证**：未烧录、未接串口；未验证真实 LCD/触摸/旋钮/PSRAM
 
@@ -29,6 +29,7 @@ ESP-IDF  : v5.4.4 (/home/perch/esp/esp-idf)
 目标     : esp32s3
 工具链   : xtensa-esp32s3-elf
 LVGL     : 8.4.0（Component Manager）
+BSP      : waveshare/esp32_s3_touch_lcd_4 3.0.0
 构建     : idf.py build 成功
 烧录     : 未执行（硬件未到）
 ```
@@ -43,7 +44,10 @@ LVGL     : 8.4.0（Component Manager）
 - 官方 BSP：`waveshare/esp32_s3_touch_lcd_4 ^3.0.0`
 - 触摸为主，板载 BOOT / RESET / BAT_PWR 按键辅助；无板载旋钮
 
-**没有假设任何 GPIO、LCD 控制器、触摸控制器或背光引脚。** 当前使用 `stub-headless` 板级 HAL：仍报告旧的 320×480 面板信息，不驱动真实硬件。下一步优先接入官方 BSP，封装为 `espui_board_hal_t`；480×480 布局适配与 BSP 接入一起进行。
+**没有在本地写死 GPIO。** 真实板级适配 `main/board_lcd4.c` 直接调用官方 BSP：
+`bsp_display_start()` / `bsp_display_lock/unlock` / `bsp_display_brightness_set()` /
+`bsp_display_get_input_dev()`。BSP 负责 ST7701、GT911、CH32V003 复位/背光/LVGL port；
+`espui_board_stub()` 仅保留给 host tests。
 
 ## 构建
 
@@ -59,8 +63,9 @@ idf.py size
 # idf.py -p /dev/ttyACM0 flash monitor
 ```
 
-本次已用 ESP-IDF v5.4.4 完成首次真实构建。Component Manager 实际解析到
-LVGL 8.4.0（`^8.3.0`）。`sdkconfig`、`dependencies.lock`、`managed_components/`
+本次已用 ESP-IDF v5.4.4 完成 LCD-4 BSP 真实构建。Component Manager 解析到
+BSP 3.0.0、LVGL 8.4.0、esp_lvgl_port 2.9.0；LVGL 固定为 `8.4.*`，不启用
+`lv_demo_*` 或额外字体。`sdkconfig`、`dependencies.lock`、`managed_components/`
 和 `build/` 均由 `.gitignore` 忽略。
 
 > 未烧录、未接串口。构建大小、内存与限制详见 `docs/BUILD_STATUS.md`。
@@ -100,7 +105,9 @@ firmware/terminal/
 ├── CMakeLists.txt
 ├── sdkconfig.defaults
 ├── main/
-│   └── app_main.c
+│   ├── app_main.c
+│   ├── board_lcd4.c        # 官方 LCD-4 BSP → ESPUI HAL
+│   └── board_lcd4.h
 ├── components/
 │   ├── espui/
 │   │   ├── theme_api/      # Theme API / Manifest / Tokens / Renderer Registry / 公共类型

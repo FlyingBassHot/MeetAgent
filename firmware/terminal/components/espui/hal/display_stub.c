@@ -1,17 +1,17 @@
 /*
- * Headless display stub. It reports the target logical resolution but does not
- * drive a panel. Replaced by the board BSP once the LCD/touch controller are
- * confirmed from the Waveshare schematic.
+ * Headless display stub for host/CI boot paths. It reports the LCD-4 V4
+ * logical resolution but does not drive a panel. The real board uses the
+ * official Waveshare BSP (main/board_lcd4.c).
  */
 #include "espui_display.h"
 
 #include "hal_stub.h"
 
 static const espui_display_info_t s_info = {
-    .panel_name = "headless-stub-320x480",
-    .width = 320,
+    .panel_name = "headless-stub-480x480",
+    .width = 480,
     .height = 480,
-    .orientation = ESPUI_ORIENTATION_PORTRAIT,
+    .orientation = ESPUI_ORIENTATION_ANY,
     .color_depth = 16,
     .supports_touch = true,
 };

@@ -33,8 +33,8 @@ typedef struct {
 } espui_ascii_frame_t;
 ```
 
-- 默认 60 × 22，适合终端预览；LCD-4 设备目标 480×480、8×16 字体约 60×30，最终网格在 480×480 布局阶段确认。
-- 每帧固定约 9.4 KB；`espui_ascii_renderer_t` 自身持有 frame，不每帧分配。
+- 默认 60 × 30，对应 LCD-4 480×480、约 8×16 字体网格。
+- 默认 frame 约 5.5 KB；`espui_ascii_renderer_t` 持有最大 80×40 的固定数组（约 9.6 KB），不每帧分配。
 - 行尾始终有 `\0`；文本绘制自动裁剪。
 - `color` 是抽象颜色索引：PRIMARY / SECONDARY / MUTED / WARNING / ERROR / HIGHLIGHT。E3b 再映射到 Theme Tokens。
 
@@ -191,7 +191,7 @@ ascii_preview [all|idle|working|completed|approval|error|offline] [frames] [dela
 
 输出包含状态、时间、speed/density/amplitude、frame 序号和字符帧。
 
-示例（Working, 60×22 截取）：
+示例（Working, 60×30 截取）：
 
 ```text
 === WORKING  t=0ms  speed=100% density=80% amp=70%  frame=1 ===

@@ -115,8 +115,8 @@ typedef struct {
   "api_version": 1,
   "renderer_id": "builtin.label",
   "display": {
-    "orientation": "portrait",
-    "min_width": 320,
+    "orientation": "any",
+    "min_width": 480,
     "min_height": 480
   },
   "scenes": ["ambient", "focus", "activity", "attention", "settings"],

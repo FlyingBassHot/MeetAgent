@@ -1,24 +1,35 @@
 # MeetAgent Terminal — ESP-IDF defaults
 #
-# Target board: Waveshare ESP32-S3-Touch-LCD-4 (V4 default, 480x480).
+# Target board: Waveshare ESP32-S3-Touch-LCD-4 V4.0.
 # Select the target once with: idf.py set-target esp32s3
 #
-# GPIO/LCD/touch/backlight assignments are intentionally NOT defined here:
-# they must come from the board schematic and a verified BSP.
-# These values are starting points, not verified hardware settings.
+# Board: ESP32-S3N16R8, 480×480 RGB565, GT911 touch, CH32V003F4U6 helper.
+# Performance values follow the official 06_lvgl_demo_v8 example, except that
+# LVGL demos and extra Montserrat font sizes are intentionally NOT enabled.
+# Hardware-dependent values remain unverified until the board is available.
 
-# PSRAM: confirm the package variant (N16R8 / octal) against the board label
-# before flashing. Wrong PSRAM mode can prevent boot.
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
+
+# 240 MHz CPU, 80 MHz Octal PSRAM, PSRAM instruction/rodata fetch.
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
 CONFIG_SPIRAM=y
 CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_SPEED_80M=y
+CONFIG_SPIRAM_FETCH_INSTRUCTIONS=y
+CONFIG_SPIRAM_RODATA=y
+
+# Cache line size from the official V4 example.
+CONFIG_ESP32S3_DATA_CACHE_LINE_64B=y
 
 CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
 CONFIG_FREERTOS_HZ=1000
-CONFIG_COMPILER_OPTIMIZATION_SIZE=y
+CONFIG_COMPILER_OPTIMIZATION_PERF=y
 CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE=y
 
-# 16 MB flash is the common Waveshare variant; verify before flashing.
-CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
-
-# LVGL 8.3 is pinned by components/espui/idf_component.yml.
+# LVGL 8.4: RGB565, default Montserrat 14 only, no lv_demo_*.
 CONFIG_LV_COLOR_DEPTH_16=y
+CONFIG_LV_DISP_DEF_REFR_PERIOD=15
+CONFIG_LV_MEM_SIZE_KILOBYTES=48
+CONFIG_LV_ATTRIBUTE_FAST_MEM_USE_IRAM=y
