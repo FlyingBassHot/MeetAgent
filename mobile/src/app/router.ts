@@ -6,6 +6,7 @@ import SessionsView from '@/views/SessionsView.vue';
 import SessionDetailView from '@/views/SessionDetailView.vue';
 import ActivityView from '@/views/ActivityView.vue';
 import SettingsView from '@/views/SettingsView.vue';
+import DeveloperView from '@/views/DeveloperView.vue';
 import ConnectView from '@/views/ConnectView.vue';
 
 const router = createRouter({
@@ -16,37 +17,43 @@ const router = createRouter({
       path: '/connect',
       name: 'connect',
       component: ConnectView,
-      meta: { requiresAuth: false, title: '连接 Node' },
+      meta: { requiresAuth: false, title: '连接' },
     },
     {
       path: '/',
       component: AppShell,
       children: [
         { path: '', redirect: '/home' },
-        { path: 'home', name: 'home', component: HomeView, meta: { title: 'Home' } },
+        { path: 'home', name: 'home', component: HomeView, meta: { title: '概览' } },
         {
           path: 'sessions',
           name: 'sessions',
           component: SessionsView,
-          meta: { title: 'Sessions' },
+          meta: { title: '会话' },
         },
         {
           path: 'sessions/:sessionId',
           name: 'session-detail',
           component: SessionDetailView,
-          meta: { title: 'Session 详情' },
+          meta: { title: '会话详情' },
         },
         {
           path: 'activity',
           name: 'activity',
           component: ActivityView,
-          meta: { title: 'Activity' },
+          meta: { title: '动态' },
         },
         {
           path: 'settings',
           name: 'settings',
           component: SettingsView,
-          meta: { title: 'Settings' },
+          meta: { title: '设置' },
+        },
+        {
+          path: 'settings/developer',
+          name: 'settings-developer',
+          component: DeveloperView,
+          meta: { title: '开发者信息' },
         },
       ],
     },

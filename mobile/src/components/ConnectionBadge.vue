@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { Tone } from '@/domain/labels';
-import { formatRtt } from '@/domain/format';
 import { useConnectionStore } from '@/stores/connection';
 import StatusPill from './StatusPill.vue';
 
@@ -25,14 +24,11 @@ const view = computed<{ label: string; tone: Tone }>(() => {
       return { label: '未连接', tone: 'neutral' };
   }
 });
-
-const rtt = computed(() => (connection.isOnline ? formatRtt(connection.rttMs) : ''));
 </script>
 
 <template>
   <span class="connection-badge" :title="connection.detail">
     <StatusPill :label="view.label" :tone="view.tone" />
-    <span v-if="rtt" class="connection-badge__rtt small mono muted">{{ rtt }}</span>
   </span>
 </template>
 
@@ -41,15 +37,5 @@ const rtt = computed(() => (connection.isOnline ? formatRtt(connection.rttMs) : 
   display: inline-flex;
   align-items: center;
   gap: 6px;
-}
-
-.connection-badge__rtt {
-  font-size: 10px;
-}
-
-@media (max-width: 520px) {
-  .connection-badge__rtt {
-    display: none;
-  }
 }
 </style>

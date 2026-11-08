@@ -11,33 +11,55 @@ const props = withDefaults(
     compact?: boolean;
     sessionTitle?: string;
     agentName?: string;
+    showTechnical?: boolean;
   }>(),
-  { compact: false, sessionTitle: '', agentName: '' },
+  { compact: false, sessionTitle: '', agentName: '', showTechnical: false },
 );
 
 const open = ref(false);
 const label = computed(() => EVENT_LABELS[props.event.type] ?? props.event.type);
-const summary = computed(() => eventSummary(props.event));
+const summary = computed(() =>
+  eventSummary(props.event, {
+    sessionTitle: props.sessionTitle,
+    agentName: props.agentName,
+  }),
+);
 const details = computed(() =>
   Object.entries(props.event.payload ?? {}).map(([key, value]) => ({
     key,
     value: stringifyValue(value),
   })),
 );
+
+function toggle(): void {
+  if (!props.showTechnical) return;
+  open.value = !open.value;
+}
 </script>
 
 <template>
-  <article class="event" :class="{ 'event--compact': compact, 'event--open': open }">
-    <button type="button" class="event__head" @click="open = !open">
-      <span class="event__seq mono">{{ event.sequence }}</span>
+  <article
+    class="event"
+    :class="{ 'event--compact': compact, 'event--open': open, 'event--plain': !showTechnical }"
+  >
+    <div
+      class="event__head"
+      :role="showTechnical ? 'button' : undefined"
+      :tabindex="showTechnical ? 0 : undefined"
+      @click="toggle"
+      @keydown.enter="toggle"
+    >
+      <span v-if="showTechnical" class="event__seq mono">{{ event.sequence }}</span>
       <span class="pill" :class="`pill--${eventTone(event.type)}`">{{ label }}</span>
       <span class="event__summary grow">{{ summary }}</span>
       <span class="event__time small muted nowrap" :title="formatRelative(event.occurred_at)">
         {{ formatClock(event.occurred_at) }}
       </span>
-      <span class="event__chevron" :class="{ 'event__chevron--open': open }">›</span>
-    </button>
-    <div v-if="open" class="event__details">
+      <span v-if="showTechnical" class="event__chevron" :class="{ 'event__chevron--open': open }">
+        ›
+      </span>
+    </div>
+    <div v-if="showTechnical && open" class="event__details">
       <dl class="kv">
         <template v-if="sessionTitle">
           <dt>Session</dt>
@@ -84,6 +106,9 @@ const details = computed(() =>
   background: transparent;
   color: inherit;
   text-align: left;
+}
+
+.event__head[role='button'] {
   cursor: pointer;
 }
 

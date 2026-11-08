@@ -1,32 +1,122 @@
-.settings-card {
+.settings {
   display: flex;
   flex-direction: column;
-  gap: 11px;
+  gap: 18px;
 }
 
-.settings-card + .settings-card {
-  margin-top: 12px;
-}
-
-.settings-modes {
+.settings-group {
   display: flex;
-  gap: 7px;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
 }
 
-.settings-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
+.settings-group h2 {
+  padding: 14px 15px 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
 }
 
-.settings-foot {
+.settings-row {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px 14px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 52px;
+  padding: 11px 15px;
+  border-top: 1px solid var(--border);
+  color: var(--fg);
+  text-align: left;
+}
+
+.settings-group h2 + .settings-row {
+  border-top: 0;
+}
+
+.settings-row--action {
+  width: 100%;
+  border-left: 0;
+  border-right: 0;
+  border-bottom: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.settings-row--action:hover {
+  background: var(--surface-2);
+}
+
+.settings-row__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.settings-row__text strong {
+  font-size: 14px;
+  font-weight: 550;
+}
+
+.settings-row__text span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.settings-row__chevron {
+  color: var(--faint);
+  font-size: 18px;
+}
+
+.settings-dev {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 52px;
+  padding: 0 15px;
+  color: var(--fg);
+  font-size: 14px;
+}
+
+.switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 42px;
+  height: 25px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  transition: background 0.15s ease;
+}
+
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.switch--on {
+  background: var(--accent);
+}
+
+.switch--on::after {
+  transform: translateX(17px);
+  background: var(--on-accent);
 }
 
 @media (min-width: 900px) {
-  .settings-card {
-    max-width: 760px;
+  .settings {
+    max-width: 680px;
   }
 }

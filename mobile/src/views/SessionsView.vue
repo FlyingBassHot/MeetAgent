@@ -1,97 +1,112 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { latestSummaryBySession } from '@/domain/session';
 import { useNodeStore } from '@/stores/node';
 import PageHeader from '@/components/PageHeader.vue';
 import SessionCard from '@/components/SessionCard.vue';
 import EmptyState from '@/components/EmptyState.vue';
+import BottomSheet from '@/components/BottomSheet.vue';
 
 type SessionFilter = 'all' | 'active' | 'waiting' | 'idle';
 
 const nodeStore = useNodeStore();
 const search = ref('');
+const searchOpen = ref(false);
+const filterOpen = ref(false);
 const filter = ref<SessionFilter>('all');
 
-const summaries = computed(() => latestSummaryBySession(nodeStore.events));
-
-const filterCounts = computed<Record<SessionFilter, number>>(() => ({
-  all: nodeStore.sessions.length,
-  active: nodeStore.runningSessions.length,
-  waiting: nodeStore.waitingSessions.length,
-  idle: nodeStore.sessions.filter(
-    (session) => session.status === 'idle' || session.status === 'completed',
-  ).length,
-}));
+const filters: Array<{ key: SessionFilter; label: string }> = [
+  { key: 'all', label: '全部会话' },
+  { key: 'active', label: '运行中' },
+  { key: 'waiting', label: '等待中' },
+  { key: 'idle', label: '空闲 / 已完成' },
+];
 
 const visibleSessions = computed(() => {
   const query = search.value.trim().toLowerCase();
-  return nodeStore.sessions.filter((session) => {
-    const agentName = nodeStore.agentById[session.agent_id]?.name ?? '';
-    const haystack = `${session.title ?? ''} ${session.session_id} ${agentName}`.toLowerCase();
-    if (query.length > 0 && !haystack.includes(query)) return false;
-    switch (filter.value) {
-      case 'active':
-        return session.status === 'running';
-      case 'waiting':
-        return session.status === 'waiting';
-      case 'idle':
+  const priority = (status: string): number => {
+    if (status === 'running') return 0;
+    if (status === 'waiting') return 1;
+    return 2;
+  };
+  return nodeStore.sessions
+    .filter((session) => {
+      const agentName = nodeStore.agentById[session.agent_id]?.name ?? '';
+      const haystack = `${session.title ?? ''} ${agentName}`.toLowerCase();
+      if (query.length > 0 && !haystack.includes(query)) return false;
+      if (filter.value === 'active') return session.status === 'running';
+      if (filter.value === 'waiting') return session.status === 'waiting';
+      if (filter.value === 'idle') {
         return session.status === 'idle' || session.status === 'completed';
-      default:
-        return true;
-    }
-  });
+      }
+      return true;
+    })
+    .sort((left, right) => {
+      const delta = priority(left.status) - priority(right.status);
+      if (delta !== 0) return delta;
+      return Date.parse(right.updated_at) - Date.parse(left.updated_at);
+    });
 });
 
-const filters: Array<{ key: SessionFilter; label: string }> = [
-  { key: 'all', label: '全部' },
-  { key: 'active', label: '运行中' },
-  { key: 'waiting', label: '等待中' },
-  { key: 'idle', label: '空闲/完成' },
-];
+function selectFilter(next: SessionFilter): void {
+  filter.value = next;
+  filterOpen.value = false;
+}
 </script>
 
 <template>
-  <div class="stack">
-    <PageHeader title="Sessions" :subtitle="`${nodeStore.sessions.length} 个 Session · ${nodeStore.runningSessions.length} 个运行中`" />
-
-    <div class="sessions__tools">
-      <input
-        v-model="search"
-        class="input"
-        type="search"
-        placeholder="搜索标题、Session ID 或 Agent"
-        aria-label="搜索 Session"
-      />
-      <div class="chip-row">
+  <div class="sessions">
+    <PageHeader title="会话" :subtitle="`${nodeStore.sessions.length} 个会话`">
+      <template #actions>
         <button
-          v-for="item in filters"
-          :key="item.key"
           type="button"
-          class="chip"
-          :class="{ 'chip--active': filter === item.key }"
-          @click="filter = item.key"
+          class="sessions__action"
+          :class="{ 'sessions__action--active': searchOpen }"
+          @click="searchOpen = !searchOpen"
         >
-          {{ item.label }} <span class="chip__count">{{ filterCounts[item.key] }}</span>
+          搜索
         </button>
-      </div>
-    </div>
+        <button type="button" class="sessions__action" @click="filterOpen = true">
+          筛选{{ filter === 'all' ? '' : ' · 1' }}
+        </button>
+      </template>
+    </PageHeader>
+
+    <input
+      v-if="searchOpen"
+      v-model="search"
+      class="sessions__search"
+      type="search"
+      placeholder="搜索会话或 Agent"
+      aria-label="搜索会话"
+    />
 
     <div v-if="visibleSessions.length === 0" class="card card--pad">
-      <EmptyState
-        title="没有匹配的 Session"
-        description="调整搜索或筛选条件，或先在 Activity 查看事件。"
-      />
+      <EmptyState title="没有匹配的会话" description="调整搜索或筛选条件后重试。" />
     </div>
-    <div v-else class="session-list">
+    <div v-else class="sessions__list">
       <SessionCard
         v-for="session in visibleSessions"
         :key="session.session_id"
         :session="session"
         :agent-name="nodeStore.agentById[session.agent_id]?.name"
         :pending-count="nodeStore.pendingFor(session.session_id).length"
-        :latest-event="summaries[session.session_id]"
       />
     </div>
+
+    <BottomSheet :open="filterOpen" title="筛选会话" @close="filterOpen = false">
+      <div class="sessions__options">
+        <button
+          v-for="item in filters"
+          :key="item.key"
+          type="button"
+          class="sessions__option"
+          :class="{ 'sessions__option--active': filter === item.key }"
+          @click="selectFilter(item.key)"
+        >
+          {{ item.label }}
+        </button>
+      </div>
+    </BottomSheet>
   </div>
 </template>
 

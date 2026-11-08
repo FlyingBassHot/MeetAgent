@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { SessionView } from '@/domain/protocol';
-import { formatRelative, truncate } from '@/domain/format';
+import { formatRelative } from '@/domain/format';
 import { sessionStatusLabel, sessionStatusTone } from '@/domain/labels';
 import StatusPill from './StatusPill.vue';
 
@@ -9,90 +9,80 @@ const props = defineProps<{
   session: SessionView;
   agentName?: string;
   pendingCount?: number;
-  latestEvent?: string;
 }>();
 
-const title = computed(() => props.session.title?.trim() || props.session.session_id);
-const summary = computed(() => {
-  if (props.latestEvent) return truncate(props.latestEvent, 72);
-  return props.session.working_directory ?? '暂无事件';
-});
+const title = computed(() => props.session.title?.trim() || '未命名会话');
 </script>
 
 <template>
-  <RouterLink
-    :to="`/sessions/${session.session_id}`"
-    class="card card--pad card--link session-card"
-  >
-    <div class="session-card__head">
-      <div class="session-card__title">
-        <strong>{{ title }}</strong>
-        <span class="session-card__id mono small muted">{{ session.session_id }}</span>
-      </div>
+  <RouterLink :to="`/sessions/${session.session_id}`" class="session-row">
+    <div class="session-row__title">{{ title }}</div>
+    <div class="session-row__meta">
       <StatusPill
         :label="sessionStatusLabel(session.status)"
         :tone="sessionStatusTone(session.status)"
       />
-    </div>
-    <p class="session-card__summary small muted">{{ summary }}</p>
-    <div class="session-card__meta small">
-      <span v-if="agentName" class="session-card__agent">{{ agentName }}</span>
+      <span v-if="agentName" class="session-row__agent">{{ agentName }}</span>
       <span class="muted">{{ formatRelative(session.updated_at) }}</span>
-      <span v-if="pendingCount" class="pill pill--warning">{{ pendingCount }} 项待审批</span>
+    </div>
+    <div v-if="pendingCount" class="session-row__pending">
+      <span class="pill pill--warning">{{ pendingCount }} 项待审批</span>
     </div>
   </RouterLink>
 </template>
 
 <style scoped>
-.session-card {
+.session-row {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 5px;
+  padding: 13px 14px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: var(--surface);
+  color: inherit;
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
 
-.session-card__head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
+.session-row:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-2);
 }
 
-.session-card__title {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.session-card__title strong {
-  font-size: 15px;
-  font-weight: 610;
-  line-height: 1.35;
-}
-
-.session-card__id {
-  font-size: 10px;
+.session-row__title {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
 }
 
-.session-card__summary {
-  line-height: 1.45;
-}
-
-.session-card__meta {
+.session-row__meta {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 7px;
+  min-width: 0;
   color: var(--muted);
+  font-size: 11px;
 }
 
-.session-card__agent {
-  padding: 1px 7px;
-  border-radius: 999px;
-  background: var(--surface-3);
+.session-row__agent {
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--fg);
-  font-size: 11px;
+}
+
+.session-row__pending {
+  margin-top: 1px;
+}
+
+@media (min-width: 760px) {
+  .session-row {
+    padding: 14px 16px;
+  }
 }
 </style>

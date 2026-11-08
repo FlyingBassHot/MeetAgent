@@ -7,6 +7,7 @@ export interface StoredPreferences {
   deviceName: string;
   autoConnect: boolean;
   notifyEnabled: boolean;
+  showRawEvents: boolean;
 }
 
 const STORAGE_KEY = 'meetagent.mobile.preferences.v1';
@@ -20,6 +21,7 @@ export const DEFAULT_PREFERENCES: StoredPreferences = {
   deviceName: 'Mobile Web',
   autoConnect: false,
   notifyEnabled: false,
+  showRawEvents: false,
 };
 
 function readString(source: Record<string, unknown>, key: string): string | undefined {
@@ -52,6 +54,7 @@ function parsePreferences(raw: string): StoredPreferences | null {
     deviceName: deviceName && deviceName.length > 0 ? deviceName : DEFAULT_PREFERENCES.deviceName,
     autoConnect: readBoolean(source, 'autoConnect') ?? false,
     notifyEnabled: readBoolean(source, 'notifyEnabled') ?? false,
+    showRawEvents: readBoolean(source, 'showRawEvents') ?? false,
   };
 }
 

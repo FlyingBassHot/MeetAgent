@@ -128,8 +128,8 @@ sdkVersion:'23'
 targetSdkVersion:'35'
 application-label:'MeetAgent Mobile'
 APK: mobile/android/app/build/outputs/apk/debug/app-debug.apk
-大小: 4,260,002 bytes（约 4.1 MB）
-SHA-256: bbc8f06e16451080ef8469d98e4f0b153a08a0e95b1ddeaf185111e183b4bd27
+大小: 4,259,671 bytes（约 4.1 MB）
+SHA-256: a1987c31a7d0d9aa4bdfdb2cd7bf5d5de4105e11706edf0cc290b362dde38be2
 ```
 
 ## 5. Gradle 网络问题
@@ -207,6 +207,25 @@ touch "$DIST/gradle-8.11.1-all.zip.ok"
 
 - Wi-Fi / 蜂窝 / Tailscale 网络之间的切换时延
 - Release 签名、系统通知、Keystore、后台保活
+
+P0 UX 真机检查（2026-11-08）：
+
+- 真实 Node（Token 自动重连）检查概览 / 会话 / 详情 / 动态 / 设置 / 开发者信息
+- 测试 Session 发送 Prompt 后，用户 Prompt 与 Agent 回复合并为聊天流
+- 权限卡不再显示内部 permission_id；技术字段只在开发者信息/原始事件开关中出现
+- 事件摘要已中文化：会话标题 + 中文状态、审批决策（允许一次/拒绝）、工具状态（运行中/已完成）
+- 空会话 composer 贴近底部；有消息时保持 sticky，不与 TabBar 重叠
+- 截图：`/tmp/opencode/meetagent-mobile-android/`
+  - `80-p0-real-home.png`
+  - `81-p0-real-sessions.png`
+  - `82-p0-real-session-detail.png`
+  - `83-p0-real-activity.png`
+  - `84-p0-real-settings.png`
+  - `85-p0-real-developer.png`
+  - `86-p0-real-chat.png`
+  - `89-p0-session-menu.png`
+  - `95-final-empty-composer.png`
+  - `96-final-activity-cn.png`
 
 ## 8. 签名与发布
 

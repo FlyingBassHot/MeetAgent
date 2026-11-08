@@ -185,8 +185,8 @@ ClientTransport
 - `npm run build && npx cap add android && npx cap sync android`
 - JDK 21 + Android SDK 35 + Gradle 8.11.1 + AGP 8.7.2 执行 `./gradlew assembleDebug`
 - `BUILD SUCCESSFUL`，Debug APK：`android/app/build/outputs/apk/debug/app-debug.apk`
-  - 大小 **4,260,002 bytes（约 4.1 MB）**
-  - SHA-256 `bbc8f06e16451080ef8469d98e4f0b153a08a0e95b1ddeaf185111e183b4bd27`
+  - 大小 **4,259,671 bytes（约 4.1 MB）**
+  - SHA-256 `a1987c31a7d0d9aa4bdfdb2cd7bf5d5de4105e11706edf0cc290b362dde38be2`
 - APK `assets/capacitor.config.json` 已确认包含 `"androidScheme": "http"`、`"cleartext": true`
 - 真机（HBN-AL00 / USB）验证：
   - 配对真实 Node `http://100.69.235.2:8787`，Home 恢复 41 个 Session
@@ -203,6 +203,44 @@ ClientTransport
 - `.gitignore` 已忽略 `local.properties`、`.gradle/`、`build/`、`app/build/` 与 APK
 
 未连接设备/模拟器，因此未执行安装与真机运行。
+
+## P0 UX 改造
+
+已完成“信息减法 + 页面骨架”：
+
+- Home →「概览」：紧凑状态行 + 待处理 + 活跃会话（≤4）+ 最近动态（≤5）；移除统计块、Agent 大卡、Node 技术卡
+- Sessions →「会话」：搜索默认收起，筛选改为底部面板；行最多 3 行，隐藏 Session ID/工作目录；运行中优先
+- Session 详情：原生顶部导航 + 「…」菜单；隐藏 ID/事件数/全局序号；Prompt 合并进聊天流；工具调用折叠；Interrupt 收进菜单
+- Activity →「动态」：默认只展示重要事件，按今天/昨天/更早分组；筛选收进面板；原始字段可在开发者信息开启
+- 事件摘要中文映射：会话标题/状态、Agent 名称/状态、审批决策、工具状态均使用中文，不再出现 `idle/running/once`
+- 空会话的输入框贴近底部（flex + margin-top:auto），有消息时保持 sticky，均不与 TabBar 重叠
+- Settings →「设置」：原生分组列表（连接/通知/外观/关于/开发者信息）；技术信息移入 `/settings/developer`
+- 开发者信息：Node/连接详情、Client ID/Token/权限/capabilities、RTT/协议/地址、原始事件开关
+- Connect →「连接」：只保留地址/配对码/设备名称；高级信息折叠；Mock 改为次级演示入口
+- 360px 宽度已验证无横向溢出；深色主题与 4 Tab 保留
+
+P0 截图位于 `/tmp/opencode/meetagent-mobile-ux/`：
+
+- `connect-360.png`
+- `home-360.png`
+- `sessions-360.png`
+- `session-detail-360.png`
+- `activity-360.png`
+- `settings-360.png`
+- `developer-360.png`
+
+Android 真机 P0 截图位于 `/tmp/opencode/meetagent-mobile-android/`：
+
+- `80-p0-real-home.png`
+- `81-p0-real-sessions.png`
+- `82-p0-real-session-detail.png`
+- `83-p0-real-activity.png`
+- `84-p0-real-settings.png`
+- `85-p0-real-developer.png`
+- `86-p0-real-chat.png`
+- `89-p0-session-menu.png`
+- `95-final-empty-composer.png`
+- `96-final-activity-cn.png`
 
 ## 尚未实现（后续里程碑）
 

@@ -1,5 +1,16 @@
 import type { JsonObject, JsonValue, ProtocolEvent } from './protocol';
 import { isRecord } from './protocol';
+import {
+  agentStatusLabel,
+  decisionLabel,
+  sessionStatusLabel,
+  toolStatusLabel,
+} from './labels';
+
+export interface EventSummaryContext {
+  sessionTitle?: string;
+  agentName?: string;
+}
 
 export function parseEventPayload(event: ProtocolEvent): JsonObject {
   return isRecord(event.payload) ? (event.payload as JsonObject) : {};
@@ -29,37 +40,63 @@ export function eventText(event: ProtocolEvent): string | undefined {
   );
 }
 
-export function eventSummary(event: ProtocolEvent): string {
+export function eventSummary(event: ProtocolEvent, context: EventSummaryContext = {}): string {
   const payload = parseEventPayload(event);
-  const pieces: string[] = [];
-  const permissionId = textField(payload, 'permission_id');
-  const messageId = textField(payload, 'message_id');
   const status = textField(payload, 'status');
   const decision = textField(payload, 'decision');
-  if (event.type === 'permission.requested' || event.type === 'permission.resolved') {
-    if (textField(payload, 'description')) pieces.push(String(textField(payload, 'description')));
-    if (decision) pieces.push(`决策 ${decision}`);
-    else if (permissionId) pieces.push(permissionId);
-  } else if (event.type === 'message.delta' || event.type === 'message.completed') {
-    const text = eventText(event);
-    if (text) pieces.push(text);
-    else if (event.type === 'message.delta' && messageId) pieces.push(messageId);
-    else if (event.type === 'message.completed') pieces.push('已完成');
-  } else if (event.type.startsWith('tool.')) {
+  const sessionTitle =
+    context.sessionTitle?.trim() || textField(payload, 'title') || '当前会话';
+  const agentName = context.agentName?.trim() || 'Agent';
+
+  if (event.type === 'permission.requested') {
+    return textField(payload, 'description') ?? '新的审批请求';
+  }
+
+  if (event.type === 'permission.resolved') {
+    const result = decision ? decisionLabel(decision) : '已处理';
+    return `${sessionTitle} · ${result}`;
+  }
+
+  if (event.type === 'message.delta' || event.type === 'message.completed') {
+    return eventText(event) ?? (event.type === 'message.completed' ? '消息已完成' : '消息更新');
+  }
+
+  if (event.type.startsWith('tool.')) {
     const tool = textField(payload, 'tool');
     const target = textField(payload, 'target');
-    const callId = textField(payload, 'call_id');
-    if (tool) pieces.push(target ? `${tool} ${target}` : tool);
-    else if (callId) pieces.push(`调用 ${callId}`);
-    if (status) pieces.push(status);
-  } else if (event.type === 'session.created' || event.type === 'session.updated') {
-    pieces.push(textField(payload, 'title') ?? event.session_id ?? event.type);
-  } else {
-    const text = eventText(event);
-    if (text) pieces.push(text);
-    if (status) pieces.push(`状态 ${status}`);
+    const subject = tool ? (target ? `${tool} ${target}` : tool) : '工具调用';
+    return status ? `${subject} · ${toolStatusLabel(status)}` : subject;
   }
-  return pieces.length > 0 ? pieces.join(' · ') : event.type;
+
+  if (event.type === 'session.status_changed') {
+    return status ? `${sessionTitle} · ${sessionStatusLabel(status)}` : sessionTitle;
+  }
+
+  if (event.type === 'session.created' || event.type === 'session.updated') {
+    return sessionTitle;
+  }
+
+  if (event.type === 'session.deleted') {
+    return `${sessionTitle} · 已删除`;
+  }
+
+  if (event.type === 'agent.status_changed') {
+    return status ? `${agentName} · ${agentStatusLabel(status)}` : agentName;
+  }
+
+  if (event.type === 'agent.connected') {
+    return `${agentName} · 已连接`;
+  }
+
+  if (event.type === 'agent.disconnected') {
+    return `${agentName} · 已断开`;
+  }
+
+  if (event.type === 'agent.error') {
+    return `${agentName} · ${eventText(event) ?? '异常'}`;
+  }
+
+  return eventText(event) ?? event.type;
 }
 
 export function stringifyValue(value: JsonValue): string {

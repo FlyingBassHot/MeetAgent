@@ -6,9 +6,8 @@ const props = withDefaults(
     modelValue: string;
     disabled?: boolean;
     busy?: boolean;
-    hint?: string;
   }>(),
-  { disabled: false, busy: false, hint: '' },
+  { disabled: false, busy: false },
 );
 
 const emit = defineEmits<{
@@ -32,48 +31,71 @@ function submit(): void {
 </script>
 
 <template>
-  <div class="composer card card--pad">
+  <div class="composer">
     <textarea
       v-model="draft"
-      class="textarea composer__input"
+      class="composer__input"
       :disabled="disabled || busy"
-      placeholder="输入 Prompt，交给当前 Session 的 Agent…"
-      rows="3"
+      placeholder="输入消息…"
+      rows="2"
+      aria-label="Prompt"
       @keydown.ctrl.enter.prevent="submit"
       @keydown.meta.enter.prevent="submit"
     />
-    <div class="composer__foot">
-      <span class="small muted">{{ hint || 'Ctrl / ⌘ + Enter 发送' }}</span>
-      <div class="row">
-        <span class="small mono muted">{{ modelValue.length }}</span>
-        <button
-          type="button"
-          class="btn btn--primary btn--sm"
-          :disabled="!canSend"
-          @click="submit"
-        >
-          {{ busy ? '发送中…' : '发送 Prompt' }}
-        </button>
-      </div>
-    </div>
+    <button
+      type="button"
+      class="composer__send"
+      :disabled="!canSend"
+      aria-label="发送"
+      @click="submit"
+    >
+      {{ busy ? '发送中' : '发送' }}
+    </button>
   </div>
 </template>
 
 <style scoped>
 .composer {
   display: flex;
-  flex-direction: column;
+  align-items: flex-end;
   gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface);
 }
 
 .composer__input {
-  min-height: 84px;
+  flex: 1;
+  min-height: 40px;
+  max-height: 140px;
+  padding: 9px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  resize: none;
+  outline: none;
 }
 
-.composer__foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+.composer__input::placeholder {
+  color: var(--faint);
+}
+
+.composer__send {
+  min-height: 38px;
+  padding: 0 15px;
+  border: 0;
+  border-radius: 13px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.composer__send:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 </style>

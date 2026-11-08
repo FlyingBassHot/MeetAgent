@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { NAV_ITEMS } from '@/app/nav';
-import { shortId } from '@/domain/format';
 import { useConnectionStore } from '@/stores/connection';
 import { useNetworkStore } from '@/stores/network';
 import { useNodeStore } from '@/stores/node';
@@ -14,11 +13,7 @@ const connection = useConnectionStore();
 const network = useNetworkStore();
 const nodeStore = useNodeStore();
 
-const nodeName = computed(() => nodeStore.node?.name ?? 'MeetAgent Node');
-const nodeHost = computed(
-  () => nodeStore.node?.hostname ?? (connection.mode === 'mock' ? 'local mock' : '未连接'),
-);
-const nodeId = computed(() => shortId(nodeStore.node?.node_id, 8));
+const nodeName = computed(() => nodeStore.node?.name ?? 'MeetAgent');
 const isMock = computed(() => connection.mode === 'mock');
 </script>
 
@@ -37,18 +32,12 @@ const isMock = computed(() => connection.mode === 'mock');
           <span>{{ item.label }}</span>
         </RouterLink>
       </nav>
-      <div class="nav-foot">
-        <MockBadge v-if="isMock" />
-        <span class="mono">{{ nodeId }}</span>
-        <span>{{ isMock ? '本地 Mock Node' : 'Node 连接' }}</span>
-      </div>
     </aside>
 
     <div class="shell__main">
       <header class="topbar">
         <div class="topbar__node">
           <span class="topbar__name">{{ nodeName }}</span>
-          <span class="topbar__host">{{ nodeHost }}</span>
         </div>
         <div class="topbar__status">
           <MockBadge v-if="isMock" />

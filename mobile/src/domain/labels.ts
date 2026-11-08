@@ -44,10 +44,10 @@ export const EVENT_LABELS: Record<string, string> = {
   'agent.disconnected': 'Agent 已断开',
   'agent.status_changed': 'Agent 状态变化',
   'agent.error': 'Agent 异常',
-  'session.created': 'Session 创建',
-  'session.updated': 'Session 更新',
-  'session.deleted': 'Session 删除',
-  'session.status_changed': 'Session 状态变化',
+  'session.created': '会话创建',
+  'session.updated': '会话更新',
+  'session.deleted': '会话删除',
+  'session.status_changed': '会话状态变化',
   'message.started': '消息开始',
   'message.delta': '消息增量',
   'message.completed': '消息完成',
@@ -100,6 +100,19 @@ export function agentStatusTone(status: string): Tone {
 
 export function sessionStatusLabel(status: string): string {
   return SESSION_STATUS[status] ?? status;
+}
+
+const TOOL_STATUS: Record<string, string> = {
+  running: '运行中',
+  started: '运行中',
+  completed: '已完成',
+  success: '已完成',
+  failed: '失败',
+  error: '失败',
+};
+
+export function toolStatusLabel(status: string): string {
+  return TOOL_STATUS[status] ?? status;
 }
 
 export function sessionStatusTone(status: string): Tone {

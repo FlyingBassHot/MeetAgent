@@ -37,7 +37,6 @@ function respond(decision: PermissionDecision): void {
       <span v-if="agentName">{{ agentName }}</span>
       <span v-if="sessionTitle">· {{ sessionTitle }}</span>
       <span>· {{ expiry }}</span>
-      <span class="mono permission__id">{{ permission.permission_id }}</span>
     </div>
     <div class="permission__actions">
       <button
@@ -103,10 +102,6 @@ function respond(decision: PermissionDecision): void {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
-}
-
-.permission__id {
-  font-size: 10px;
 }
 
 .permission__actions {
