@@ -25,6 +25,16 @@ func (s *Server) handleCommand(c *clientConn, cmd clientproto.Command) clientpro
 		result.DurationMS = time.Since(started).Milliseconds()
 		result.CompletedAt = time.Now().UTC()
 		s.commands.put(key, result)
+		switch result.Status {
+		case protocol.StatusCompleted:
+			s.commandsCompleted.Add(1)
+		case protocol.StatusRejected:
+			s.commandsRejected.Add(1)
+		case protocol.StatusTimeout:
+			s.commandsTimeout.Add(1)
+		default:
+			s.commandsFailed.Add(1)
+		}
 		s.audit("command.finished",
 			"client_id", c.id,
 			"command_id", cmd.CommandID,

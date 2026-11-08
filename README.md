@@ -165,6 +165,37 @@ server:
 - Mobile 填写 `https://<主机>:8787`，客户端会自动使用 `wss://`
 - 公网部署请关闭 `allow_lan_origins`，只放行明确域名
 
+### 常驻运行
+
+开发时可以用 `make run-node`；需要长期在线时安装 systemd user service：
+
+```bash
+make build
+make install-service
+```
+
+服务会自动重启，OpenCode 密码保存在 `~/.config/meetagent/node.env`（权限 600）：
+
+```bash
+systemctl --user status meetagent-node
+systemctl --user restart meetagent-node
+journalctl --user -u meetagent-node -f
+```
+
+`install-service` 同时启用 linger，使服务在注销图形会话后仍保持运行。
+
+Node 暴露 Prometheus 文本指标 `GET /metrics`（本机访问免认证；远程访问需要 `admin_token`）：
+
+```text
+meetagent_ws_clients
+meetagent_paired_clients
+meetagent_agents{status="online"}
+meetagent_events_published_total
+meetagent_events_retained
+meetagent_event_sequence
+meetagent_command_results_total{status="completed"}
+```
+
 ## 协议与安全
 
 - 客户端先通过 6 位配对码换取独立 Token；Token 只保存 SHA-256 哈希

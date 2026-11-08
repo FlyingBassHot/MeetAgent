@@ -36,10 +36,20 @@ type Hub struct {
 	logger        *slog.Logger
 	permissionTTL time.Duration
 
-	mu      sync.Mutex
-	nextSub int
-	v2      map[int]chan clientproto.Event
-	raw     map[int]chan protocol.AgentEvent
+	mu        sync.Mutex
+	nextSub   int
+	published uint64
+	v2        map[int]chan clientproto.Event
+	raw       map[int]chan protocol.AgentEvent
+}
+
+// Stats is a point-in-time snapshot of the event hub.
+type Stats struct {
+	EventsPublished uint64
+	EventsRetained  int
+	LastSequence    uint64
+	Subscribers     int
+	RawSubscribers  int
 }
 
 // New creates a hub. The caller must run Run for the lifetime of the Node.
@@ -81,6 +91,19 @@ func (h *Hub) HasPendingPermission(permissionID string) bool {
 	return false
 }
 
+// Stats returns current hub counters for health and metrics endpoints.
+func (h *Hub) Stats() Stats {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return Stats{
+		EventsPublished: h.published,
+		EventsRetained:  h.cache.Len(),
+		LastSequence:    h.cache.NodeSequences(h.nodeID),
+		Subscribers:     len(h.v2),
+		RawSubscribers:  len(h.raw),
+	}
+}
+
 // Run consumes adapter events until ctx is canceled.
 func (h *Hub) Run(ctx context.Context) {
 	for {
@@ -103,6 +126,7 @@ func (h *Hub) publish(event protocol.AgentEvent) {
 
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	h.published++
 	for id, sub := range h.v2 {
 		select {
 		case sub <- clientEvent:

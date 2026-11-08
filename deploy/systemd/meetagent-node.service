@@ -1,0 +1,17 @@
+[Unit]
+Description=MeetAgent Node (local client gateway)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=@ROOT@
+EnvironmentFile=%h/.config/meetagent/node.env
+ExecStart=@ROOT@/bin/meetagent-node -config configs/node.yaml
+Restart=always
+RestartSec=3
+KillMode=mixed
+TimeoutStopSec=10
+
+[Install]
+WantedBy=default.target

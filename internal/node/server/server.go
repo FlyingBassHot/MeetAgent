@@ -16,8 +16,10 @@ import (
 	"net/url"
 	"os"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/FlyingBassHot/meetagent/internal/node/adapter"
@@ -92,9 +94,16 @@ type Server struct {
 	mdns       *zeroconf.Server
 	upgrader   websocket.Upgrader
 
+	startedAt time.Time
+
 	clientsMu sync.Mutex
 	clients   map[string]*clientConn
 	commands  *commandCache
+
+	commandsCompleted atomic.Uint64
+	commandsFailed    atomic.Uint64
+	commandsRejected  atomic.Uint64
+	commandsTimeout   atomic.Uint64
 
 	permissionMu    sync.Mutex
 	permissionState map[string]permissionState
@@ -116,6 +125,7 @@ func New(opts Options, nodeID, nodeName string, manager *adapter.Manager, hub *e
 		clients:         make(map[string]*clientConn),
 		commands:        newCommandCache(5*time.Minute, 1000),
 		permissionState: make(map[string]permissionState),
+		startedAt:       time.Now(),
 	}
 	s.upgrader = websocket.Upgrader{
 		ReadBufferSize:  4096,
@@ -146,6 +156,7 @@ func newNodeInfo(nodeID, nodeName string) clientproto.NodeInfo {
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", s.handleHealth)
+	mux.HandleFunc("/metrics", s.handleMetrics)
 	mux.HandleFunc("/api/v2/info", s.handleInfo)
 	mux.HandleFunc("/api/v2/pair", s.handlePair)
 	mux.HandleFunc("/api/v2/snapshot", s.handleSnapshot)
@@ -280,6 +291,77 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 		"node_id": s.node.NodeID,
 		"version": version.Version,
 	})
+}
+
+func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if !isLoopbackRemote(r.RemoteAddr) && !s.adminAuthorized(r) {
+		http.Error(w, "admin token required", http.StatusUnauthorized)
+		return
+	}
+
+	s.clientsMu.Lock()
+	onlineClients := len(s.clients)
+	s.clientsMu.Unlock()
+	stats := s.hub.Stats()
+	agentCounts := make(map[string]int)
+	for _, agent := range s.manager.Agents() {
+		agentCounts[agent.Status]++
+	}
+	agentStatuses := make([]string, 0, len(agentCounts))
+	for status := range agentCounts {
+		agentStatuses = append(agentStatuses, status)
+	}
+	sort.Strings(agentStatuses)
+
+	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+	fmt.Fprintln(w, "# HELP meetagent_up Node process is serving.")
+	fmt.Fprintln(w, "# TYPE meetagent_up gauge")
+	fmt.Fprintln(w, "meetagent_up 1")
+	fmt.Fprintln(w, "# HELP meetagent_uptime_seconds Node process uptime.")
+	fmt.Fprintln(w, "# TYPE meetagent_uptime_seconds gauge")
+	fmt.Fprintf(w, "meetagent_uptime_seconds %.0f\n", time.Since(s.startedAt).Seconds())
+	fmt.Fprintln(w, "# HELP meetagent_ws_clients Currently connected WebSocket clients.")
+	fmt.Fprintln(w, "# TYPE meetagent_ws_clients gauge")
+	fmt.Fprintf(w, "meetagent_ws_clients %d\n", onlineClients)
+	fmt.Fprintln(w, "# HELP meetagent_paired_clients Paired client identities.")
+	fmt.Fprintln(w, "# TYPE meetagent_paired_clients gauge")
+	fmt.Fprintf(w, "meetagent_paired_clients %d\n", len(s.pairing.Clients()))
+	fmt.Fprintln(w, "# HELP meetagent_agents Configured agents by status.")
+	fmt.Fprintln(w, "# TYPE meetagent_agents gauge")
+	for _, status := range agentStatuses {
+		fmt.Fprintf(w, "meetagent_agents{status=%q} %d\n", status, agentCounts[status])
+	}
+	fmt.Fprintln(w, "# HELP meetagent_events_published_total Events published by this process.")
+	fmt.Fprintln(w, "# TYPE meetagent_events_published_total counter")
+	fmt.Fprintf(w, "meetagent_events_published_total %d\n", stats.EventsPublished)
+	fmt.Fprintln(w, "# HELP meetagent_events_retained Events in the replay cache.")
+	fmt.Fprintln(w, "# TYPE meetagent_events_retained gauge")
+	fmt.Fprintf(w, "meetagent_events_retained %d\n", stats.EventsRetained)
+	fmt.Fprintln(w, "# HELP meetagent_event_sequence Latest event sequence.")
+	fmt.Fprintln(w, "# TYPE meetagent_event_sequence gauge")
+	fmt.Fprintf(w, "meetagent_event_sequence %d\n", stats.LastSequence)
+	fmt.Fprintln(w, "# HELP meetagent_event_subscribers Active event subscribers.")
+	fmt.Fprintln(w, "# TYPE meetagent_event_subscribers gauge")
+	fmt.Fprintf(w, "meetagent_event_subscribers %d\n", stats.Subscribers)
+	fmt.Fprintln(w, "# HELP meetagent_command_results_total Command results by status.")
+	fmt.Fprintln(w, "# TYPE meetagent_command_results_total counter")
+	fmt.Fprintf(w, "meetagent_command_results_total{status=%q} %d\n", "completed", s.commandsCompleted.Load())
+	fmt.Fprintf(w, "meetagent_command_results_total{status=%q} %d\n", "failed", s.commandsFailed.Load())
+	fmt.Fprintf(w, "meetagent_command_results_total{status=%q} %d\n", "rejected", s.commandsRejected.Load())
+	fmt.Fprintf(w, "meetagent_command_results_total{status=%q} %d\n", "timeout", s.commandsTimeout.Load())
+}
+
+func isLoopbackRemote(remoteAddr string) bool {
+	host, _, err := net.SplitHostPort(remoteAddr)
+	if err != nil {
+		return false
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 func (s *Server) handleInfo(w http.ResponseWriter, _ *http.Request) {
