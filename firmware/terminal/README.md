@@ -15,29 +15,29 @@
 
 已验证：
 
+- **真实 ESP-IDF 构建**：ESP-IDF v5.4.4 + esp32s3 工具链 + LVGL 8.4.0，`idf.py build` 成功
+- 固件：`meetagent_terminal.bin` 253,152 bytes；app 分区剩余 84%
 - 主机测试：`805 checks, 0 failure(s)`（ASan/UBSan + `-Werror`）
 - 主机语法检查：33 个固件 C 文件全部通过（ESP-IDF / FreeRTOS / LVGL stub）
 - E3a 帧预览：`make preview STATE=working FRAMES=3 DELAY=300`
-- **未验证**：没有安装 ESP-IDF，因此没有执行 `idf.py build`，没有链接 LVGL，也没有真机显示
+- **未验证**：未烧录、未接串口；未验证真实 LCD/触摸/旋钮/PSRAM
 
-当前机器环境：
+当前环境：
 
 ```text
-gcc       : present
-make      : present
-cmake     : missing
-ninja     : missing
-idf.py    : missing
-IDF_PATH  : empty
+ESP-IDF  : v5.4.4 (/home/perch/esp/esp-idf)
+目标     : esp32s3
+工具链   : xtensa-esp32s3-elf
+LVGL     : 8.4.0（Component Manager）
+构建     : idf.py build 成功
+烧录     : 未执行（硬件未到）
 ```
-
-ESP-IDF 由主会话统一处理，本模块未自行下载或安装。
 
 ## 目标硬件
 
 - Waveshare ESP32-S3-Touch-LCD-3.5B
 - 320 × 480 竖屏
-- ESP32-S3 + ESP-IDF + FreeRTOS + LVGL 8.3
+- ESP32-S3 + ESP-IDF + FreeRTOS + LVGL 8.x（当前 8.4.0）
 - 旋钮 / 按键为主，触摸为辅
 
 **没有假设任何 GPIO、LCD 控制器、触摸控制器或背光引脚。** 当前使用 `stub-headless` 板级 HAL：报告 320×480 面板信息，但不驱动真实硬件。真实 BSP 必须依据开发板原理图和官方示例实现。
@@ -47,15 +47,20 @@ ESP-IDF 由主会话统一处理，本模块未自行下载或安装。
 需要 ESP-IDF 5.x、Python 环境、LVGL 组件（由 `idf_component.yml` 通过 Component Manager 拉取）。
 
 ```bash
+source "$HOME/esp/esp-idf/export.sh"
 cd firmware/terminal
 idf.py set-target esp32s3
 idf.py build
-idf.py -p /dev/ttyACM0 flash monitor
+idf.py size
+# 硬件到达后再执行：
+# idf.py -p /dev/ttyACM0 flash monitor
 ```
 
-首次构建会读取 `components/espui/idf_component.yml` 并获取 LVGL 8.3。若网络受限，需要先把 LVGL 放入 Component Manager 缓存或 `managed_components/`。
+本次已用 ESP-IDF v5.4.4 完成首次真实构建。Component Manager 实际解析到
+LVGL 8.4.0（`^8.3.0`）。`sdkconfig`、`dependencies.lock`、`managed_components/`
+和 `build/` 均由 `.gitignore` 忽略。
 
-> 当前交付无法执行以上命令：本机没有 ESP-IDF。详见 `docs/BUILD_STATUS.md`。
+> 未烧录、未接串口。构建大小、内存与限制详见 `docs/BUILD_STATUS.md`。
 
 ## 主机测试
 
