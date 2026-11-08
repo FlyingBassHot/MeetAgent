@@ -4,7 +4,7 @@
 
 **Node-Centric · Multi-Client · Plugin-Based · LAN First · Cloud Optional**
 
-当前状态：**V2.1 核心链路已贯通**。Node 独立服务、V2.1 客户端协议、配对、事件中心、命令/权限、审计与限流已完成；Mobile 已完成 OpenCode 真实 Session、Tailscale 与 Android 真机验收（Prompt、Interrupt、权限审批、断网恢复、Node 重启恢复）。Terminal 已完成 E0–E3a，并接入 **Waveshare ESP32-S3-Touch-LCD-4 V4** 官方 BSP：480×480 RGB LCD + GT911 + CH32V003、LVGL 8.4，固件 502 KB，等待实物显示/触摸验收。
+当前状态：**V2.1 核心链路已贯通**。Node 独立服务、V2.1 客户端协议、配对、事件中心、命令/权限、审计与限流已完成；Mobile 已完成 OpenCode 真实 Session、Tailscale 与 Android 真机验收（Prompt、Interrupt、权限审批、断网恢复、Node 重启恢复），并完成 UX P0 信息层级改造（概览/会话/聊天式详情/动态/统一开发者信息）。Terminal 已完成 E0–E3a，并接入 **Waveshare ESP32-S3-Touch-LCD-4 V4** 官方 BSP：480×480 RGB LCD + GT911 + CH32V003、LVGL 8.4，固件 502 KB，等待实物显示/触摸验收。
 
 > 设计文档：
 > - [`MeetAgentV2.1.md`](./MeetAgentV2.1.md) — 总体架构、双客户端、南向插件、阶段计划
@@ -48,7 +48,7 @@ Mobile (Vue + Capacitor)        ESP32 Terminal (ESP-IDF + LVGL)
 |---|---|---|
 | Core / Node | `cmd/node`, `internal/`, `pkg/`, `configs/` | M0/M1/M4 完成；审计、限流、重连边界加固 |
 | Node 模拟器 | `cmd/simulator` | 可用 |
-| Mobile | `mobile/` | M5b 完成；Tailscale + Android 真机 Prompt/Interrupt/审批/断网恢复已验证 |
+| Mobile | `mobile/` | M5b + UX P0 完成；Android 真机 Prompt/Interrupt/审批/断网恢复已验证 |
 | ESP32 Terminal / ESPUI | `firmware/terminal/` | E0–E3a + LCD-4 V4 BSP 完成；480×480 构建通过（502 KB）；待实物验收 |
 | V1 Cloud / Web Console | `cmd/cloud`, `web/test-client` | 归档参考 |
 
