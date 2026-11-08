@@ -33,7 +33,7 @@ typedef struct {
 } espui_ascii_frame_t;
 ```
 
-- 默认 60 × 22，适合终端预览；设备目标 320×480、8×16 字体约 40×30。
+- 默认 60 × 22，适合终端预览；LCD-4 设备目标 480×480、8×16 字体约 60×30，最终网格在 480×480 布局阶段确认。
 - 每帧固定约 9.4 KB；`espui_ascii_renderer_t` 自身持有 frame，不每帧分配。
 - 行尾始终有 `\0`；文本绘制自动裁剪。
 - `color` 是抽象颜色索引：PRIMARY / SECONDARY / MUTED / WARNING / ERROR / HIGHLIGHT。E3b 再映射到 Theme Tokens。

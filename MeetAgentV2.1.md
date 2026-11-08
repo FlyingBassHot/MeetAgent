@@ -49,7 +49,7 @@ Agent 运行情况快速感知。
 
 关键事件即时提醒。
 
-使用旋钮、按键进行快捷操作。
+使用触摸、按键进行快捷操作。
 
 不打开电脑或手机即可完成部分轻量操作。
 
@@ -552,7 +552,7 @@ Client Capability
 
 是否支持系统通知。
 
-是否有旋钮和实体按键。
+是否有板载实体按键或外接旋钮（LCD-4 默认只有触摸 + BOOT/RESET/BAT_PWR）。
 
 Agent Capability
 
@@ -780,23 +780,34 @@ ESP32 不需要实现完整聊天和大量历史数据浏览。
 
 6.2 硬件与软件
 
-当前原型硬件方向：
+当前目标硬件：
 
-ESP32-S3-Touch-LCD-3.5B。
+Waveshare ESP32-S3-Touch-LCD-4（默认按 V4 版本规划，实物版本待确认）。
 
-ESP-IDF。
+- 4.0 英寸 480 × 480 RGB565 电容触摸屏
+- GT911 五点触控，支持中断
+- ESP32-S3N16R8：16MB Flash + 8MB Octal PSRAM
+- RGB 并口 LCD；TCA9554 IO 扩展控制 LCD/触摸复位与背光
+- 板载 CAN、RS485、RTC、SD 卡、蜂鸣器、电池接口（首版 Terminal 不要求全部使用）
+- ESP-IDF（官方要求 >= 5.2.5；当前使用 5.4.4）
+- FreeRTOS、LVGL 8.x
+- Wi-Fi、触摸；板载 BOOT / RESET / BAT_PWR 按键
 
-FreeRTOS。
-
-LVGL。
-
-Wi-Fi。
-
-旋钮和实体按键。
+输入模型随之调整：新板没有旋钮，首版以**触摸为主**，板载按键作为 Back / Interrupt / 电源辅助；如后续需要旋钮，再外接编码器。
 
 后续按需增加麦克风和音频输出。
 
-硬件 GPIO、LCD、触摸、音频与电源设计必须以实际开发板原理图和官方示例为准，不提前固定未经验证的引脚定义。
+硬件 GPIO、LCD、触摸、音频与电源设计必须以实际开发板原理图和官方示例为准，不提前固定未经验证的引脚定义。I2C 引脚在 V1 与 V2/V3/V4 之间有差异，必须按实物版本使用对应示例。
+
+### 6.2.1 开发顺序（BSP First）
+
+1. 确认实物版本（V1 / V2 / V3 / V4）和屏幕方向。
+2. 以对应版本原理图与官方 `06_LVGL_Porting` 示例为准，整理 RGB LCD、GT911、TCA9554 和背光映射。
+3. 先完成板级 BSP bring-up：LCD 点亮、颜色/方向、触摸坐标、背光。
+4. 再把主题布局从旧的 320×480 竖屏适配为 480×480 方形屏。
+5. 最后接 Wi-Fi 配网、mDNS、配对、WSS 和 Client Protocol（E4）。
+
+在 BSP 未通过真机验证前，不把 GPIO 猜测值写入 `sdkconfig.defaults` 或板级代码。
 
 6.3 软件任务划分
 
@@ -1168,7 +1179,9 @@ Workstream C：ESP32 Terminal
 
 工作内容：
 
-硬件驱动和系统初始化。
+硬件与 BSP：ESP32-S3-Touch-LCD-4（480×480 RGB LCD + GT911 + TCA9554）。
+
+系统初始化与显示/触摸/背光 bring-up。
 
 Wi-Fi 配网。
 
@@ -1178,9 +1191,9 @@ mDNS 发现。
 
 Client Protocol 实现。
 
-LVGL 页面。
+LVGL 页面（480×480 方形布局）。
 
-输入设备驱动。
+输入设备驱动（触摸为主，板载按键辅助）。
 
 事件显示与快捷控制。
 
@@ -1292,9 +1305,11 @@ ESP32
 
 ESP-IDF 工程初始化。
 
-LCD / Touch 初始化。
+ESP32-S3-Touch-LCD-4 BSP：480×480 RGB LCD、GT911 触摸、TCA9554 复位/背光。
 
-LVGL 框架。
+480×480 LVGL 布局。
+
+触摸优先的输入抽象。
 
 Wi-Fi 配网。
 
@@ -1345,6 +1360,8 @@ Mobile 验收
 能够处理审批。
 
 ESP32 验收
+
+LCD-4 480×480 显示、GT911 触摸、背光通过真机验证。
 
 能显示真实 Agent 状态。
 

@@ -2,8 +2,10 @@
 
 日期：2026-11-08  
 范围：`firmware/terminal/` only  
-目标：ESP32-S3（Waveshare ESP32-S3-Touch-LCD-3.5B）  
+目标：ESP32-S3（Waveshare ESP32-S3-Touch-LCD-4，默认 V4，480×480）  
 构建方式：真实 ESP-IDF 编译，**未烧录、未接串口**
+
+> 注意：本次 253KB 构建仍是 **320×480 headless stub**，尚未包含 LCD-4 的真实 RGB LCD / GT911 / TCA9554 BSP，也未做 480×480 布局适配。切换到 LCD-4 后需要重新构建并做真机显示/触摸验收。
 
 ## 1. 真实固件构建
 
@@ -155,8 +157,10 @@ managed_components/
 ## 6. 未验证项 / 风险
 
 - [ ] 未烧录、未接串口，未验证 bootloader / app 启动日志
-- [ ] 未验证真实 LCD、触摸、背光、旋钮/按键（BSP 仍是 headless stub）
+- [ ] 未验证真实 RGB LCD、GT911 触摸、TCA9554 背光/复位（BSP 仍是 headless stub）
+- [ ] 未验证 480×480 方形布局（当前仍是 320×480 stub）
 - [ ] 未验证 16MB flash / Octal PSRAM 与实物一致
+- [ ] 未确认 LCD-4 实物版本（V1/V2/V3/V4）及对应 I2C/EXIO 映射
 - [ ] LVGL 实际分辨率 8.4.0 的运行时行为（本次只验证编译/链接）
 - [ ] E3b：ASCII 帧 → LVGL 字符网格、字体/颜色 Token 映射、局部刷新
 - [ ] E4：Wi-Fi / mDNS / 配对 / WSS / 协议 JSON / Event 增量
@@ -180,7 +184,7 @@ managed_components/
 - [x] 非法主题/初始化失败回退安全主题
 - [x] 两个内置主题：`safe_fallback`、`terminal_aesthetic` mock
 - [x] LVGL 8.x Label/Rect Renderer
-- [x] HAL 接口 + headless stub board（320×480）
+- [x] HAL 接口 + headless stub board（旧 320×480；LCD-4 480×480 BSP 待做）
 - [x] UI Task + 事件队列 + 线程边界
 - [x] Protocol V2.1 C 类型 + Snapshot 校验 + JSON stub
 - [x] State Adapter（Snapshot → ViewModel）+ Mock 状态任务

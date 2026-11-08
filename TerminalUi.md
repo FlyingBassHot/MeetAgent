@@ -6,7 +6,7 @@
 **架构定位：** 嵌入式 UI Framework + Theme Plugin System  
 **首发主题：** Terminal Aesthetic（终端美学）  
 **开发平台：** ESP32-S3 + ESP-IDF + FreeRTOS + LVGL  
-**目标硬件：** Waveshare ESP32-S3-Touch-LCD-3.5B  
+**目标硬件：** Waveshare ESP32-S3-Touch-LCD-4（V4 默认，480 × 480，GT911 触摸，TCA9554 IO 扩展）  
 **设计原则：** 基础设施先行、主题可替换、数据与表现分离、低资源消耗、持续视觉体验。
 
 ---
@@ -206,7 +206,7 @@ MeetAgent ESPUI
 
 - 当前 LCD 型号。
 - 触摸屏驱动。
-- 旋钮输入。
+- 触摸输入；外接旋钮/编码器输入。
 - 按键输入。
 - 屏幕方向。
 - 亮度控制。
@@ -374,8 +374,8 @@ Theme Registry
   "renderer_id": "builtin.ascii_terminal",
 
   "display": {
-    "orientation": "portrait",
-    "min_width": 320,
+    "orientation": "any",
+    "min_width": 480,
     "min_height": 480
   },
 
@@ -678,7 +678,7 @@ Scene 的内容布局属于 Theme。
 
 这样：
 
-- 旋钮旋转可以映射成 Focus 或页面切换。
+- 触摸滑动（或外接旋钮旋转）可以映射成 Focus 或页面切换。
 - 按键可以映射成 Select / Back。
 - 长按可以触发全局操作。
 - 主题可以定义焦点和视觉反馈，但不能越权执行命令。
@@ -1098,7 +1098,9 @@ output[x][y] = glyph_ramp[glyph_index]
 
 # 九、Terminal Aesthetic 首屏 UI 设计
 
-目标硬件使用 320 × 480 竖屏作为首版布局基准。
+目标硬件使用 480 × 480 方形屏作为首版布局基准（Waveshare ESP32-S3-Touch-LCD-4）。
+
+方形屏不再沿用旧的 320×480 竖屏比例，首屏需要重新组织视觉中心；ASCII Core、状态区和底部信息区都要按 480×480 重新分配，而不是把旧布局简单拉伸。
 
 设计需要具有明确的视觉中心，而不是把整个屏幕平均划分成若干卡片。
 
@@ -1168,7 +1170,7 @@ output[x][y] = glyph_ramp[glyph_index]
 
 ## 9.2 Focus Scene
 
-当用户旋转旋钮或者触摸主要视觉主体时，进入 Focus Scene。
+当用户触摸主要视觉主体（或外接旋钮旋转）时，进入 Focus Scene。
 
 显示：
 
@@ -1214,15 +1216,15 @@ output[x][y] = glyph_ramp[glyph_index]
 
 ## 10.1 输入设备
 
-第一版交互方式：
+第一版交互方式（ESP32-S3-Touch-LCD-4 没有板载旋钮）：
 
-- 旋钮：选择和切换焦点。
-- 旋钮按下：确认。
-- Back：返回。
-- Interrupt：中断当前 Session。
-- Touch：可选辅助交互。
+- Touch：主要交互方式，点击选择、滑动切换、长按确认。
+- Back：屏幕返回区域或板载按键。
+- Interrupt：屏幕快捷按钮或板载按键组合。
+- 板载 BOOT / RESET / BAT_PWR：可作为调试、复位和电源操作。
+- Encoder CW / CCW：保留抽象事件，后续需要时外接旋钮编码器。
 
-实际 GPIO、按键数量和输入方式以开发板原理图及后续硬件设计为准。
+实际 GPIO、按键数量和外接输入以开发板原理图及后续硬件设计为准。
 
 ## 10.2 输入抽象
 
@@ -1521,16 +1523,17 @@ Theme Manager 读取 Manifest 后生成可用配置列表。
 任务：
 
 - ESP-IDF 工程集成。
-- LCD 驱动接入。
-- LVGL 初始化。
+- ESP32-S3-Touch-LCD-4 板级 BSP：RGB LCD、GT911 触摸、TCA9554 复位/背光。
+- 480×480 LVGL 初始化与显示刷新。
 - UI Task。
-- 输入事件抽象。
+- 输入事件抽象（触摸为主，按键辅助）。
 - Theme Registry。
 - 默认安全主题。
 
 验收：
 
-- 能正常显示基础 UI。
+- 能正常显示 480×480 基础 UI。
+- LCD 颜色、方向正确；GT911 触摸坐标正确。
 - 输入事件能够正常响应。
 - 主题可以初始化和销毁。
 - 出现主题加载错误时能回退默认界面。
@@ -1674,7 +1677,7 @@ ESPUI 的验收不应只有功能测试。
 
 ### 交互体验
 
-旋钮与按键具有可预测的行为，用户不需要每次都查看说明。
+触摸与板载按键具有可预测的行为，用户不需要每次都查看说明；外接旋钮时复用同一套输入抽象。
 
 ### 稳定性
 

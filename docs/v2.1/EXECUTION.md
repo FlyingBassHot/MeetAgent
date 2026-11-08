@@ -15,6 +15,8 @@
 | Mobile | `omp` | `mobile/` | Vue 3 + TS + Vite + Pinia + Router，后续 Capacitor |
 | Terminal | `pi` | `firmware/terminal/` | ESP-IDF + FreeRTOS + LVGL + ESPUI |
 
+Terminal 目标硬件：**Waveshare ESP32-S3-Touch-LCD-4**（默认 V4，480×480 RGB565、GT911 五点触摸、TCA9554 IO 扩展、ESP32-S3N16R8）。开发顺序为 **BSP First**：确认版本 → 点亮 LCD/触摸/背光 → 480×480 布局 → Wi-Fi/WSS。
+
 规则：
 
 - Mobile / Terminal 只能改自己的目录；不得修改 `internal/`、`pkg/`、`cmd/`、`configs/`、`web/test-client/`、根文档。
@@ -79,9 +81,11 @@ Mobile：
 
 Terminal：
 
-- ESP-IDF 工程、LCD/Touch、LVGL、ESPUI E0/E1
+- 目标硬件：Waveshare ESP32-S3-Touch-LCD-4（默认 V4，480×480 RGB LCD + GT911 + TCA9554）
+- ESP-IDF 工程、板级 BSP bring-up（LCD 点亮、触摸坐标、背光）、LVGL、ESPUI E0/E1
+- 480×480 主题布局适配（替代旧的 320×480 竖屏假设）
 - Wi-Fi 配网、mDNS 发现、WSS 原型、Mock 事件显示
-- 验收：终端能显示 Mock 状态；主题错误可回退
+- 验收：终端能显示 Mock 状态；LCD/触摸/背光正常；主题错误可回退
 
 ### M3：真实 Agent 集成
 

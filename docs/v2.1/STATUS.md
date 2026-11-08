@@ -1,13 +1,13 @@
 # MeetAgent V2.1 状态板
 
-更新时间：2026-11-06
+更新时间：2026-11-08
 
 | 模块 | 负责人 | 当前阶段 | 状态 | 下一步 |
 |---|---|---|---|---|
 | Core / Node | 主会话 | M0 + M1 + M4 Core | 完成；审计/限流/重连边界加固 | M6 可选增强 |
 | Protocol v2 | 主会话 | M0 | 完成 | 随实现补兼容测试 |
 | Mobile | omp | M4 + M5a + M5b | 完成（Tailscale、WSS/TLS、Android 真机配对/Prompt/事件/node 重启恢复） | iOS/Release |
-| Terminal / ESPUI | pi | E0–E2 + E3a | ESP-IDF v5.4.4 + LVGL 8.4.0 构建通过（app 253 KB） | ESP32 实物显示/触摸验收 |
+| Terminal / ESPUI | pi | E0–E2 + E3a | ESP-IDF v5.4.4 + LVGL 8.4.0 构建通过（stub 320×480，app 253 KB） | LCD-4 480×480 BSP + 实物验收 |
 | Cloud relay | 主会话 | 可选 | 保留 V1 实现 | M6 再验证混合模式 |
 
 ## 已完成
@@ -23,7 +23,8 @@
 - mDNS `_meetagent._tcp`（avahi-browse 实测）
 - 测试：`go test ./... -race -count=1` 通过
 - Mobile：`npm run typecheck` / `npm run build` 通过；390/1440 截图
-- Terminal：host tests 805/805；syntax 33/33；ESP-IDF v5.4.4 + LVGL 8.4.0 `idf.py build` 成功，app 253,152 bytes
+- Terminal：host tests 805/805；syntax 33/33；ESP-IDF v5.4.4 + LVGL 8.4.0 `idf.py build` 成功，app 253,152 bytes（当前仍为 320×480 headless stub）
+- Terminal 硬件目标改为 **Waveshare ESP32-S3-Touch-LCD-4**（480×480 RGB LCD + GT911 + TCA9554，V4 默认）；480×480 布局与真实 BSP 待实施
 
 ## 真实联调（主会话）
 
@@ -52,7 +53,7 @@
 
 ## 阻塞 / 暂停
 
-- **ESP32 硬件未到**：ESP-IDF v5.4.4 + esp32s3 工具链已安装，`idf.py build` 通过（app 253,152 bytes）；显示/触摸/烧录验收需等实物
+- **ESP32 硬件未到**：ESP-IDF v5.4.4 + esp32s3 工具链已安装，`idf.py build` 通过（stub，app 253,152 bytes）；LCD-4 实物版本（V1/V2/V3/V4）未确认，480×480 BSP、显示/触摸/烧录验收需等实物
 - Mobile：使用 5174，避免与 V1 的 5173 冲突
 - 语音/STT：按用户要求暂缓
 - 多客户端/同 Token 多标签页：M4 处理

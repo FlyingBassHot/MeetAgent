@@ -13,14 +13,30 @@
 - 状态、活跃 Session、关键事件、Interrupt、审批摘要
 - 不实现完整 Prompt 聊天、文件浏览、长历史、本地 AI
 
-目标硬件：**Waveshare ESP32-S3-Touch-LCD-3.5B**，320×480 竖屏，ESP-IDF + FreeRTOS + LVGL。
+目标硬件：**Waveshare ESP32-S3-Touch-LCD-4**（默认按 V4 规划，实物版本待确认）。
 
-## 当前环境
+- 4.0 英寸 480 × 480 RGB565 电容触摸屏
+- GT911 五点触控，支持中断
+- ESP32-S3N16R8：16MB Flash + 8MB Octal PSRAM
+- RGB 并口 LCD；TCA9554PWR IO 扩展控制 LCD/触摸复位与背光
+- 输入以触摸为主，板载 BOOT / RESET / BAT_PWR 按键辅助；无板载旋钮
+- ESP-IDF >= 5.2.5（当前 5.4.4），FreeRTOS，LVGL 8.x
 
-- 本机尚未安装 ESP-IDF（`idf.py` 不存在，`IDF_PATH` 为空）
-- 先完成 E0/E1/E2 的代码与架构，能写的代码先写；不能编译时如实汇报阻塞
-- 不要自行下载/安装 ESP-IDF（体积大、可能影响环境）；需要时由主会话统一处理
-- 不要假设 GPIO/引脚；以开发板原理图和官方示例为准，先定义 HAL 接口
+## 当前环境与进度
+
+- ESP-IDF v5.4.4 与 esp32s3 工具链已安装，`idf.py build` 已通过（当前仍是 320×480 headless stub）
+- E0/E1/E2 + E3a 已完成；host tests 805/805，syntax 33/33
+- 尚未接真实 LCD/触摸/背光；480×480 布局与新 BSP 待实施
+- 实物版本（V1/V2/V3/V4）未确认；V1 与 V2-V4 的 I2C/扩展 IO 映射不同
+- 不要假设 GPIO/引脚；以对应版本原理图和官方 `06_LVGL_Porting` 示例为准
+
+## 开发顺序：BSP First
+
+1. 确认实物版本与屏幕方向。
+2. 依据对应版本原理图实现板级 BSP：RGB LCD、GT911、TCA9554、背光。
+3. 先点亮屏幕并验证颜色/方向/触摸坐标，再改 UI。
+4. 将布局从 320×480 竖屏适配为 480×480 方形。
+5. 最后接 Wi-Fi、mDNS、配对、WSS 和 Client Protocol（E4）。
 
 ## 第一阶段（本次交付）
 
@@ -51,10 +67,11 @@ firmware/terminal/
 ### E1：基础 UI Runtime
 
 - ESP-IDF 工程初始化、LVGL 接入点
-- HAL 接口：display/touch/encoder/button/power（实现可为空/模拟）
+- ESP32-S3-Touch-LCD-4 板级 BSP：RGB LCD、GT911、TCA9554、背光
+- HAL 接口：display/touch/encoder/button/power（真实 BSP + headless stub）
 - UI Task + 事件队列（网络回调不能直接操作 LVGL）
 - Theme Registry + 内置安全主题
-- 一个可运行的 Mock ViewModel + 简单状态页面（不能编译时保留代码与说明）
+- 一个可运行的 Mock ViewModel + 简单状态页面
 
 ### E2：主题框架（最小）
 
@@ -63,13 +80,21 @@ firmware/terminal/
 - 主题加载失败回退安全主题
 - 切换主题不丢 ViewModel
 
-首版不要求完整 ASCII Renderer/六态动画；E3 后续再做。先让框架和数据流成立。
+首版框架已完成，E3a 纯逻辑 ASCII Renderer 也已补齐；下一阶段是在 ESP32-S3-Touch-LCD-4 上完成真实 BSP、480×480 布局和 E3b 字符网格。
 
 ## 后续（等主会话下发）
 
-- E3 Terminal Aesthetic：ASCII Renderer、六态动画、Ambient/Focus/Activity/Attention
+- E3b：480×480 方形布局、ASCII 帧 → LVGL 字符网格、字体/颜色 Token、局部刷新
+- E3 Terminal Aesthetic：六态动画、Ambient/Focus/Activity/Attention
 - E4 接真实 Node：Snapshot/Event/Command
 - E5 配置、亮度、夜间模式、长时间运行
+
+## 验收/汇报要求
+
+1. 先报告实物版本与屏幕方向；未确认前不写死 GPIO。
+2. BSP 阶段汇报：LCD 点亮结果、颜色/方向、GT911 触摸坐标、背光、串口日志。
+3. 480×480 适配阶段汇报：截图/照片、主机测试、`idf.py build`、固件大小。
+4. 未烧录或未验证的项必须明确标注。
 
 ## 协议
 

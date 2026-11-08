@@ -35,12 +35,14 @@ LVGL     : 8.4.0（Component Manager）
 
 ## 目标硬件
 
-- Waveshare ESP32-S3-Touch-LCD-3.5B
-- 320 × 480 竖屏
-- ESP32-S3 + ESP-IDF + FreeRTOS + LVGL 8.x（当前 8.4.0）
-- 旋钮 / 按键为主，触摸为辅
+- Waveshare ESP32-S3-Touch-LCD-4（默认 V4，实物版本待确认）
+- 4.0 英寸 480 × 480 RGB565 方形屏
+- GT911 五点电容触摸 + TCA9554PWR IO 扩展
+- ESP32-S3N16R8：16MB Flash + 8MB Octal PSRAM
+- ESP32-S3 + ESP-IDF 5.x（当前 5.4.4）+ FreeRTOS + LVGL 8.x（当前 8.4.0）
+- 触摸为主，板载 BOOT / RESET / BAT_PWR 按键辅助；无板载旋钮
 
-**没有假设任何 GPIO、LCD 控制器、触摸控制器或背光引脚。** 当前使用 `stub-headless` 板级 HAL：报告 320×480 面板信息，但不驱动真实硬件。真实 BSP 必须依据开发板原理图和官方示例实现。
+**没有假设任何 GPIO、LCD 控制器、触摸控制器或背光引脚。** 当前使用 `stub-headless` 板级 HAL：仍报告旧的 320×480 面板信息，不驱动真实硬件。真实 BSP 必须依据对应版本原理图和官方 `06_LVGL_Porting` 示例实现；480×480 布局适配与真实 BSP 一起进行。
 
 ## 构建
 

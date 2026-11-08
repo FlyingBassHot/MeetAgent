@@ -2,18 +2,31 @@
 
 ## 1. 目标硬件
 
+目标硬件已从旧的 3.5B 切换为 **Waveshare ESP32-S3-Touch-LCD-4**，默认按 V4 版本规划。
+
 | 项 | 值 | 状态 |
 |---|---|---|
-| 开发板 | Waveshare ESP32-S3-Touch-LCD-3.5B | 任务书指定 |
-| SoC | ESP32-S3 | 任务书指定 |
-| 屏幕 | 320 × 480 竖屏，RGB565 | 任务书指定，待实物确认 |
-| 触摸 | 电容触摸（具体控制器待确认） | **未假设** |
-| 旋钮 / 按键 | 数量与 GPIO 待确认 | **未假设** |
-| PSRAM | N16R8 / Octal 待确认 | `sdkconfig.defaults` 暂按 Octal |
-| Flash | 16 MB 待确认 | `sdkconfig.defaults` 暂按 16 MB |
-| 背光 | 控制方式待确认 | HAL 仅保留接口 |
+| 开发板 | Waveshare ESP32-S3-Touch-LCD-4 | 默认 V4，实物版本待确认 |
+| SoC | ESP32-S3（240MHz） | 官方规格 |
+| 屏幕 | 4.0 英寸，480 × 480，RGB565 | 官方规格 |
+| 显示接口 | RGB 并口 LCD | 真实 BSP 待实现 |
+| 触摸 | GT911，I2C，五点触控，支持中断 | 真实 BSP 待实现 |
+| IO 扩展 | TCA9554PWR：触摸/LCD 复位、背光等 | 版本差异待确认 |
+| Flash / PSRAM | 16MB Flash + 8MB Octal PSRAM（N16R8） | `sdkconfig.defaults` 暂按 Octal |
+| 板载输入 | BOOT / RESET / BAT_PWR；**无旋钮** | 触摸为主，按键辅助 |
+| 背光 | 经 TCA9554 / BLC 控制 | 以 V4 示例为准 |
+| 其他 | CAN、RS485、RTC、SD、蜂鸣器、电池 | 首版 Terminal 不要求全部使用 |
 
-**本工程没有写死任何 GPIO、LCD 控制器型号、触摸控制器型号、I2C/SPI 地址或背光 PWM 通道。** 这些必须来自开发板原理图、官方示例和实测。
+**本工程没有写死任何 GPIO、LCD 控制器型号、触摸控制器型号、I2C/SPI 地址或背光控制通道。** 这些必须来自对应版本原理图、官方 `06_LVGL_Porting` 示例和实测。
+
+### 板卡版本差异
+
+官方说明 V1 与 V2/V3/V4 的 I2C 分配不同：
+
+- V1：触摸与 TCA9554 使用不同 I2C 引脚。
+- V2/V3/V4：I2C 设备统一使用 GPIO15（SDA）/ GPIO7（SCL）。
+
+在实物版本确认前，不写死 I2C 总线和 TCA9554 EXIO 映射。
 
 ## 2. HAL 接口
 
@@ -78,7 +91,8 @@ espui_board_hal_t {
 }
 ```
 
-当前实现：`espui_board_stub()`（headless，320×480，无真实 flush/触摸/输入）。
+当前实现：`espui_board_stub()`（headless，**仍为旧的 320×480**，无真实 flush/触摸/输入）。  
+LCD-4 目标为 480×480；stub 与两个主题布局将在 480×480 适配阶段一起更新。
 
 ## 3. 为什么先做 stub 板
 
@@ -89,7 +103,7 @@ espui_board_hal_t {
 
 ## 4. LVGL 接入约定
 
-- LVGL 版本：8.3（`components/espui/idf_component.yml` 固定 `^8.3.0`）。
+- LVGL 版本：`^8.3.0`（当前 Component Manager 解析到 8.4.0）。
 - ESPUI 的 Renderer 只使用 LVGL v8 API。
 - `lv_timer_handler()` 由板级 LVGL port task 调用；ESPUI UI Task 不负责刷新，只负责状态/主题对象更新。
 - 所有 ESPUI 对 LVGL 的调用都在 display HAL lock 内；板级 port 必须在同一把锁内调用 `lv_timer_handler`。
@@ -100,13 +114,14 @@ espui_board_hal_t {
 
 ## 5. 待确认清单
 
-1. LCD 控制器型号、SPI/RGB 接口、初始化和旋转。
-2. 触摸控制器型号、I2C 地址、中断/复位引脚、坐标映射。
-3. 背光控制方式（GPIO/PWM/恒流芯片）。
-4. 编码器 A/B/按键 GPIO 与上拉；独立 Back / Interrupt 键是否存在。
-5. PSRAM 封装（Octal/Quad）与 Flash 容量。
-6. 电源路径、USB 检测、电池 ADC。
-7. 官方 BSP/示例版本与 LVGL 版本是否匹配。
+1. 实物版本（V1 / V2 / V3 / V4）与丝印/包装标识。
+2. RGB LCD 的 R/G/B、HSYNC、VSYNC、DE、PCLK、LCD_CS/SPI 初始化引脚。
+3. TCA9554 EXIO 映射（TP_RST / LCD_RST / BL_EN / BLC 等，按实物版本）。
+4. GT911 I2C 地址、INT/RST、坐标方向与 5 点触控配置。
+5. 背光控制方式（TCA9554 / BLC / PWM）与有效电平。
+6. PSRAM 封装（Octal）与 Flash 容量（16MB）实机确认。
+7. 电源路径、USB 检测、电池 ADC（首版可延后）。
+8. 官方 V4 示例与 LVGL 8.x 的版本匹配。
 
 在以上确认前，不添加 `board_*.c` 真实实现，也不在 `sdkconfig.defaults` 写死外设参数。
 
@@ -118,4 +133,4 @@ espui_board_hal_t {
 4. 确认 LVGL port 的锁与 `lv_timer_handler` 任务。
 5. 用 `esptool.py` / 串口日志确认 PSRAM、Flash、面板方向。
 6. 点亮后先验证 `safe_fallback`，再切 `terminal_aesthetic` mock。
-7. 最后进入 E3 的 ASCII Renderer。
+7. 完成 480×480 方形布局适配，再进入 E3b 的 ASCII → LVGL 字符网格。

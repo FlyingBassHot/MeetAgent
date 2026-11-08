@@ -1,6 +1,6 @@
 # MeetAgent Terminal — ESP-IDF defaults
 #
-# Target board: Waveshare ESP32-S3-Touch-LCD-3.5B.
+# Target board: Waveshare ESP32-S3-Touch-LCD-4 (V4 default, 480x480).
 # Select the target once with: idf.py set-target esp32s3
 #
 # GPIO/LCD/touch/backlight assignments are intentionally NOT defined here:
