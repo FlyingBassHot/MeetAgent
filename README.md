@@ -4,7 +4,7 @@
 
 **Node-Centric · Multi-Client · Plugin-Based · LAN First · Cloud Optional**
 
-当前状态：**V2.1 核心链路已贯通**。Node 独立服务、V2.1 客户端协议、配对、事件中心、命令/权限、审计与限流已完成；Mobile 已完成 OpenCode 真实 Session、Tailscale 与 Android debug APK 真机验证（配对、Prompt、事件回传、Node 重启恢复）。Terminal 等待 ESP32 硬件与 ESP-IDF，暂停在 E3a。
+当前状态：**V2.1 核心链路已贯通**。Node 独立服务、V2.1 客户端协议、配对、事件中心、命令/权限、审计与限流已完成；Mobile 已完成 OpenCode 真实 Session、Tailscale 与 Android debug APK 真机验证（配对、Prompt、事件回传、Node 重启恢复）。Terminal 已完成 E0–E3a，ESP-IDF v5.4.4 已安装并开始首次固件编译，等待 ESP32 实物做显示/触摸验收。
 
 > 设计文档：
 > - [`MeetAgentV2.1.md`](./MeetAgentV2.1.md) — 总体架构、双客户端、南向插件、阶段计划
@@ -36,7 +36,7 @@ Mobile (Vue + Capacitor)        ESP32 Terminal (ESP-IDF + LVGL)
 
 - **Node** 是核心：Agent 接入、Session、事件、命令、权限、配对、客户端注册
 - **Mobile** 是完整远程入口：LAN/Tailscale 直连，M4 多客户端与 Node 重启恢复已验证，Capacitor Android debug APK 已完成真机配对与 Prompt 回传
-- **Terminal** 是局域网常驻终端：E0–E3a 已完成，硬件/ESP-IDF 到位前暂停
+- **Terminal** 是局域网常驻终端：E0–E3a 已完成，ESP-IDF v5.4.4 已就绪，等待 ESP32 实物验收
 - **Cloud** 不再是必需项；旧 Cloud 代码保留为可选 relay
 - **Adapter** 通过统一 Manifest/Capability 接入，OpenCode 只是第一个 Adapter
 
@@ -49,7 +49,7 @@ Mobile (Vue + Capacitor)        ESP32 Terminal (ESP-IDF + LVGL)
 | Core / Node | `cmd/node`, `internal/`, `pkg/`, `configs/` | M0/M1/M4 完成；审计、限流、重连边界加固 |
 | Node 模拟器 | `cmd/simulator` | 可用 |
 | Mobile | `mobile/` | M5b 完成；Tailscale + Android 真机配对/Prompt/事件已验证 |
-| ESP32 Terminal / ESPUI | `firmware/terminal/` | E0–E2 + E3a 完成；等待真机/ESP-IDF，暂停 |
+| ESP32 Terminal / ESPUI | `firmware/terminal/` | E0–E3a 完成；ESP-IDF v5.4.4 已安装，首次编译验证中 |
 | V1 Cloud / Web Console | `cmd/cloud`, `web/test-client` | 归档参考 |
 
 ---
@@ -252,4 +252,4 @@ make run-cloud        # 旧 V1 Cloud（可选）
 | M5 | Mobile 远程（Tailscale/Capacitor） | 完成（Tailscale 实网 + WSS/TLS + Android debug APK 真机验证；iOS/Release 待环境） |
 | M6 | 语音/STT、Cloud Relay、第二 Adapter、OTA | 暂缓 |
 
-> 语音/STT 按当前要求暂缓。ESP32 硬件未到、ESP-IDF 未安装，Terminal 暂停在 E3a；Node 与 Mobile 继续推进，Mobile 已完成 M4、M5a/M5b（Tailscale、WSS/TLS、网络切换、诊断、Android debug APK）。
+> 语音/STT 按当前要求暂缓。ESP32 硬件未到，但 ESP-IDF v5.4.4 与 esp32s3 工具链已安装，Terminal 正在做首次真实编译；Node 与 Mobile 继续推进，Mobile 已完成 M4、M5a/M5b（Tailscale、WSS/TLS、网络切换、诊断、Android debug APK）。

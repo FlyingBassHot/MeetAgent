@@ -7,7 +7,7 @@
 | Core / Node | 主会话 | M0 + M1 + M4 Core | 完成；审计/限流/重连边界加固 | M6 可选增强 |
 | Protocol v2 | 主会话 | M0 | 完成 | 随实现补兼容测试 |
 | Mobile | omp | M4 + M5a + M5b | 完成（Tailscale、WSS/TLS、Android 真机配对/Prompt/事件/node 重启恢复） | iOS/Release |
-| Terminal / ESPUI | pi | E0–E2 + E3a | 暂停（host tests 805/805，33 files syntax） | 等 ESP32 真机 + ESP-IDF |
+| Terminal / ESPUI | pi | E0–E2 + E3a | ESP-IDF v5.4.4 已安装；首次固件编译验证中 | ESP32 实物显示/触摸验收 |
 | Cloud relay | 主会话 | 可选 | 保留 V1 实现 | M6 再验证混合模式 |
 
 ## 已完成
@@ -52,7 +52,7 @@
 
 ## 阻塞 / 暂停
 
-- **ESP32 模块暂停**：硬件未到、ESP-IDF 未安装；Terminal 停在 E3a，不继续写 ESP 代码
+- **ESP32 硬件未到**：ESP-IDF v5.4.4 与 esp32s3 工具链已安装，Terminal 可编译；显示/触摸/烧录验收需等实物
 - Mobile：使用 5174，避免与 V1 的 5173 冲突
 - 语音/STT：按用户要求暂缓
 - 多客户端/同 Token 多标签页：M4 处理
