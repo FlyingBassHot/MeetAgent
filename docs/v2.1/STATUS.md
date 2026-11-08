@@ -6,8 +6,8 @@
 |---|---|---|---|---|
 | Core / Node | 主会话 | M0 + M1 + M4 Core | 完成；审计/限流/重连边界加固 | M6 可选增强 |
 | Protocol v2 | 主会话 | M0 | 完成 | 随实现补兼容测试 |
-| Mobile | omp | M4 + M5a + M5b | 完成（Tailscale、WSS/TLS、Android 真机配对/Prompt/事件/node 重启恢复） | iOS/Release |
-| Terminal / ESPUI | pi | E0–E2 + E3a | ESP-IDF v5.4.4 + LVGL 8.4.0 构建通过（stub 320×480，app 253 KB） | LCD-4 480×480 BSP + 实物验收 |
+| Mobile | omp | M4 + M5a + M5b | 完成（Tailscale、WSS/TLS、Android 真机 Prompt/Interrupt/审批/断网恢复） | iOS/Release |
+| Terminal / ESPUI | pi | E0–E2 + E3a + LCD-4 BSP | 官方 BSP 3.0.0 + 480×480 构建通过（app 502 KB） | LCD-4 实物显示/触摸验收 |
 | Cloud relay | 主会话 | 可选 | 保留 V1 实现 | M6 再验证混合模式 |
 
 ## 已完成
@@ -23,8 +23,8 @@
 - mDNS `_meetagent._tcp`（avahi-browse 实测）
 - 测试：`go test ./... -race -count=1` 通过
 - Mobile：`npm run typecheck` / `npm run build` 通过；390/1440 截图
-- Terminal：host tests 805/805；syntax 33/33；ESP-IDF v5.4.4 + LVGL 8.4.0 `idf.py build` 成功，app 253,152 bytes（当前仍为 320×480 headless stub）
-- Terminal 硬件目标改为 **Waveshare ESP32-S3-Touch-LCD-4 V4**（480×480 RGB LCD + GT911 + CH32V003 helper）；官方 BSP、480×480 布局与真实 BSP 适配待实施
+- Terminal：host tests 807/807；syntax 33/33；ESP-IDF v5.4.4 + LVGL 8.4.0 + 官方 BSP 3.0.0 `idf.py build` 成功，app 502,272 bytes，480×480 布局已适配
+- Terminal 硬件目标确定为 **Waveshare ESP32-S3-Touch-LCD-4 V4**（480×480 RGB LCD + GT911 + CH32V003 helper）；真实 BSP 已接入，显示/触摸方向/PSRAM 待实物验证
 
 ## 真实联调（主会话）
 
@@ -44,8 +44,8 @@
 - Node 重启恢复：同一配对存储下，旧 `last_sequence` 重连得到新序号 Snapshot，后续事件从新序号连续递增（集成测试）
 - 运维：Docker 部署（`compose.yaml`，host network、`restart: unless-stopped`、配置/数据挂载、健康检查）已实测；systemd user service 保留为替代方案；`GET /metrics` 输出连接数、事件序号/缓存、命令结果等 Prometheus 指标
 - Tailscale：100.69.235.2 登录；Mobile 通过 Tailscale IP 配对并读取真实 Snapshot（CORS 已允许 100.64/10）
-- Android：JDK 21 + Android SDK 35；Capacitor 7.6.10；Gradle 8.11.1 Debug APK 4,230,914 bytes，SHA-256 `b8fbdc243d45251c0e98e542282e9e1e23b12aa0e2f289bfa1c9d93195cceec4`（package com.flyingbasshot.meetagent）
-- Android 真机（HBN-AL00 / 2NP0224717021762）：USB ADB 已授权；Tailscale `100.69.235.2:8787` 配对成功，Home 恢复 41 个真实 Session；真实测试 Session `ses_e5a1c7989ffefcU1XdrTiq6WXX` 发出 Prompt，收到 `message.completed` 与 running→idle 状态；Node 重启后客户端自动重连并应用新 Snapshot
+- Android：JDK 21 + Android SDK 35；Capacitor 7.6.10 + `@capacitor/network` 7.0.4；Debug APK 4,260,002 bytes，SHA-256 `bbc8f06e16451080ef8469d98e4f0b153a08a0e95b1ddeaf185111e183b4bd27`（package com.flyingbasshot.meetagent）
+- Android 真机（HBN-AL00 / 2NP0224717021762）：USB ADB 已授权；Tailscale `100.69.235.2:8787` 配对成功，Home 恢复 41 个真实 Session；测试 Session 完成 Prompt、Interrupt、权限「允许一次」、断网离线提示与恢复重连；Node 重启后自动应用新 Snapshot
 - Android 真机修复：旧 WebView 缺少 `Promise.withResolvers`，已在 `mobile/src/main.ts` 增加 polyfill，并重新构建/安装 APK
 - `make dev-tls`：本地自签证书生成脚本（data/ 已忽略）
 - M4 Core：双客户端同时收到同一 Prompt 事件；同一 permission 只允许一个最终决策；按 last_sequence 补发事件；PATCH 可独立配置客户端权限（集成测试）
@@ -53,7 +53,7 @@
 
 ## 阻塞 / 暂停
 
-- **ESP32 硬件未到**：ESP-IDF v5.4.4 + esp32s3 工具链已安装，`idf.py build` 通过（stub，app 253,152 bytes）；LCD-4 实物版本（V1/V2/V3/V4）未确认，480×480 BSP、显示/触摸/烧录验收需等实物
+- **ESP32 硬件未到**：LCD-4 V4 BSP 已接入并编译通过（app 502,272 bytes），但未烧录/接串口；显示颜色/方向、GT911 触摸方向、CH32V003 背光/电源、PSRAM/Flash 需实物验证；官方 BSP 推荐 ESP-IDF 5.5.5/6，本机 5.4.4 仅验证编译/链接
 - Mobile：使用 5174，避免与 V1 的 5173 冲突
 - 语音/STT：按用户要求暂缓
 - 多客户端/同 Token 多标签页：M4 处理
