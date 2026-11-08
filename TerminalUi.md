@@ -6,7 +6,7 @@
 **架构定位：** 嵌入式 UI Framework + Theme Plugin System  
 **首发主题：** Terminal Aesthetic（终端美学）  
 **开发平台：** ESP32-S3 + ESP-IDF + FreeRTOS + LVGL  
-**目标硬件：** Waveshare ESP32-S3-Touch-LCD-4（V4 默认，480 × 480，GT911 触摸，TCA9554 IO 扩展）  
+**目标硬件：** Waveshare ESP32-S3-Touch-LCD-4 V4（480 × 480，GT911 触摸，CH32V003 helper 控制背光/复位/电源）  
 **设计原则：** 基础设施先行、主题可替换、数据与表现分离、低资源消耗、持续视觉体验。
 
 ---
@@ -1523,7 +1523,7 @@ Theme Manager 读取 Manifest 后生成可用配置列表。
 任务：
 
 - ESP-IDF 工程集成。
-- ESP32-S3-Touch-LCD-4 板级 BSP：RGB LCD、GT911 触摸、TCA9554 复位/背光。
+- ESP32-S3-Touch-LCD-4 V4 板级 BSP：优先复用官方 `waveshare/esp32_s3_touch_lcd_4`，封装 RGB LCD、GT911 触摸、CH32V003 复位/背光。
 - 480×480 LVGL 初始化与显示刷新。
 - UI Task。
 - 输入事件抽象（触摸为主，按键辅助）。

@@ -5,7 +5,7 @@
 目标：ESP32-S3（Waveshare ESP32-S3-Touch-LCD-4，默认 V4，480×480）  
 构建方式：真实 ESP-IDF 编译，**未烧录、未接串口**
 
-> 注意：本次 253KB 构建仍是 **320×480 headless stub**，尚未包含 LCD-4 的真实 RGB LCD / GT911 / TCA9554 BSP，也未做 480×480 布局适配。切换到 LCD-4 后需要重新构建并做真机显示/触摸验收。
+> 注意：本次 253KB 构建仍是 **320×480 headless stub**，尚未包含 LCD-4 V4 的真实 RGB LCD / GT911 / CH32V003 BSP，也未做 480×480 布局适配。切换到 LCD-4 后需要重新构建并做真机显示/触摸验收。
 
 ## 1. 真实固件构建
 
@@ -157,7 +157,7 @@ managed_components/
 ## 6. 未验证项 / 风险
 
 - [ ] 未烧录、未接串口，未验证 bootloader / app 启动日志
-- [ ] 未验证真实 RGB LCD、GT911 触摸、TCA9554 背光/复位（BSP 仍是 headless stub）
+- [ ] 未验证真实 RGB LCD、GT911 触摸、CH32V003 背光/复位（BSP 仍是 headless stub）
 - [ ] 未验证 480×480 方形布局（当前仍是 320×480 stub）
 - [ ] 未验证 16MB flash / Octal PSRAM 与实物一致
 - [ ] 未确认 LCD-4 实物版本（V1/V2/V3/V4）及对应 I2C/EXIO 映射

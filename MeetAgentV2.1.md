@@ -782,12 +782,13 @@ ESP32 不需要实现完整聊天和大量历史数据浏览。
 
 当前目标硬件：
 
-Waveshare ESP32-S3-Touch-LCD-4（默认按 V4 版本规划，实物版本待确认）。
+Waveshare ESP32-S3-Touch-LCD-4（V4.0，近期购买确认）。
 
 - 4.0 英寸 480 × 480 RGB565 电容触摸屏
 - GT911 五点触控，支持中断
 - ESP32-S3N16R8：16MB Flash + 8MB Octal PSRAM
-- RGB 并口 LCD；TCA9554 IO 扩展控制 LCD/触摸复位与背光
+- RGB 并口 LCD
+- V4 使用 CH32V003F4U6 helper（I2C）控制背光、LCD/触摸复位、蜂鸣器和电源/电池 ADC；早期版本为 TCA9554
 - 板载 CAN、RS485、RTC、SD 卡、蜂鸣器、电池接口（首版 Terminal 不要求全部使用）
 - ESP-IDF（官方要求 >= 5.2.5；当前使用 5.4.4）
 - FreeRTOS、LVGL 8.x
@@ -797,12 +798,12 @@ Waveshare ESP32-S3-Touch-LCD-4（默认按 V4 版本规划，实物版本待确�
 
 后续按需增加麦克风和音频输出。
 
-硬件 GPIO、LCD、触摸、音频与电源设计必须以实际开发板原理图和官方示例为准，不提前固定未经验证的引脚定义。I2C 引脚在 V1 与 V2/V3/V4 之间有差异，必须按实物版本使用对应示例。
+硬件 GPIO、LCD、触摸、音频与电源设计必须以 V4 原理图、官方示例和 BSP 为准，不提前固定未经验证的引脚定义。旧版本文档中的 TCA9554/I2C 分配不适用于 V4。
 
 ### 6.2.1 开发顺序（BSP First）
 
-1. 确认实物版本（V1 / V2 / V3 / V4）和屏幕方向。
-2. 以对应版本原理图与官方 `06_LVGL_Porting` 示例为准，整理 RGB LCD、GT911、TCA9554 和背光映射。
+1. 以 V4.0 原理图、官方 `06_lvgl_demo_v8` 示例和 BSP 组件为准，整理 RGB LCD、GT911、CH32V003 helper 和背光映射。
+2. 优先评估官方 BSP `waveshare/esp32_s3_touch_lcd_4 ^3.0.0`，通过 HAL 包装接入；仅在版本/API 不兼容时写最小 BSP。
 3. 先完成板级 BSP bring-up：LCD 点亮、颜色/方向、触摸坐标、背光。
 4. 再把主题布局从旧的 320×480 竖屏适配为 480×480 方形屏。
 5. 最后接 Wi-Fi 配网、mDNS、配对、WSS 和 Client Protocol（E4）。
@@ -1179,7 +1180,7 @@ Workstream C：ESP32 Terminal
 
 工作内容：
 
-硬件与 BSP：ESP32-S3-Touch-LCD-4（480×480 RGB LCD + GT911 + TCA9554）。
+硬件与 BSP：ESP32-S3-Touch-LCD-4 V4（480×480 RGB LCD + GT911 + CH32V003 helper）。
 
 系统初始化与显示/触摸/背光 bring-up。
 
@@ -1305,7 +1306,7 @@ ESP32
 
 ESP-IDF 工程初始化。
 
-ESP32-S3-Touch-LCD-4 BSP：480×480 RGB LCD、GT911 触摸、TCA9554 复位/背光。
+ESP32-S3-Touch-LCD-4 V4 BSP：480×480 RGB LCD、GT911 触摸、CH32V003 helper 复位/背光。
 
 480×480 LVGL 布局。
 

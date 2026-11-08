@@ -2,31 +2,29 @@
 
 ## 1. 目标硬件
 
-目标硬件已从旧的 3.5B 切换为 **Waveshare ESP32-S3-Touch-LCD-4**，默认按 V4 版本规划。
+目标硬件已从旧的 3.5B 切换为 **Waveshare ESP32-S3-Touch-LCD-4 V4.0**（近期购买确认最新版）。
 
 | 项 | 值 | 状态 |
 |---|---|---|
-| 开发板 | Waveshare ESP32-S3-Touch-LCD-4 | 默认 V4，实物版本待确认 |
+| 开发板 | Waveshare ESP32-S3-Touch-LCD-4 V4.0 | 已确认 |
 | SoC | ESP32-S3（240MHz） | 官方规格 |
 | 屏幕 | 4.0 英寸，480 × 480，RGB565 | 官方规格 |
-| 显示接口 | RGB 并口 LCD | 真实 BSP 待实现 |
-| 触摸 | GT911，I2C，五点触控，支持中断 | 真实 BSP 待实现 |
-| IO 扩展 | TCA9554PWR：触摸/LCD 复位、背光等 | 版本差异待确认 |
+| 显示接口 | RGB 并口 LCD | 官方 BSP 可用 |
+| 触摸 | GT911，I2C，五点触控，支持中断 | 官方 BSP 可用 |
+| Helper | CH32V003F4U6（I2C）：背光、复位、蜂鸣器、电源/电池 ADC | V4 实物 |
 | Flash / PSRAM | 16MB Flash + 8MB Octal PSRAM（N16R8） | `sdkconfig.defaults` 暂按 Octal |
 | 板载输入 | BOOT / RESET / BAT_PWR；**无旋钮** | 触摸为主，按键辅助 |
-| 背光 | 经 TCA9554 / BLC 控制 | 以 V4 示例为准 |
+| 背光 | 经 CH32V003 helper 控制 | 以 V4 BSP 为准 |
 | 其他 | CAN、RS485、RTC、SD、蜂鸣器、电池 | 首版 Terminal 不要求全部使用 |
 
-**本工程没有写死任何 GPIO、LCD 控制器型号、触摸控制器型号、I2C/SPI 地址或背光控制通道。** 这些必须来自对应版本原理图、官方 `06_LVGL_Porting` 示例和实测。
+**本工程没有写死任何 GPIO、LCD 控制器型号、触摸控制器型号、I2C/SPI 地址或背光控制通道。** 这些必须来自 V4 原理图、官方 `06_lvgl_demo_v8` 示例和官方 BSP 实测。
 
-### 板卡版本差异
+### 官方 BSP 与版本差异
 
-官方说明 V1 与 V2/V3/V4 的 I2C 分配不同：
-
-- V1：触摸与 TCA9554 使用不同 I2C 引脚。
-- V2/V3/V4：I2C 设备统一使用 GPIO15（SDA）/ GPIO7（SCL）。
-
-在实物版本确认前，不写死 I2C 总线和 TCA9554 EXIO 映射。
+- V4 官方 BSP：`waveshare/esp32_s3_touch_lcd_4 ^3.0.0`
+- 官方示例：`examples/esp-idf/06_lvgl_demo_v8`（LVGL 8.4）
+- V4 使用 CH32V003 helper，**不是** TCA9554；旧版 V1 的 I2C/TCA9554 映射不适用
+- 已确认实物为 V4，不再按 V1/V2/V3 兼容设计；以后需要时再加版本分支
 
 ## 2. HAL 接口
 
@@ -114,23 +112,23 @@ LCD-4 目标为 480×480；stub 与两个主题布局将在 480×480 适配阶�
 
 ## 5. 待确认清单
 
-1. 实物版本（V1 / V2 / V3 / V4）与丝印/包装标识。
-2. RGB LCD 的 R/G/B、HSYNC、VSYNC、DE、PCLK、LCD_CS/SPI 初始化引脚。
-3. TCA9554 EXIO 映射（TP_RST / LCD_RST / BL_EN / BLC 等，按实物版本）。
+1. 实物 V4.0 丝印/包装已确认（近期购买）。
+2. RGB LCD 的 R/G/B、HSYNC、VSYNC、DE、PCLK、LCD_CS/SPI 初始化引脚（以官方 BSP 为准）。
+3. CH32V003 helper 的 I2C 地址/寄存器与背光/复位映射（以官方 BSP 为准）。
 4. GT911 I2C 地址、INT/RST、坐标方向与 5 点触控配置。
-5. 背光控制方式（TCA9554 / BLC / PWM）与有效电平。
+5. 背光亮度控制与有效电平。
 6. PSRAM 封装（Octal）与 Flash 容量（16MB）实机确认。
 7. 电源路径、USB 检测、电池 ADC（首版可延后）。
-8. 官方 V4 示例与 LVGL 8.x 的版本匹配。
+8. 官方 BSP 与 ESP-IDF 5.4.4 / LVGL 8.4 的兼容性。
 
-在以上确认前，不添加 `board_*.c` 真实实现，也不在 `sdkconfig.defaults` 写死外设参数。
+优先使用官方 BSP；在 BSP 验证前不写死外设参数。只有官方 BSP 与 LVGL 8.4 / ESP-IDF 5.4.4 不兼容时，才实现最小自定义 BSP。
 
 ## 6. 真机接入步骤（建议）
 
-1. 依据原理图实现 `hal/display_*.c`、`hal/touch_*.c`、`hal/input_*.c`、`hal/power_*.c`。
-2. 组装 `espui_board_hal_t`，替换 `espui_board_stub()`。
-3. 在 `app_main` 先完成 BSP 初始化，再调用 `espui_init()`。
-4. 确认 LVGL port 的锁与 `lv_timer_handler` 任务。
-5. 用 `esptool.py` / 串口日志确认 PSRAM、Flash、面板方向。
+1. 在 `components/espui/idf_component.yml` 或工程依赖中加入 `waveshare/esp32_s3_touch_lcd_4 ^3.0.0`。
+2. 用官方 `bsp_display_start()` / `bsp_display_lock()` 完成 LCD、GT911、CH32V003 初始化和 LVGL port 注册。
+3. 把 BSP 的显示信息、触摸读取和背光控制封装进 `espui_board_hal_t`，替换 `espui_board_stub()`。
+4. 在 `app_main` 先完成 BSP 初始化，再调用 `espui_init()`。
+5. 用串口日志确认 PSRAM、Flash、面板方向和 GT911 坐标。
 6. 点亮后先验证 `safe_fallback`，再切 `terminal_aesthetic` mock。
 7. 完成 480×480 方形布局适配，再进入 E3b 的 ASCII → LVGL 字符网格。

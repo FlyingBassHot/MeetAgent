@@ -24,7 +24,7 @@
 - 测试：`go test ./... -race -count=1` 通过
 - Mobile：`npm run typecheck` / `npm run build` 通过；390/1440 截图
 - Terminal：host tests 805/805；syntax 33/33；ESP-IDF v5.4.4 + LVGL 8.4.0 `idf.py build` 成功，app 253,152 bytes（当前仍为 320×480 headless stub）
-- Terminal 硬件目标改为 **Waveshare ESP32-S3-Touch-LCD-4**（480×480 RGB LCD + GT911 + TCA9554，V4 默认）；480×480 布局与真实 BSP 待实施
+- Terminal 硬件目标改为 **Waveshare ESP32-S3-Touch-LCD-4 V4**（480×480 RGB LCD + GT911 + CH32V003 helper）；官方 BSP、480×480 布局与真实 BSP 适配待实施
 
 ## 真实联调（主会话）
 

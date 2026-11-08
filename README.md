@@ -4,7 +4,7 @@
 
 **Node-Centric · Multi-Client · Plugin-Based · LAN First · Cloud Optional**
 
-当前状态：**V2.1 核心链路已贯通**。Node 独立服务、V2.1 客户端协议、配对、事件中心、命令/权限、审计与限流已完成；Mobile 已完成 OpenCode 真实 Session、Tailscale 与 Android debug APK 真机验证（配对、Prompt、事件回传、Node 重启恢复）。Terminal 已完成 E0–E3a，并完成首次真实固件构建（ESP-IDF v5.4.4 + LVGL 8.4.0，app 253 KB）；硬件目标已切换为 **Waveshare ESP32-S3-Touch-LCD-4**（480×480 RGB LCD + GT911 + TCA9554），等待实物做 BSP/显示/触摸验收。
+当前状态：**V2.1 核心链路已贯通**。Node 独立服务、V2.1 客户端协议、配对、事件中心、命令/权限、审计与限流已完成；Mobile 已完成 OpenCode 真实 Session、Tailscale 与 Android debug APK 真机验证（配对、Prompt、事件回传、Node 重启恢复）。Terminal 已完成 E0–E3a，并完成首次真实固件构建（ESP-IDF v5.4.4 + LVGL 8.4.0，app 253 KB）；硬件目标已切换为 **Waveshare ESP32-S3-Touch-LCD-4 V4**（480×480 RGB LCD + GT911 + CH32V003 helper），下一步接官方 BSP 并做显示/触摸验收。
 
 > 设计文档：
 > - [`MeetAgentV2.1.md`](./MeetAgentV2.1.md) — 总体架构、双客户端、南向插件、阶段计划

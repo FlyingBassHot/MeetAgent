@@ -13,28 +13,30 @@
 - 状态、活跃 Session、关键事件、Interrupt、审批摘要
 - 不实现完整 Prompt 聊天、文件浏览、长历史、本地 AI
 
-目标硬件：**Waveshare ESP32-S3-Touch-LCD-4**（默认按 V4 规划，实物版本待确认）。
+目标硬件：**Waveshare ESP32-S3-Touch-LCD-4 V4**（近期购买确认最新版）。
 
 - 4.0 英寸 480 × 480 RGB565 电容触摸屏
 - GT911 五点触控，支持中断
 - ESP32-S3N16R8：16MB Flash + 8MB Octal PSRAM
-- RGB 并口 LCD；TCA9554PWR IO 扩展控制 LCD/触摸复位与背光
+- RGB 并口 LCD
+- V4 使用 CH32V003F4U6 helper（I2C）控制背光、LCD/触摸复位、蜂鸣器和电源/电池 ADC；早期版本为 TCA9554
 - 输入以触摸为主，板载 BOOT / RESET / BAT_PWR 按键辅助；无板载旋钮
 - ESP-IDF >= 5.2.5（当前 5.4.4），FreeRTOS，LVGL 8.x
+- 官方 BSP：`waveshare/esp32_s3_touch_lcd_4 ^3.0.0`（V4）
 
 ## 当前环境与进度
 
 - ESP-IDF v5.4.4 与 esp32s3 工具链已安装，`idf.py build` 已通过（当前仍是 320×480 headless stub）
 - E0/E1/E2 + E3a 已完成；host tests 805/805，syntax 33/33
-- 尚未接真实 LCD/触摸/背光；480×480 布局与新 BSP 待实施
-- 实物版本（V1/V2/V3/V4）未确认；V1 与 V2-V4 的 I2C/扩展 IO 映射不同
-- 不要假设 GPIO/引脚；以对应版本原理图和官方 `06_LVGL_Porting` 示例为准
+- 尚未接真实 LCD/触摸/背光；480×480 布局与 V4 BSP 待实施
+- 实物为 V4.0；旧版 V1 的 I2C/TCA9554 映射不适用
+- 不要假设 GPIO/引脚；以 V4 原理图、官方 `06_lvgl_demo_v8` 和 BSP 组件为准
 
 ## 开发顺序：BSP First
 
-1. 确认实物版本与屏幕方向。
-2. 依据对应版本原理图实现板级 BSP：RGB LCD、GT911、TCA9554、背光。
-3. 先点亮屏幕并验证颜色/方向/触摸坐标，再改 UI。
+1. 优先接入官方 BSP `waveshare/esp32_s3_touch_lcd_4 ^3.0.0`，确认其 LVGL 8.4 / ESP-IDF 5.4.4 兼容性。
+2. 用 BSP 完成 LCD 点亮、颜色/方向、GT911 触摸坐标、CH32V003 背光/复位。
+3. 将 BSP 封装进现有 `espui_board_hal_t`，保持 Theme/UI Core 不变。
 4. 将布局从 320×480 竖屏适配为 480×480 方形。
 5. 最后接 Wi-Fi、mDNS、配对、WSS 和 Client Protocol（E4）。
 
@@ -67,7 +69,7 @@ firmware/terminal/
 ### E1：基础 UI Runtime
 
 - ESP-IDF 工程初始化、LVGL 接入点
-- ESP32-S3-Touch-LCD-4 板级 BSP：RGB LCD、GT911、TCA9554、背光
+- ESP32-S3-Touch-LCD-4 V4 板级 BSP：优先官方组件；RGB LCD、GT911、CH32V003 背光/复位
 - HAL 接口：display/touch/encoder/button/power（真实 BSP + headless stub）
 - UI Task + 事件队列（网络回调不能直接操作 LVGL）
 - Theme Registry + 内置安全主题
