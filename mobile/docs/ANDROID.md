@@ -9,6 +9,7 @@
 | 组件 | 版本 |
 |---|---|
 | Capacitor Core / CLI / Android | 7.6.10 |
+| @capacitor/network | 7.0.4 |
 | Java | OpenJDK 21.0.13 |
 | Android SDK Platform | android-35 |
 | Android Build Tools | 35.0.0 |
@@ -127,8 +128,8 @@ sdkVersion:'23'
 targetSdkVersion:'35'
 application-label:'MeetAgent Mobile'
 APK: mobile/android/app/build/outputs/apk/debug/app-debug.apk
-大小: 4,230,914 bytes（约 4.1 MB）
-SHA-256: b8fbdc243d45251c0e98e542282e9e1e23b12aa0e2f289bfa1c9d93195cceec4
+大小: 4,260,002 bytes（约 4.1 MB）
+SHA-256: bbc8f06e16451080ef8469d98e4f0b153a08a0e95b1ddeaf185111e183b4bd27
 ```
 
 ## 5. Gradle 网络问题
@@ -164,7 +165,7 @@ touch "$DIST/gradle-8.11.1-all.zip.ok"
 - Android 的 network security config 不能直接表达 CIDR；debug 采用全局允许明文，正式包必须改回 HTTPS/WSS，不能把该配置带入 release。
 - Token 当前仍存在 WebView localStorage；Capacitor 正式版应迁移到 Android Keystore（通过自定义插件或安全存储插件）。
 
-## 7. 真机验证（2026-11-06）
+## 7. 真机验证（2026-11-08）
 
 设备与网络：
 
@@ -175,28 +176,37 @@ touch "$DIST/gradle-8.11.1-all.zip.ok"
 
 结果：
 
-- 配对成功，Home 展示真实 Node `developer-machine` 与 41 个 Session
+- 配对成功（Token 自动重连），Home 展示真实 Node `developer-machine` 与 41 个 Session
 - Sessions 列表与测试 Session `ses_e5a1c7989ffefcU1XdrTiq6WXX` 详情正常打开
 - 在测试 Session 发送 Prompt，收到真实 Agent 回复，Session 状态 `running → idle`
+- Interrupt：发送较慢任务后中断，状态回到 `idle`，UI 无卡死，时间线记录 `running → idle`
+- 权限审批：读取 `.env` 触发真实 `permission.requested`，点击「允许一次」后返回 `OK-1794118574`；时间线仅一条「审批完成 · 决策 once」，pending 卡片消失
+- 断网/恢复：关闭 Wi-Fi/数据并停止 Tailscale 后显示「网络离线：已暂停 Node 自动重连」；恢复网络与 Tailscale 后自动重连，Snapshot 恢复（序号 710）
+- logcat：修复后未出现 Capacitor JS Console 异常、CORS 或 mixed-content 错误
 - 未向主会话 `ses_e5e6e776fffeeeCdeah5WtPEhJ` 发送任何 Prompt
 - 真机截图：`/tmp/opencode/meetagent-mobile-android/`
   - `06-home-real.png`
   - `07-sessions-real.png`
   - `08-target-session-real.png`
-  - `11-prompt-response.png`
+  - `24-running-before-interrupt.png`
+  - `25-after-interrupt.png`
+  - `30-permission-pending.png`
+  - `32-permission-approved.png`
+  - `41-offline-verified.png`
+  - `42-recovered-verified.png`
 
 真机修复：
 
-- 旧版 Android WebView（Chrome < 119）没有 `Promise.withResolvers`，点击连接时报：
-  `E/Capacitor/Console ... TypeError: Promise.withResolvers is not a function`
-- 已在 `src/main.ts` 增加运行时 polyfill，重新 `npm run build` / `cap sync` / `assembleDebug` / `adb install -r` 后连接成功
-- 修复后 logcat 无 Capacitor JS Console 异常
+1. 旧版 Android WebView（Chrome < 119）没有 `Promise.withResolvers`，点击连接时报：
+   `E/Capacitor/Console ... TypeError: Promise.withResolvers is not a function`
+   已在 `src/main.ts` 增加运行时 polyfill。
+2. WebView 的 `navigator.onLine` 在 Tailscale VPN 残留时不可靠，断网后仍为 `true`。
+   已接入 `@capacitor/network@7.0.4`，使用原生 `networkStatusChange` + 4 秒轮询刷新；离线时暂停重连，恢复后立即重连。
 
 未在真机验证：
 
-- Interrupt、权限审批、断网恢复
-- 切换 Wi-Fi / Tailscale 网络
-- Release 签名、系统通知、Keystore
+- Wi-Fi / 蜂窝 / Tailscale 网络之间的切换时延
+- Release 签名、系统通知、Keystore、后台保活
 
 ## 8. 签名与发布
 
@@ -220,8 +230,8 @@ keytool -genkeypair -v \
 
 ## 9. 本机未验证
 
-- 已安装 Debug APK 并完成配对/Prompt 真机验证；未验证 Interrupt、审批、断网恢复。
+- 已安装 Debug APK 并完成配对、Prompt、Interrupt、权限审批、断网恢复真机验证。
 - 未构建 Release APK，未配置发布签名。
 - 未验证 Android Keystore、系统通知、FCM、后台保活。
-- 未验证 Tailscale Android 客户端在 Wi-Fi/蜂窝之间的实际切换。
+- 未验证 Wi-Fi / 蜂窝 / Tailscale 之间的实际切换时延。
 - 未在 iOS 上打包或运行。

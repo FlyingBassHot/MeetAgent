@@ -1,20 +1,23 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
+import {
+  initNetworkStatus,
+  isNetworkOnline,
+  subscribeNetwork,
+} from '@/services/connectivity/networkStatus';
 
 export const useNetworkStore = defineStore('network', () => {
-  const online = ref(typeof navigator === 'undefined' ? true : navigator.onLine);
+  const online = ref(isNetworkOnline());
   let initialized = false;
 
-  function sync(): void {
-    online.value = navigator.onLine;
-  }
-
-  function init(): void {
+  async function init(): Promise<void> {
     if (initialized) return;
     initialized = true;
-    window.addEventListener('online', sync);
-    window.addEventListener('offline', sync);
-    sync();
+    await initNetworkStatus();
+    online.value = isNetworkOnline();
+    subscribeNetwork((next) => {
+      online.value = next;
+    });
   }
 
   return { online, init };

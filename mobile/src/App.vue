@@ -8,8 +8,8 @@ import { useNetworkStore } from '@/stores/network';
 const connection = useConnectionStore();
 const network = useNetworkStore();
 
-onMounted(() => {
-  network.init();
+onMounted(async () => {
+  await network.init();
   connection.bootstrap();
 });
 </script>

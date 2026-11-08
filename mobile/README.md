@@ -185,11 +185,19 @@ ClientTransport
 - `npm run build && npx cap add android && npx cap sync android`
 - JDK 21 + Android SDK 35 + Gradle 8.11.1 + AGP 8.7.2 执行 `./gradlew assembleDebug`
 - `BUILD SUCCESSFUL`，Debug APK：`android/app/build/outputs/apk/debug/app-debug.apk`
-  - 大小 **4,230,914 bytes（约 4.1 MB）**
-  - SHA-256 `b8fbdc243d45251c0e98e542282e9e1e23b12aa0e2f289bfa1c9d93195cceec4`
+  - 大小 **4,260,002 bytes（约 4.1 MB）**
+  - SHA-256 `bbc8f06e16451080ef8469d98e4f0b153a08a0e95b1ddeaf185111e183b4bd27`
 - APK `assets/capacitor.config.json` 已确认包含 `"androidScheme": "http"`、`"cleartext": true`
-- 真机（HBN-AL00 / USB）安装验证：配对真实 Node `http://100.69.235.2:8787` 成功，Home 恢复 41 个 Session；测试 Session `ses_e5a1c7989ffefcU1XdrTiq6WXX` 发送 Prompt 并收到真实回复，状态 `running → idle`；未触碰主会话
-- 真机修复：旧 WebView 缺少 `Promise.withResolvers`，已在 `src/main.ts` 增加 polyfill，重新打包安装后连接成功
+- 真机（HBN-AL00 / USB）验证：
+  - 配对真实 Node `http://100.69.235.2:8787`，Home 恢复 41 个 Session
+  - 测试 Session `ses_e5a1c7989ffefcU1XdrTiq6WXX` Prompt 与较慢任务正常
+  - Interrupt 后状态 `running → idle`，UI 无卡死
+  - 真实 permission 请求「允许一次」后返回 secret，pending 消失，仅一条审批完成事件
+  - 关闭 Wi-Fi/数据 + 停止 Tailscale 后显示「网络离线」，恢复后自动重连并恢复 Snapshot
+  - 未触碰主会话 `ses_e5e6e776fffeeeCdeah5WtPEhJ`
+- 真机修复：
+  - 旧 WebView 缺少 `Promise.withResolvers`，已在 `src/main.ts` 增加 polyfill
+  - WebView `navigator.onLine` 在 Tailscale VPN 残留时不可靠，已接入 `@capacitor/network@7.0.4`（原生事件 + 4 秒轮询）
 - aapt 检查：`package=com.flyingbasshot.meetagent`、`versionCode=1`、`versionName=1.0`、`minSdk=23`、`targetSdk=35`
 - Debug 专用明文配置：`android/app/src/debug/AndroidManifest.xml` + `network_security_config.xml`，允许 LAN / Tailscale `100.64.0.0/10` 的 HTTP/WS 调试
 - `.gitignore` 已忽略 `local.properties`、`.gradle/`、`build/`、`app/build/` 与 APK
@@ -272,7 +280,12 @@ M5b 真机截图位于 `/tmp/opencode/meetagent-mobile-android/`：
 - `06-home-real.png`（真实 Node Home）
 - `07-sessions-real.png`（41 个 Session）
 - `08-target-session-real.png`（测试 Session 详情）
-- `11-prompt-response.png`（Prompt 回复与状态回传）
+- `24-running-before-interrupt.png`
+- `25-after-interrupt.png`
+- `30-permission-pending.png`
+- `32-permission-approved.png`
+- `41-offline-verified.png`
+- `42-recovered-verified.png`
 
 ## 已知限制
 
@@ -282,7 +295,7 @@ M5b 真机截图位于 `/tmp/opencode/meetagent-mobile-android/`：
 - Web Locks 不可用的环境退化为允许连接；Capacitor 单 WebView 场景不受影响。
 - 自签证书只用于本机测试；正式远程部署需使用受信任 CA 或 Tailscale 证书。浏览器不会向页面暴露证书细节，UI 只能给出通用信任提示。
 - Android Debug 包允许明文 HTTP/WS，仅用于 LAN / Tailscale 开发；Release 包必须使用 HTTPS/WSS。
-- Android 真机已验证配对与 Prompt；Interrupt、审批、断网恢复、网络切换尚未在真机验证；未配置 Release 签名与 iOS 工程。
+- Android 真机已验证配对、Prompt、Interrupt、权限审批与断网恢复；Wi-Fi/蜂窝/Tailscale 切换时延、Release 签名与 iOS 尚未验证。
 - 开发模式使用 Vite HMR 时，长时间断网可能让开发服务器连接丢失并触发页面重载；生产构建与 Capacitor 不受此影响。
 - 真实 Node 需要允许 `http://localhost:5174` / `http://localhost:4173` 的 CORS 来源；WSS 证书需浏览器信任。
 - 浏览器通知依赖用户授权；部分移动浏览器要求 Service Worker 才能展示系统通知。

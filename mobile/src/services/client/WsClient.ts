@@ -18,6 +18,7 @@ import type {
   TransportListener,
 } from './types';
 import { toWebSocketUrl } from '@/services/storage/preferences';
+import { isNetworkOnline, subscribeNetwork } from '@/services/connectivity/networkStatus';
 
 const COMMAND_TIMEOUT_MS = 15_000;
 const AUTH_TIMEOUT_MS = 10_000;
@@ -66,7 +67,7 @@ export class WsClient implements ClientTransport {
   private heartbeatTimer: number | null = null;
   private beatNonce = '';
   private beatSentAt = 0;
-  private networkBound = false;
+  private networkUnsubscribe: (() => void) | null = null;
   private offlineSuspended = false;
 
   private readonly handleNetworkOffline = (): void => {
@@ -101,7 +102,7 @@ export class WsClient implements ClientTransport {
     this.attempt = 0;
     this.intentionalClose = false;
     this.bindNetwork();
-    if (!navigator.onLine) {
+    if (!isNetworkOnline()) {
       this.offlineSuspended = true;
       this.setPhase('offline', '网络离线');
       return;
@@ -171,7 +172,7 @@ export class WsClient implements ClientTransport {
   private openSocket(): void {
     const config = this.config;
     if (!config || this.intentionalClose) return;
-    if (this.offlineSuspended || !navigator.onLine) {
+    if (this.offlineSuspended || !isNetworkOnline()) {
       this.offlineSuspended = true;
       this.setPhase('offline', '网络离线');
       return;
@@ -218,7 +219,7 @@ export class WsClient implements ClientTransport {
       this.clearHandshakeTimers();
       this.rejectPending(new Error('连接已断开'));
       if (this.intentionalClose) return;
-      if (!navigator.onLine) {
+      if (!isNetworkOnline()) {
         this.offlineSuspended = true;
         this.setPhase('offline', '网络离线');
         return;
@@ -371,7 +372,7 @@ export class WsClient implements ClientTransport {
 
   private scheduleReconnect(detail: string): void {
     if (this.intentionalClose) return;
-    if (!navigator.onLine || this.offlineSuspended) {
+    if (!isNetworkOnline() || this.offlineSuspended) {
       this.offlineSuspended = true;
       this.setPhase('offline', '网络离线');
       return;
@@ -435,17 +436,20 @@ export class WsClient implements ClientTransport {
   }
 
   private bindNetwork(): void {
-    if (this.networkBound) return;
-    window.addEventListener('offline', this.handleNetworkOffline);
-    window.addEventListener('online', this.handleNetworkOnline);
-    this.networkBound = true;
+    if (this.networkUnsubscribe) return;
+    this.networkUnsubscribe = subscribeNetwork((online) => {
+      if (online) {
+        this.handleNetworkOnline();
+        return;
+      }
+      this.handleNetworkOffline();
+    });
   }
 
   private unbindNetwork(): void {
-    if (!this.networkBound) return;
-    window.removeEventListener('offline', this.handleNetworkOffline);
-    window.removeEventListener('online', this.handleNetworkOnline);
-    this.networkBound = false;
+    if (!this.networkUnsubscribe) return;
+    this.networkUnsubscribe();
+    this.networkUnsubscribe = null;
   }
 
   private rejectPending(error: Error): void {
