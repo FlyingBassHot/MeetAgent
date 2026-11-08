@@ -11,10 +11,12 @@ withDefaults(
 <template>
   <div class="skeleton" aria-busy="true" aria-label="正在加载">
     <div v-if="status" class="skeleton__status shimmer" />
-    <div v-for="row in rows" :key="row" class="skeleton__row">
-      <span class="skeleton__line skeleton__line--title shimmer" />
-      <span class="skeleton__line skeleton__line--meta shimmer" />
-      <span class="skeleton__line skeleton__line--wide shimmer" />
+    <div class="skeleton__surface">
+      <div v-for="row in rows" :key="row" class="skeleton__row">
+        <span class="skeleton__line skeleton__line--title shimmer" />
+        <span class="skeleton__line skeleton__line--meta shimmer" />
+        <span class="skeleton__line skeleton__line--wide shimmer" />
+      </div>
     </div>
   </div>
 </template>
@@ -23,24 +25,33 @@ withDefaults(
 .skeleton {
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: 12px;
 }
 
 .skeleton__status {
-  width: 68%;
-  height: 14px;
-  margin-bottom: 3px;
-  border-radius: 7px;
+  width: 58%;
+  height: 16px;
+  margin-bottom: 2px;
+  border-radius: 8px;
+}
+
+.skeleton__surface {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
 }
 
 .skeleton__row {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 14px;
-  border: 1px solid var(--border);
-  border-radius: 13px;
-  background: var(--surface);
+  min-height: 66px;
+  padding: 13px 15px;
+}
+
+.skeleton__row + .skeleton__row {
+  border-top: 1px solid var(--border);
 }
 
 .skeleton__line {
@@ -54,11 +65,11 @@ withDefaults(
 }
 
 .skeleton__line--meta {
-  width: 28%;
+  width: 27%;
 }
 
 .skeleton__line--wide {
-  width: 76%;
+  width: 74%;
 }
 
 .shimmer {
@@ -75,12 +86,6 @@ withDefaults(
 @keyframes skeleton-shimmer {
   to {
     background-position: -220% 0;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .shimmer {
-    animation: none;
   }
 }
 </style>

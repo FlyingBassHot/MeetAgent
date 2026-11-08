@@ -72,6 +72,21 @@ const groups = computed(() => groupEventsByDay(visibleEvents.value));
 const activeFilterLabel = computed(
   () => filters.value.find((item) => item.key === filter.value)?.label ?? '重要事件',
 );
+const emptyState = computed(() => {
+  if (nodeStore.recentEvents.length === 0) {
+    return { title: '暂无动态', description: '新的会话、审批与 Agent 事件会出现在这里。' };
+  }
+  if (filter.value === 'important') {
+    return {
+      title: '暂无重要动态',
+      description: '运行状态、审批与异常事件会显示在这里。',
+    };
+  }
+  return {
+    title: '无匹配事件',
+    description: '当前筛选范围没有事件，试试其他筛选条件。',
+  };
+});
 
 function selectFilter(next: ActivityFilter): void {
   filter.value = next;
@@ -125,13 +140,16 @@ function respond(permissionId: string, decision: PermissionDecision): void {
       <span class="muted">{{ visibleEvents.length }} 条</span>
     </div>
 
-    <div v-if="groups.length === 0" class="card card--pad">
-      <EmptyState title="暂无动态" description="新的会话、审批与 Agent 事件会出现在这里。" />
-    </div>
+    <EmptyState
+      v-if="groups.length === 0"
+      :title="emptyState.title"
+      :description="emptyState.description"
+      mark=">_"
+    />
     <template v-else>
       <section v-for="group in groups" :key="group.key" class="activity__group">
         <h2 class="activity__day">{{ group.label }}</h2>
-        <div class="list">
+        <div class="list list--surface activity__events">
           <EventRow
             v-for="event in group.events"
             :key="event.event_id"

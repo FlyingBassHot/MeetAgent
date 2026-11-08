@@ -94,7 +94,7 @@ function onPageEntered(): void {
 
 <style scoped>
 .network-banner {
-  margin: 12px 16px 0;
+  margin: 12px 20px 0;
   padding: 10px 12px;
   border: 1px solid rgba(244, 119, 119, 0.3);
   border-radius: var(--radius-sm);

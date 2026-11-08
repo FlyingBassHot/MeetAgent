@@ -1,32 +1,45 @@
 .activity {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
 }
 
 .activity__filter {
-  min-height: 32px;
-  padding: 0 10px;
+  min-height: 44px;
+  padding: 0 13px;
   border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: 12px;
   background: transparent;
   color: var(--muted);
   font-size: 12px;
   cursor: pointer;
 }
 
+.activity__filter:active {
+  opacity: 1;
+  background: var(--surface-2);
+}
+
 .activity__filter--active {
-  border-color: var(--accent);
+  border-color: rgba(95, 157, 255, 0.4);
+  background: var(--accent-soft);
   color: var(--accent-strong);
 }
 
 .activity__current {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
+  gap: 12px;
   padding: 0 2px;
   color: var(--fg);
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 560;
+}
+
+.activity__current .muted {
+  font-size: 11px;
+  font-weight: 400;
 }
 
 .activity__group {
@@ -36,11 +49,31 @@
 }
 
 .activity__day {
-  padding: 2px 2px 0;
+  position: sticky;
+  top: calc(58px + 6px);
+  z-index: 3;
+  margin: 0 -20px;
+  padding: 8px 20px;
+  background: rgba(9, 11, 14, 0.94);
+  backdrop-filter: blur(14px);
   color: var(--muted);
   font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.02em;
+}
+
+.activity__events :deep(.event) {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.activity__events :deep(.event + .event) {
+  border-top: 1px solid var(--border);
+}
+
+.activity__events :deep(.event__head:hover) {
+  background: var(--surface-2);
 }
 
 .activity__options {
@@ -50,10 +83,10 @@
 }
 
 .activity__option {
-  min-height: 44px;
-  padding: 0 13px;
+  min-height: 52px;
+  padding: 0 14px;
   border: 1px solid transparent;
-  border-radius: 10px;
+  border-radius: 14px;
   background: var(--surface-2);
   color: var(--fg);
   font-size: 14px;
@@ -61,8 +94,13 @@
   cursor: pointer;
 }
 
+.activity__option:active {
+  opacity: 1;
+  background: var(--surface-3);
+}
+
 .activity__option--active {
-  border-color: var(--accent);
+  border-color: rgba(95, 157, 255, 0.4);
   background: var(--accent-soft);
   color: var(--accent-strong);
 }
@@ -70,5 +108,12 @@
 @media (min-width: 900px) {
   .activity {
     max-width: 760px;
+  }
+
+  .activity__day {
+    margin: 0;
+    padding: 8px 0;
+    background: transparent;
+    backdrop-filter: none;
   }
 }

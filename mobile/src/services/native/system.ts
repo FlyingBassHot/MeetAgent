@@ -15,8 +15,8 @@ function pathName(router: Router): string {
 async function configureStatusBar(): Promise<void> {
   await Promise.allSettled([
     StatusBar.setOverlaysWebView({ overlay: false }),
-    StatusBar.setStyle({ style: Style.Light }),
-    StatusBar.setBackgroundColor({ color: '#0b0d10' }),
+    StatusBar.setStyle({ style: Style.Dark }),
+    StatusBar.setBackgroundColor({ color: '#090b0e' }),
   ]);
 }
 

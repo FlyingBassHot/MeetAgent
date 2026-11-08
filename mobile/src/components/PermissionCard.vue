@@ -67,8 +67,9 @@ function respond(decision: PermissionDecision): void {
 .permission {
   display: flex;
   flex-direction: column;
-  gap: 9px;
-  border-color: rgba(240, 180, 90, 0.28);
+  gap: 10px;
+  border-color: rgba(230, 181, 104, 0.18);
+  background: var(--surface);
 }
 
 .permission__head {
@@ -81,33 +82,41 @@ function respond(decision: PermissionDecision): void {
 .permission__title {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
   min-width: 0;
 }
 
 .permission__title strong {
-  font-size: 14px;
+  font-size: 14.5px;
+  font-weight: 580;
   line-height: 1.45;
   overflow-wrap: anywhere;
 }
 
 .permission__kicker {
   color: var(--warning);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 650;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
 }
 
 .permission__meta {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
+  line-height: 1.4;
 }
 
 .permission__actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
+}
+
+@media (max-width: 360px) {
+  .permission__actions {
+    gap: 6px;
+  }
 }
 </style>

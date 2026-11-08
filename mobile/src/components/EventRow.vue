@@ -50,9 +50,12 @@ function toggle(): void {
       @keydown.enter="toggle"
     >
       <span v-if="showTechnical" class="event__seq mono">{{ event.sequence }}</span>
-      <span class="pill" :class="`pill--${eventTone(event.type)}`">{{ label }}</span>
+      <span class="event__kind">
+        <span class="event__dot" :class="`event__dot--${eventTone(event.type)}`" />
+        <span class="event__label">{{ label }}</span>
+      </span>
       <span class="event__summary grow">{{ summary }}</span>
-      <span class="event__time small muted nowrap" :title="formatRelative(event.occurred_at)">
+      <span class="event__time nowrap" :title="formatRelative(event.occurred_at)">
         {{ formatClock(event.occurred_at) }}
       </span>
       <span v-if="showTechnical" class="event__chevron" :class="{ 'event__chevron--open': open }">
@@ -86,22 +89,21 @@ function toggle(): void {
 
 <style scoped>
 .event {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
   overflow: hidden;
+  background: transparent;
 }
 
 .event--open {
-  border-color: var(--border-strong);
+  background: var(--surface-2);
 }
 
 .event__head {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   width: 100%;
-  padding: 9px 11px;
+  min-height: 52px;
+  padding: 10px 14px;
   border: 0;
   background: transparent;
   color: inherit;
@@ -116,10 +118,44 @@ function toggle(): void {
   background: var(--surface-2);
 }
 
+.event__head:active {
+  background: var(--surface-2);
+}
+
 .event__seq {
-  min-width: 34px;
+  min-width: 30px;
   color: var(--faint);
   font-size: 10px;
+}
+
+.event__kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  width: 96px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.event__dot {
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--faint);
+}
+
+.event__dot--success { background: var(--success); }
+.event__dot--warning { background: var(--warning); }
+.event__dot--danger { background: var(--danger); }
+.event__dot--info { background: var(--info); }
+
+.event__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .event__summary {
@@ -127,16 +163,25 @@ function toggle(): void {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--muted);
-  font-size: 12px;
+  color: var(--fg);
+  font-size: 13px;
 }
 
 .event--compact .event__summary {
   white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-height: 1.45;
 }
 
 .event__time {
-  font-size: 10px;
+  flex-shrink: 0;
+  min-width: 42px;
+  color: var(--faint);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 
 .event__chevron {
@@ -151,8 +196,14 @@ function toggle(): void {
 }
 
 .event__details {
-  padding: 2px 12px 12px;
+  padding: 2px 14px 14px;
   border-top: 1px solid var(--border);
+}
+
+.event--compact {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
 }
 
 .event--compact .event__seq,
@@ -161,15 +212,31 @@ function toggle(): void {
 }
 
 .event--compact .event__head {
-  padding: 7px 10px;
+  min-height: 0;
+  padding: 9px 11px;
 }
 
-@media (max-width: 520px) {
+.event--compact .event__kind {
+  width: auto;
+  max-width: 110px;
+}
+
+@media (max-width: 420px) {
+  .event__kind {
+    width: 94px;
+  }
+
+  .event__head {
+    gap: 8px;
+    padding: 10px 12px;
+  }
+
   .event__summary {
     white-space: normal;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
+    line-height: 1.4;
   }
 }
 </style>

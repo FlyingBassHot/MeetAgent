@@ -125,8 +125,6 @@ export function sessionStatusTone(status: string): Tone {
     case 'failed':
     case 'error':
       return 'danger';
-    case 'completed':
-      return 'info';
     default:
       return 'neutral';
   }

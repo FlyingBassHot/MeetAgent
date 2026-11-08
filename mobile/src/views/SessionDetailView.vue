@@ -175,6 +175,7 @@ function respond(permissionId: string, decision: PermissionDecision): void {
       v-else
       title="会话不存在或已被删除"
       description="返回会话列表刷新当前快照。"
+      mark=">_"
     >
       <RouterLink to="/sessions" class="btn btn--sm">返回会话</RouterLink>
     </EmptyState>

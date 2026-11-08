@@ -2,7 +2,7 @@
 
 MeetAgent V2.1 的移动端 Web 原型，由 Capacitor 打包为 Android 应用。
 
-当前进度：P0 UX + **P1 原生交互完成**（Capacitor 7.6.10 + JDK 21 + SDK 35）。
+当前进度：P0 UX + P1 原生交互 + **P2 视觉打磨完成**（Capacitor 7.6.10 + JDK 21 + SDK 35）。
 Web、Mock、局域网 Node、自签 WSS Node 与 Android WebView 共用同一套 `ClientTransport` 与协议类型。
 
 ## 技术栈
@@ -187,8 +187,8 @@ ClientTransport
 - `npm run build && npx cap add android && npx cap sync android`
 - JDK 21 + Android SDK 35 + Gradle 8.11.1 + AGP 8.7.2 执行 `./gradlew assembleDebug`
 - `BUILD SUCCESSFUL`，Debug APK：`android/app/build/outputs/apk/debug/app-debug.apk`
-  - 大小 **4,380,775 bytes（约 4.2 MB）**
-  - SHA-256 `b8fbd8765add0dc7e970b8ae675ee7c4ed70de2f81b2e34eabb069d97af32d87`
+  - 大小 **4,192,802 bytes（约 4.0 MB）**
+  - SHA-256 `adfcc3efd3928c7a46e80e01e3a766235c1668256a72a632bd081fbca1ae3702`
 - APK `assets/capacitor.config.json` 已确认包含 `"androidScheme": "http"`、`"cleartext": true`
 - 真机（HBN-AL00 / USB）验证：
   - 配对真实 Node `http://100.69.235.2:8787`，Home 恢复 41 个 Session
@@ -305,6 +305,75 @@ P1 截图位于 `/tmp/opencode/meetagent-mobile-android/`：
 - `132-p1-offline-pull.png`
 - `133-p1-offline-recovered.png`
 - `134-p1-activity-scroll-before.png` / `135-p1-activity-scroll-after.png`
+
+## P2 视觉打磨
+
+目标：保持深色终端美学与原生 App 感，不改变信息架构。
+
+设计系统：
+
+- 页面标题 29px / 区块标题 15px / 正文 14.5–15px / 辅助 11–12px
+- 页面横向 20px；列表行 66–68px；圆角统一 14–16px
+- 卡片边框降级为分组容器 + 分隔线；列表使用 `surface` 分组
+- 等宽字体仅保留在开发者信息、ID、协议字段和终端符号
+- StatusPill 统一 24px：运行中绿、等待中琥珀、空闲灰、异常红，全部为圆点 + 文案
+- 所有可点击区域 ≥44px；增加 `:focus-visible`、按压态；`prefers-reduced-motion` 全局降级
+
+页面调整：
+
+- Home：3 个轻量状态 chip；活跃会话/最近动态改为分组列表；空状态加入 `$_` / `&gt;_`；最近动态 4 条
+- Sessions：按运行中 / 等待中 / 空闲分组，分组标题 sticky；行高 66px、状态点与标题同排
+- Session 详情：聊天气泡分离、工具卡分层、composer 固定底部；空状态与发送按钮层次调整
+- Activity：按天 sticky 分组，事件行改为“状态点 + 事件标签 + 摘要 + 右对齐时间”；重要事件与无匹配空状态文案区分
+- Settings/Developer/Connect：分组列表分隔线、chevron、开关、输入框聚焦态统一；连接页增加终端标记 hero 与分区表单
+- Sheet：遮罩/入场节奏缩短，安全区与关闭按钮热区修正
+- 图标：按反馈恢复第一版 App 图标；启动背景改为深色并复用第一版图标，不再使用 P2 自绘终端图标
+- StatusBar：修正为深色背景 + 浅色图标（`Style.Dark`）
+
+验证：
+
+```text
+npm run typecheck → 0 错误
+npm run build     → 155 modules, built successfully
+npx cap sync android → 5 plugins
+./gradlew clean assembleDebug → BUILD SUCCESSFUL
+```
+
+```text
+APK: android/app/build/outputs/apk/debug/app-debug.apk
+大小: 4,192,802 bytes
+SHA-256: adfcc3efd3928c7a46e80e01e3a766235c1668256a72a632bd081fbca1ae3702
+```
+
+真机（HBN-AL00）：
+
+- Home / Sessions / 会话详情 / 动态 / 设置 / 开发者 / 连接逐页检查
+- 状态栏浅色图标恢复可见；App 图标确认为第一版图标
+- 360px Web：所有页面 `scrollWidth === innerWidth`，无横向溢出
+- 筛选 Sheet、返回键、刷新等 P1 交互未回归
+- 仅使用测试 Session `ses_e5a1c7989ffefcU1XdrTiq6WXX`；未向主会话发送 Prompt
+
+360px Web 截图：`/tmp/opencode/meetagent-mobile-ux/`
+
+- `p2-home-360.png`
+- `p2-sessions-360.png`
+- `p2-session-detail-360.png`
+- `p2-activity-360.png`
+- `p2-settings-360.png`
+- `p2-developer-360.png`
+- `p2-connect-360.png`
+
+Android 真机截图：`/tmp/opencode/meetagent-mobile-android/`
+
+- `180-p2-home.png`
+- `181-p2-sessions.png`
+- `182-p2-detail.png`
+- `183-p2-activity.png`
+- `184-p2-settings.png`
+- `168-p2-final-developer.png`
+- `170-p2-final-connect.png`
+- `159-p2-app-icon.png`
+- `169-p2-final-filter-sheet.png`
 
 ## 尚未实现（后续里程碑）
 

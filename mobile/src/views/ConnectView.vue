@@ -91,7 +91,10 @@ watch(
 <template>
   <div class="connect">
     <section class="connect__intro">
-      <div class="brand connect__brand">MeetAgent <span>V2.1</span></div>
+      <div class="connect__hero">
+        <span class="connect__mark" aria-hidden="true">&gt;_</span>
+        <div class="brand connect__brand">MeetAgent <span>V2.1</span></div>
+      </div>
       <h1>连接</h1>
       <p class="muted">连接你的 Node，随后即可查看会话、动态并处理审批。</p>
     </section>
@@ -99,13 +102,13 @@ watch(
     <form class="connect__form" @submit.prevent="submit">
       <label class="connect__field">
         <span>Node 地址</span>
-        <input v-model="baseUrl" class="connect__input mono" placeholder="http://192.168.1.10:8787" />
+        <input v-model="baseUrl" class="connect__input" placeholder="http://192.168.1.10:8787" />
       </label>
       <label class="connect__field">
         <span>配对码</span>
         <input
           v-model="pairingCode"
-          class="connect__input mono"
+          class="connect__input connect__input--code"
           inputmode="numeric"
           autocomplete="one-time-code"
           maxlength="6"
@@ -149,7 +152,7 @@ watch(
             <span>已有 Token（可选）</span>
             <input
               v-model="token"
-              class="connect__input mono"
+              class="connect__input"
               type="password"
               autocomplete="off"
               placeholder="已配对 Token"

@@ -31,7 +31,7 @@ const pendingViews = computed(() =>
   })),
 );
 const recentEvents = computed(() =>
-  nodeStore.recentEvents.filter(isImportantEvent).slice(0, 5),
+  nodeStore.recentEvents.filter(isImportantEvent).slice(0, 4),
 );
 const loading = computed(() => !nodeStore.hasSnapshot && connection.isBusy);
 
@@ -53,14 +53,29 @@ function respond(permissionId: string, decision: PermissionDecision): void {
       事件序号不连续，请在设置中重新连接以刷新。
     </div>
 
-    <p class="home__status">
-      <strong>{{ onlineAgents }}</strong> 个 Agent ·
-      <strong>{{ nodeStore.runningSessions.length }}</strong> 个运行中 ·
-      <strong :class="{ 'home__alert': nodeStore.pendingPermissions.length > 0 }">
-        {{ nodeStore.pendingPermissions.length }}
-      </strong>
-      个待审批
-    </p>
+    <div class="home__chips" aria-label="运行概览">
+      <span class="home__chip">
+        <span class="home__chip-dot home__chip-dot--accent" />
+        <strong>{{ onlineAgents }}</strong>
+        <span>Agent</span>
+      </span>
+      <span class="home__chip">
+        <span
+          class="home__chip-dot"
+          :class="{ 'home__chip-dot--success': nodeStore.runningSessions.length > 0 }"
+        />
+        <strong>{{ nodeStore.runningSessions.length }}</strong>
+        <span>运行中</span>
+      </span>
+      <span class="home__chip" :class="{ 'home__chip--alert': nodeStore.pendingPermissions.length > 0 }">
+        <span
+          class="home__chip-dot"
+          :class="{ 'home__chip-dot--warning': nodeStore.pendingPermissions.length > 0 }"
+        />
+        <strong>{{ nodeStore.pendingPermissions.length }}</strong>
+        <span>待审批</span>
+      </span>
+    </div>
 
     <section v-if="pendingViews.length > 0" class="section">
       <div class="section__head">
@@ -85,8 +100,11 @@ function respond(permissionId: string, decision: PermissionDecision): void {
         <h2>活跃会话</h2>
         <RouterLink to="/sessions">查看全部</RouterLink>
       </div>
-      <div v-if="activeSessions.length === 0" class="home__empty">当前没有运行中的会话</div>
-      <div v-else class="list">
+      <div v-if="activeSessions.length === 0" class="home__empty">
+        <span class="home__empty-mark" aria-hidden="true">$_</span>
+        <span>当前没有运行中的会话</span>
+      </div>
+      <div v-else class="list list--surface home__sessions">
         <SessionCard
           v-for="session in activeSessions"
           :key="session.session_id"
@@ -102,8 +120,11 @@ function respond(permissionId: string, decision: PermissionDecision): void {
         <h2>最近动态</h2>
         <RouterLink to="/activity">查看全部</RouterLink>
       </div>
-      <div v-if="recentEvents.length === 0" class="home__empty">暂无动态</div>
-      <div v-else class="list">
+      <div v-if="recentEvents.length === 0" class="home__empty">
+        <span class="home__empty-mark" aria-hidden="true">&gt;_</span>
+        <span>暂无动态</span>
+      </div>
+      <div v-else class="list list--surface home__events">
         <EventRow
           v-for="event in recentEvents"
           :key="event.event_id"

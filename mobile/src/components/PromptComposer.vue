@@ -37,7 +37,7 @@ function submit(): void {
       class="composer__input"
       :disabled="disabled || busy"
       placeholder="输入消息…"
-      rows="2"
+      rows="1"
       aria-label="Prompt"
       @keydown.ctrl.enter.prevent="submit"
       @keydown.meta.enter.prevent="submit"
@@ -58,22 +58,29 @@ function submit(): void {
 .composer {
   display: flex;
   align-items: flex-end;
-  gap: 8px;
-  padding: 8px;
+  gap: 6px;
+  padding: 6px;
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: 16px;
   background: var(--surface);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.composer:focus-within {
+  border-color: rgba(95, 157, 255, 0.55);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 .composer__input {
   flex: 1;
-  min-height: 40px;
+  min-height: 44px;
   max-height: 140px;
-  padding: 9px 10px;
+  padding: 10px 10px;
   border: 0;
   background: transparent;
   color: var(--fg);
   font: inherit;
+  font-size: 14.5px;
   resize: none;
   outline: none;
 }
@@ -83,19 +90,26 @@ function submit(): void {
 }
 
 .composer__send {
-  min-height: 38px;
-  padding: 0 15px;
+  min-height: 44px;
+  padding: 0 16px;
   border: 0;
-  border-radius: 13px;
-  background: var(--accent);
+  border-radius: 12px;
+  background: linear-gradient(180deg, var(--accent-1), var(--accent-2));
   color: var(--on-accent);
   font-size: 13px;
   font-weight: 650;
   cursor: pointer;
+  transition: opacity 0.14s ease, filter 0.14s ease;
+}
+
+.composer__send:active:not(:disabled) {
+  filter: brightness(0.94);
 }
 
 .composer__send:disabled {
-  opacity: 0.4;
+  background: var(--surface-3);
+  color: var(--faint);
+  opacity: 1;
   cursor: not-allowed;
 }
 </style>

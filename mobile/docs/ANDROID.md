@@ -138,8 +138,8 @@ sdkVersion:'23'
 targetSdkVersion:'35'
 application-label:'MeetAgent Mobile'
 APK: mobile/android/app/build/outputs/apk/debug/app-debug.apk
-大小: 4,380,775 bytes（约 4.2 MB）
-SHA-256: b8fbd8765add0dc7e970b8ae675ee7c4ed70de2f81b2e34eabb069d97af32d87
+大小: 4,192,802 bytes（约 4.0 MB）
+SHA-256: adfcc3efd3928c7a46e80e01e3a766235c1668256a72a632bd081fbca1ae3702
 ```
 
 ## 5. Gradle 网络问题
@@ -275,7 +275,52 @@ P0 UX 真机检查（2026-11-08）：
 - `133-p1-offline-recovered.png`
 - `134-p1-activity-scroll-before.png` / `135-p1-activity-scroll-after.png`
 
-## 9. 签名与发布
+## 9. P2 视觉打磨真机验证（2026-11-08）
+
+设计结果：
+
+- 页面标题 29px、区块标题 15px、正文 14.5–15px、辅助 11–12px
+- 横向 20px；Session/设置行 60–68px；卡片圆角 14–16px
+- StatusPill 统一 24px 圆点样式：运行中绿、等待中琥珀、空闲灰、异常红
+- Home 3 个状态 chip；Sessions 分组 sticky；Activity 事件行点 + 标签 + 摘要 + 右对齐时间
+- 连接页 hero/表单层级；设置/开发者开关、chevron、输入框聚焦态统一
+- 所有点击区域 ≥44px；`prefers-reduced-motion` 全局降级；360px 无横向溢出
+- 状态栏修正为 `Style.Dark`（深色背景 + 浅色图标）
+- App 图标按反馈恢复第一版；启动背景使用深色并复用第一版图标
+
+构建：
+
+```text
+npm run typecheck → 0 错误
+npm run build → 155 modules, built successfully
+npx cap sync android → 5 plugins
+./gradlew clean assembleDebug → BUILD SUCCESSFUL
+APK: 4,192,802 bytes
+SHA-256: adfcc3efd3928c7a46e80e01e3a766235c1668256a72a632bd081fbca1ae3702
+```
+
+真机检查：
+
+- 逐页检查 Home / Sessions / 详情 / 动态 / 设置 / 开发者 / 连接
+- 状态栏浅色图标可见；App 图标为第一版
+- 筛选 Sheet、返回键、P1 下拉刷新与键盘路径未回归
+- 仅使用测试 Session `ses_e5a1c7989ffefcU1XdrTiq6WXX`
+
+截图：
+
+- Web 360px：`/tmp/opencode/meetagent-mobile-ux/p2-*-360.png`
+- Android：`/tmp/opencode/meetagent-mobile-android/`
+  - `180-p2-home.png`
+  - `181-p2-sessions.png`
+  - `182-p2-detail.png`
+  - `183-p2-activity.png`
+  - `184-p2-settings.png`
+  - `168-p2-final-developer.png`
+  - `170-p2-final-connect.png`
+  - `159-p2-app-icon.png`
+  - `169-p2-final-filter-sheet.png`
+
+## 10. 签名与发布
 
 - Debug APK 使用 Android debug keystore，仅用于内部测试，不能发布。
 - Release 需要独立 keystore：
@@ -295,7 +340,7 @@ keytool -genkeypair -v \
   - 关闭 debug 的 cleartext 配置；
   - 在真机或 Firebase Test Lab 上跑安装与连接冒烟。
 
-## 10. 本机未验证
+## 11. 本机未验证
 
 - 已完成 Debug APK 安装、连接、Prompt、Interrupt、权限审批与 P1 原生交互真机验证。
 - 未构建 Release APK，未配置发布签名。

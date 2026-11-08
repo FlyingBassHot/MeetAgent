@@ -51,6 +51,28 @@ const visibleSessions = computed(() => {
     });
 });
 
+const groups = computed(() =>
+  [
+    {
+      key: 'running',
+      label: '运行中',
+      sessions: visibleSessions.value.filter((session) => session.status === 'running'),
+    },
+    {
+      key: 'waiting',
+      label: '等待中',
+      sessions: visibleSessions.value.filter((session) => session.status === 'waiting'),
+    },
+    {
+      key: 'idle',
+      label: '空闲 / 已完成',
+      sessions: visibleSessions.value.filter(
+        (session) => session.status !== 'running' && session.status !== 'waiting',
+      ),
+    },
+  ].filter((group) => group.sessions.length > 0),
+);
+
 function selectFilter(next: SessionFilter): void {
   filter.value = next;
   filterOpen.value = false;
@@ -86,18 +108,29 @@ function selectFilter(next: SessionFilter): void {
       aria-label="搜索会话"
     />
 
-    <div v-if="visibleSessions.length === 0" class="card card--pad">
-      <EmptyState title="没有匹配的会话" description="调整搜索或筛选条件后重试。" />
-    </div>
-    <div v-else class="sessions__list">
-      <SessionCard
-        v-for="session in visibleSessions"
-        :key="session.session_id"
-        :session="session"
-        :agent-name="nodeStore.agentById[session.agent_id]?.name"
-        :pending-count="nodeStore.pendingFor(session.session_id).length"
-      />
-    </div>
+    <EmptyState
+      v-if="visibleSessions.length === 0"
+      title="没有匹配的会话"
+      description="调整搜索或筛选条件后重试。"
+      mark=">_"
+    />
+    <template v-else>
+      <section v-for="group in groups" :key="group.key" class="sessions__group">
+        <h2 class="sessions__group-title">
+          <span>{{ group.label }}</span>
+          <span>{{ group.sessions.length }}</span>
+        </h2>
+        <div class="sessions__group-list list--surface">
+          <SessionCard
+            v-for="session in group.sessions"
+            :key="session.session_id"
+            :session="session"
+            :agent-name="nodeStore.agentById[session.agent_id]?.name"
+            :pending-count="nodeStore.pendingFor(session.session_id).length"
+          />
+        </div>
+      </section>
+    </template>
     </template>
 
     <BottomSheet :open="filterOpen" title="筛选会话" @close="filterOpen = false">

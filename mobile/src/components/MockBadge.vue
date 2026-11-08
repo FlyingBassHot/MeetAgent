@@ -4,7 +4,7 @@
 
 <style scoped>
 .mock-badge {
-  letter-spacing: 0.05em;
-  font-size: 10px;
+  letter-spacing: 0.04em;
+  font-size: 11px;
 }
 </style>

@@ -44,6 +44,7 @@ const items = computed<ChatItem[]>(() => {
 
 <template>
   <div v-if="items.length === 0" class="empty">
+    <span class="empty__mark" aria-hidden="true">$_</span>
     <strong>还没有会话内容</strong>
     <span class="small">发送消息后，消息和工具调用会出现在这里。</span>
   </div>
@@ -85,35 +86,38 @@ const items = computed<ChatItem[]>(() => {
 .timeline {
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: 12px;
 }
 
 .message {
-  padding: 11px 13px;
+  align-self: flex-start;
+  max-width: 92%;
+  padding: 12px 14px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: linear-gradient(180deg, rgba(28, 36, 48, 0.75), rgba(17, 21, 27, 0.9));
+  border-radius: 6px 18px 18px 18px;
+  background: var(--surface);
 }
 
 .prompt-bubble {
   align-self: flex-end;
-  max-width: 86%;
-  padding: 10px 13px;
-  border-radius: 16px 16px 4px 16px;
+  max-width: 82%;
+  padding: 11px 14px;
+  border: 1px solid rgba(95, 157, 255, 0.16);
+  border-radius: 18px 18px 6px 18px;
   background: var(--accent-soft);
   color: var(--fg);
 }
 
 .prompt-bubble p {
-  font-size: 14px;
-  line-height: 1.55;
+  font-size: 14.5px;
+  line-height: 1.58;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
 .prompt-bubble span {
   display: block;
-  margin-top: 3px;
+  margin-top: 4px;
   text-align: right;
   font-size: 10px;
 }
@@ -122,7 +126,7 @@ const items = computed<ChatItem[]>(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 5px;
+  margin-bottom: 6px;
 }
 
 .message__who {
@@ -132,9 +136,20 @@ const items = computed<ChatItem[]>(() => {
 }
 
 .message__text {
-  font-size: 14px;
-  line-height: 1.62;
+  font-size: 14.5px;
+  line-height: 1.65;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.message .pill {
+  margin-left: auto;
+}
+
+@media (max-width: 360px) {
+  .message,
+  .prompt-bubble {
+    max-width: 94%;
+  }
 }
 </style>

@@ -2,8 +2,8 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  min-height: calc(100dvh - 190px);
+  gap: 14px;
+  min-height: calc(100dvh - 174px);
   padding-bottom: 4px;
 }
 
@@ -11,8 +11,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 42px;
-  margin: -4px -4px 2px;
+  min-height: 48px;
+  margin: -6px -4px 0;
 }
 
 .detail-nav__button {
@@ -20,13 +20,13 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   border: 0;
   border-radius: 50%;
   background: transparent;
   color: var(--fg);
-  font-size: 24px;
+  font-size: 25px;
   line-height: 1;
   text-decoration: none;
   cursor: pointer;
@@ -34,6 +34,11 @@
 
 .detail-nav__button:hover {
   background: var(--surface-2);
+}
+
+.detail-nav__button:active {
+  opacity: 1;
+  background: var(--surface-3);
 }
 
 .detail-nav__title {
@@ -44,6 +49,7 @@
   white-space: nowrap;
   font-size: 16px;
   font-weight: 620;
+  letter-spacing: -0.01em;
 }
 
 .session__permissions {
@@ -60,14 +66,14 @@
   position: sticky;
   bottom: calc(72px + env(safe-area-inset-bottom));
   z-index: 5;
-  margin-top: 4px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  margin-top: auto;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.4);
 }
 
 @media (min-width: 900px) {
   .session {
     max-width: 760px;
-    min-height: calc(100dvh - 130px);
+    min-height: calc(100dvh - 132px);
   }
 
   .session:not(.session--empty) > .composer {

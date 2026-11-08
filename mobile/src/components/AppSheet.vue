@@ -95,14 +95,19 @@ useSheetLayer(
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
   border: 0;
   border-radius: 50%;
   background: var(--surface-3);
   color: var(--muted);
   font-size: 18px;
   cursor: pointer;
+}
+
+.sheet__close:active {
+  opacity: 1;
+  background: var(--border-strong);
 }
 
 .sheet__body {
@@ -114,7 +119,7 @@ useSheetLayer(
 
 .sheet-enter-active,
 .sheet-leave-active {
-  transition: opacity 0.22s ease;
+  transition: opacity 0.18s ease;
 }
 
 .sheet-enter-from,
@@ -124,7 +129,7 @@ useSheetLayer(
 
 .sheet-enter-active .sheet__panel,
 .sheet-leave-active .sheet__panel {
-  transition: transform 0.28s cubic-bezier(0.22, 0.8, 0.25, 1);
+  transition: transform 0.24s cubic-bezier(0.22, 0.8, 0.25, 1);
 }
 
 .sheet-enter-from .sheet__panel,
