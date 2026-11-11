@@ -32,7 +32,8 @@ CFLAGS=(
 # needs ESP-IDF Wi-Fi/HTTP/NVS headers; both are verified by the real build.
 mapfile -t files < <(find "${COMPONENTS}" ../../main -name '*.c' \
     ! -path '*/main/board_lcd4.c' \
-    ! -path '*/components/networking/wifi_prov.c' | sort)
+    ! -path '*/components/networking/wifi_prov.c' \
+    ! -path '*/components/networking/net_client.c' | sort)
 for file in "${files[@]}"; do
     echo "[syntax] ${file}"
     "${CC}" "${CFLAGS[@]}" "${file}"

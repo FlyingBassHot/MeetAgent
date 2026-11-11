@@ -4,7 +4,7 @@
 
 **Node-Centric · Multi-Client · Plugin-Based · LAN First · Cloud Optional**
 
-当前状态：**V2.1 核心链路已贯通**。Node 独立服务、V2.1 客户端协议、配对、事件中心、命令/权限、审计与限流已完成；Mobile 已完成 OpenCode 真实 Session、Tailscale 与 Android 真机验收（Prompt、Interrupt、权限审批、断网恢复、Node 重启恢复），并完成 UX P0/P1/P2 改造（信息层级、聊天式详情、统一开发者信息、原生触感/键盘/返回键/下拉刷新/Sheet/视觉打磨）。Terminal 已完成 E0–E3a，并完成 **Waveshare ESP32-S3-Touch-LCD-4 V4** 真机 bring-up 与 E4a Wi-Fi 配网：ESP-IDF 5.5.5、480×480 RGB LCD、GT911、CH32V003、LVGL 8.4，16MB Flash / 8MB PSRAM 启动正常；STA 已连接手机热点（172.20.10.2）并验证 Node 可达，GT911 触摸/180° 映射已实机确认，固件 1.21 MB；AP portal 保存仍需人工确认。
+当前状态：**V2.1 核心链路已贯通**。Node 独立服务、V2.1 客户端协议、配对、事件中心、命令/权限、审计与限流已完成；Mobile 已完成 OpenCode 真实 Session、Tailscale 与 Android 真机验收（Prompt、Interrupt、权限审批、断网恢复、Node 重启恢复），并完成 UX P0/P1/P2 改造（信息层级、聊天式详情、统一开发者信息、原生触感/键盘/返回键/下拉刷新/Sheet/视觉打磨）。Terminal 已完成 E0–E3a，并完成 **Waveshare ESP32-S3-Touch-LCD-4 V4** 真机 bring-up、E4a Wi-Fi 配网和 E4b-1 Node WebSocket：ESP-IDF 5.5.5、480×480 RGB LCD、GT911、CH32V003、LVGL 8.4；STA 已连接手机热点（172.20.10.2），hello/welcome/snapshot、token NVS、心跳与重连已验证，GT911 触摸/180° 映射已实机确认，固件 1.25 MB；events apply/命令与 AP portal 保存仍待后续。
 
 > 设计文档：
 > - [`MeetAgentV2.1.md`](./MeetAgentV2.1.md) — 总体架构、双客户端、南向插件、阶段计划
@@ -49,7 +49,7 @@ Mobile (Vue + Capacitor)        ESP32 Terminal (ESP-IDF + LVGL)
 | Core / Node | `cmd/node`, `internal/`, `pkg/`, `configs/` | M0/M1/M4 完成；审计、限流、重连边界加固 |
 | Node 模拟器 | `cmd/simulator` | 可用 |
 | Mobile | `mobile/` | M5b + UX P0/P1/P2 完成；Android 真机 Prompt/Interrupt/审批/断网恢复/原生交互已验证 |
-| ESP32 Terminal / ESPUI | `firmware/terminal/` | E0–E3a + LCD-4 真机 bring-up + E4a Wi-Fi/STA/Node + GT911 触摸验证通过 | AP portal `/save` 实测、E4b |
+| ESP32 Terminal / ESPUI | `firmware/terminal/` | E0–E3a + LCD-4 bring-up + E4a Wi-Fi + E4b-1 Node WebSocket/snapshot/token/心跳/重连 | E4b-2（事件/命令）、AP portal `/save` 实测 |
 | V1 Cloud / Web Console | `cmd/cloud`, `web/test-client` | 归档参考 |
 
 ---

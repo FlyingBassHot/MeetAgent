@@ -150,7 +150,13 @@ void app_main(void)
                  esp_err_to_name(err));
     }
 
+    err = meet_net_client_start(&s_net);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Node WebSocket client start failed: %s",
+                 esp_err_to_name(err));
+    }
+
     ESP_LOGI(TAG, "terminal scaffold running (LCD-4 BSP, mock state)");
-    ESP_LOGI(TAG, "Wi-Fi provisioning started; WSS/pairing is E4b");
+    ESP_LOGI(TAG, "Wi-Fi provisioning + Node WebSocket started (E4b-1)");
     vTaskDelay(pdMS_TO_TICKS(10000));
 }

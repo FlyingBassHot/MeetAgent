@@ -3,7 +3,7 @@
 日期：2026-11-11  
 范围：`firmware/terminal/` only  
 目标：Waveshare ESP32-S3-Touch-LCD-4 V4.0（ESP32-S3N16R8）  
-状态：**E4a Wi-Fi/STA/Node 已验证；GT911 触摸已实机确认**；180° 已修正；屏幕颜色/背光仍需人工确认
+状态：**E4a Wi-Fi + E4b-1 WebSocket 配对/快照/心跳/重连已验证；GT911 触摸已确认**；屏幕颜色/背光仍需人工确认
 
 ## 1. 真机信息
 
@@ -79,8 +79,8 @@ idf.py size
 
 ```text
 build/meetagent_terminal.bin
-  size   : 1,212,272 bytes (0x127F70)
-  sha256 : 8d416686f14fe37367759687078d236f54827ecda871df210113e7e03fcca60c
+  size   : 1,246,640 bytes (0x1305B0)
+  sha256 : b7c12bd46218bc394792ffe46cebd1b4d8523fbcab8ec61df2d5a292eb375d0e
 
 build/bootloader/bootloader.bin
   size   : 22,272 bytes (0x5700)
@@ -94,10 +94,10 @@ build/partition_table/partition-table.bin
 `idf.py size`：
 
 ```text
-Total image size : 1,212,151 bytes
-Flash Code       : 900,468 bytes
-Flash Data       : 175,236 bytes
-DIRAM            : 195,895 / 341,760 bytes (57.32%)
+Total image size : 1,246,519 bytes
+Flash Code       : 925,412 bytes
+Flash Data       : 184,660 bytes
+DIRAM            : 199,431 / 341,760 bytes (58.35%)
 IRAM (size 工具) :  16,384 / 16,384 bytes (100.0%)
 ```
 
@@ -105,7 +105,7 @@ App 分区：
 
 ```text
 Smallest app partition : 0x177000 bytes
-Free                   : 0x4F090 bytes (21%)
+Free                   : 0x46A50 bytes (19%)
 ```
 
 IRAM 说明：size 工具表里的 16,384 与链接脚本 `iram0_0_seg = 0x57700` 口径不同；
@@ -220,7 +220,7 @@ Mock 状态每 3 秒循环：ACTIVE → APPROVAL → COMPLETED → OFFLINE。
 
 ```text
 Host tests: 807 checks, 0 failure(s)
-Syntax:     OK: 33 file(s)
+Syntax:     OK: 32 file(s)
 
 idf.py build: SUCCESS (exit 0)
 idf.py flash: SUCCESS (exit 0)
@@ -246,6 +246,7 @@ idf.py flash: SUCCESS (exit 0)
 - [x] app_main / UI task 启动，无 panic/assert/reset loop
 - [x] 180° 显示旋转调用已生效（日志确认），触摸变换走 LVGL indev
 - [x] 烧录后三段镜像 Hash verified
+- [x] E4b-1 WebSocket pairing/token/snapshot/heartbeat/reconnect
 
 未验证：
 
@@ -254,11 +255,12 @@ idf.py flash: SUCCESS (exit 0)
 - [ ] CH32V003 电池 ADC → 电量映射
 - [ ] 多点触控（BSP port 只注册 1 点）
 - [ ] 长时间运行、内存泄漏、FPS
-- [ ] E3b LVGL 字符网格 / E4b WebSocket/pairing/snapshot
+- [ ] E3b LVGL 字符网格 / E4b-2 event apply/commands
 
 ## 10. 风险
 
 - I2C 上拉 warning 来自 ESP-IDF master 驱动；GT911 触摸已实机确认，长期稳定性仍需观察。
+- E4b-1 token/pairing code 存 NVS 明文；生产前需 NVS/Flash encryption。
 - ST7701 初始化序列覆盖 warning 来自 BSP；显示已初始化，方向已确认，颜色未校准。
 - BSP 无完整 deinit；恢复/OTA 需另行设计。
 - `idf.py size` IRAM 行口径待核对；实际链接断言通过。
@@ -283,10 +285,10 @@ idf.py flash: SUCCESS (exit 0)
 ESP-IDF : v5.5.5
 app bin : 1,212,272 bytes (0x127F70)
 sha256  : 8d416686f14fe37367759687078d236f54827ecda871df210113e7e03fcca60c
-Total image size : 1,212,151 bytes
-Flash Code       : 900,468 bytes
-Flash Data       : 175,236 bytes
-DIRAM            : 195,895 / 341,760 bytes (57.32%)
+Total image size : 1,246,519 bytes
+Flash Code       : 925,412 bytes
+Flash Data       : 184,660 bytes
+DIRAM            : 199,431 / 341,760 bytes (58.35%)
 App partition    : 0x177000, free 0x4F090 (21%)
 ```
 
@@ -365,6 +367,56 @@ I (26244) touch_test: TOUCH release
 - Wi-Fi 仍连接手机热点（STA 172.20.10.2），Node `developer-machine/2.1.0` 可达。
 - 注意：正式固件目前仍只在启动时 `touch->init()`，生产 Mock UI 不轮询 touch HAL，
   也没有可点击控件；触摸交互待 UI 功能接入。
+
+### 11.7 E4b-1 WebSocket（2026-11-11）
+
+- 依赖：`espressif/esp_websocket_client` 1.8.0
+- build/app hash：`b7c12bd4...eb375d0e`，1,246,640 bytes
+- NVS pre-E4b backup：`/tmp/opencode/nvs-pre-e4b.bin`（24,576 B，
+  SHA-256 `e5159daf...eb0a241`）
+- 首次 pairing：`e4b1-firstpair2.log`
+  - `auth: token=empty pairing_code=set last_sequence=0`
+  - `hello: auth=pairing_code last_sequence=0`
+  - welcome 50,341 bytes，parse 10ms，events_skipped=100
+  - client_id=cli_b8aaf428f6ad3073
+  - sessions 8/42，permissions=session.read/session.control/permission.respond
+  - pending=0，seq=1411
+  - internal_free=65,895 B，psram_free=6,516,920 B
+  - heartbeat RTT=59ms
+- token 重启：`e4b1-token-reboot.log`
+  - `auth: token=set`，hello token，welcome 50,287 B，parse 10ms
+  - 无需 pairing_code
+- Node 重启：
+  - WS error/disconnected → reconnect in 1s
+  - token 仍有效，welcome 32,615 B，parse 9ms，events_skipped=45
+  - `replay_truncated=1`，snapshot seq=45 已应用
+  - heartbeat RTT=53ms
+- `/status` 仍为 connected / node_reachable=true；STA 172.20.10.2
+- 无 panic/assert/OOM
+- E4b-1 不 apply event；`send_action` 未实现，只日志一次
+- E4b-2：event apply/replay、command/审批、无效 token 重试
+
+### 11.8 E4b-1 review fixes（2026-11-11）
+
+- `process_event()` 改从 `root.payload` 读 `type/sequence/agent_id/session_id/event_id`；
+  真机日志已显示真实事件类型与序号（如 `message.delta seq=120`）。
+- `process_error()` 改从 `payload` 读 `code/message`；临时 bogus token（无 pairing）
+  实测：
+  ```text
+  server error code=auth_failed message=unknown or revoked client token
+  token authentication failed; token cleared
+  no pairing_code available; backoff
+  ```
+- `wait_for_wifi()` 只在首次进入时设置 `WIFI_CONNECTING`；真机日志只有
+  wifi_connecting → node_connecting → online 三次状态回调，无每秒刷屏。
+- `meet_net_client_stop()` 改为只请求停止并唤醒；WS/buffer/event group 均由
+  `net_task` 清理，等待最多 2s，不再从调用者任务调用 `cleanup_ws()`。
+- 修正后 app hash：`b7c12bd4...eb375d0e`，1,246,640 bytes。
+- 临时 auth 测试使用 bogus token，测试后从
+  `/tmp/opencode/nvs-e4b1-valid-token.bin`（24,576 B，
+  SHA-256 `66464b51...aa295dd`）恢复真实 token；token welcome + heartbeat
+  52/51ms 正常。
+- 无 panic/assert/OOM；主机网络未切换。
 
 ## 12. 仓库约束
 

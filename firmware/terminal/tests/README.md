@@ -34,6 +34,7 @@ by `idf.py build` instead):
 
 - `main/board_lcd4.c`
 - `components/networking/wifi_prov.c`
+- `components/networking/net_client.c`
 
 Excluded from the test binary (need FreeRTOS/LVGL):
 
