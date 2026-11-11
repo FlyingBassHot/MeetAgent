@@ -3,7 +3,7 @@
 日期：2026-11-11  
 范围：`firmware/terminal/` only  
 目标：Waveshare ESP32-S3-Touch-LCD-4 V4.0（ESP32-S3N16R8）  
-状态：**E4a Wi-Fi + E4b-1 WebSocket + E4b-2 事件 apply/replay + E4b-3 安全命令链路已验证；GT911 触摸已确认**；屏幕颜色/背光仍需人工确认
+状态：**E4a Wi-Fi + E4b-1 WebSocket + E4b-2 事件 apply/replay + E4b-3 安全命令链路已验证；GT911 触摸已确认；PHOSPHOR R2.1/P6/P5 已烧录；交互 Stage 1+2 已合并（未烧录）**；屏幕颜色/背光仍需人工确认
 
 ## 1. 真机信息
 
@@ -785,6 +785,26 @@ I (26244) touch_test: TOUCH release
   free 16%；final 恢复 P6 real ViewModel。
 - 2h soak 已启动，报告时约 18s；完整结果待继续观察，未宣称通过。
 - P5/P6 未改 Node/mobile/根文档；未 commit/push。
+
+### 11.29 交互 Stage 1 输入管线（2026-11-11）
+
+- 新增独立 `espui_input` 任务（20ms、display lock）、gesture recognizer
+  （tap ≤300ms/≤8px、long ≥600ms、swipe ≥48px/≤250ms、30ms debounce）、
+  BOOT GPIO0 短按 Back/长按 Attention、独立 input queue 16。
+- 新增 TAP/SWIPE 事件；Ambient↔Focus↔Activity 导航、Back、Attention。
+- Host：**5386 checks, 0 failures**；syntax 52；IDF build 1,292,352 B/16%。
+- **未 flash**（P5 soak 占用设备）；真机 tap/swipe/long/BOOT 待验证。
+
+### 11.30 交互 Stage 2 场景 + PHOSPHOR canvas（2026-11-11）
+
+- 删除 `lv_layer_top()` 480×480 全屏 overlay；PHOSPHOR 改为 terminal theme
+  持有的 `ESPUI_WIDGET_CANVAS`，renderer 管理 canvas，PSRAM buffer 复用，
+  attach/detach，非 Ambient 暂停渲染。
+- Ambient/Focus/Activity/Attention 四场景布局；ViewModel 固定 8 条 Activity
+  ring；`espui_focus_index()` accessor；修复 init 后未激活 canvas。
+- Stage 1+2 合并：Host **5560 checks, 0 failures**；syntax 52；
+  IDF 5.5.5 build **0x13cde0 bytes / 16% free**。
+- **未 flash**；P5 2h soak 于 20:27 重启；真机四场景/touch 待 soak 后验证。
 
 ## 12. 仓库约束
 
