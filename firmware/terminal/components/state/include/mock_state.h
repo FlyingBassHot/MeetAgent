@@ -18,6 +18,10 @@ extern "C" {
 
 void meet_mock_state_init(espui_view_model_t *model);
 esp_err_t meet_mock_state_start(uint32_t interval_ms);
+/*
+ * Requests the mock task to stop at its next loop boundary and waits up to
+ * 1 second. The task deletes itself; callers must not delete it externally.
+ */
 esp_err_t meet_mock_state_stop(void);
 
 #ifdef __cplusplus

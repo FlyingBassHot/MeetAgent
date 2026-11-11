@@ -270,11 +270,13 @@ static bool event_json_get_string(const char *json, const char *key, char *out,
             }
         }
         if (out_len + 1 >= size) {
+            out[size - 1] = '\0';
             return false;
         }
         out[out_len++] = c;
     }
     if (*value != '"') {
+        out[size - 1] = '\0';
         return false;
     }
     out[out_len] = '\0';
@@ -293,24 +295,24 @@ static void update_agent_active_sessions(espui_view_model_t *model,
     }
 }
 
-static void event_get_agent_id(const meet_protocol_event_t *event,
+static bool event_get_agent_id(const meet_protocol_event_t *event,
                                char *out, size_t size)
 {
     if (event->agent_id[0] != '\0') {
         espui_strlcpy(out, event->agent_id, size);
-        return;
+        return true;
     }
-    (void)event_json_get_string(event->payload_json, "agent_id", out, size);
+    return event_json_get_string(event->payload_json, "agent_id", out, size);
 }
 
-static void event_get_session_id(const meet_protocol_event_t *event,
+static bool event_get_session_id(const meet_protocol_event_t *event,
                                  char *out, size_t size)
 {
     if (event->session_id[0] != '\0') {
         espui_strlcpy(out, event->session_id, size);
-        return;
+        return true;
     }
-    (void)event_json_get_string(event->payload_json, "session_id", out, size);
+    return event_json_get_string(event->payload_json, "session_id", out, size);
 }
 
 static espui_agent_status_t event_agent_status(const meet_protocol_event_t *event)
@@ -334,7 +336,12 @@ static void apply_agent_event(const meet_protocol_event_t *event,
                               espui_view_model_t *model)
 {
     char agent_id[ESPUI_ID_MAX];
-    event_get_agent_id(event, agent_id, sizeof(agent_id));
+    bool id_ok = event_get_agent_id(event, agent_id, sizeof(agent_id));
+    if (!id_ok && agent_id[0] != '\0') {
+        ESP_LOGW(TAG, "agent_id too long; event dropped seq=%llu",
+                 (unsigned long long)event->sequence);
+        return;
+    }
     if (espui_str_empty(agent_id)) {
         return;
     }
@@ -361,7 +368,13 @@ static void apply_session_event(const meet_protocol_event_t *event,
                                 espui_view_model_t *model, uint32_t now_ms)
 {
     char session_id[ESPUI_ID_MAX];
-    event_get_session_id(event, session_id, sizeof(session_id));
+    bool session_ok = event_get_session_id(event, session_id,
+                                           sizeof(session_id));
+    if (!session_ok && session_id[0] != '\0') {
+        ESP_LOGW(TAG, "session_id too long; event dropped seq=%llu",
+                 (unsigned long long)event->sequence);
+        return;
+    }
     if (espui_str_empty(session_id)) {
         return;
     }
@@ -387,7 +400,12 @@ static void apply_session_event(const meet_protocol_event_t *event,
     }
 
     char agent_id[ESPUI_ID_MAX] = {0};
-    event_get_agent_id(event, agent_id, sizeof(agent_id));
+    bool agent_ok = event_get_agent_id(event, agent_id, sizeof(agent_id));
+    if (!agent_ok && agent_id[0] != '\0') {
+        ESP_LOGW(TAG, "agent_id too long; session update dropped seq=%llu",
+                 (unsigned long long)event->sequence);
+        return;
+    }
     if (agent_id[0] == '\0') {
         espui_strlcpy(agent_id, session->agent_id, sizeof(agent_id));
     }
@@ -433,10 +451,12 @@ static void apply_permission_event(const meet_protocol_event_t *event,
     event_json_get_string(event->payload_json, "action", action,
                           sizeof(action));
     char session_id[ESPUI_ID_MAX] = {0};
-    event_get_session_id(event, session_id, sizeof(session_id));
-    if (session_id[0] == '\0') {
-        event_json_get_string(event->payload_json, "session_id", session_id,
-                              sizeof(session_id));
+    bool session_ok = event_get_session_id(event, session_id,
+                                           sizeof(session_id));
+    if (!session_ok && session_id[0] != '\0') {
+        ESP_LOGW(TAG, "permission session_id too long; event dropped seq=%llu",
+                 (unsigned long long)event->sequence);
+        return;
     }
 
     espui_attention_view_t *attention = espui_view_model_push_attention(

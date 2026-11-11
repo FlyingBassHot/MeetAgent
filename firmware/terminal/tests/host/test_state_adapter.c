@@ -479,6 +479,62 @@ static void test_event_alert_cap_and_unknown(void)
                        meet_state_adapter_apply_event(&adapter, &event, 1, NULL));
 }
 
+static void test_event_oversized_ids_are_dropped(void)
+{
+    meet_state_adapter_t adapter;
+    meet_state_adapter_init(&adapter);
+    espui_view_model_t model;
+    espui_view_model_init(&model);
+
+    char long_id[65];
+    memset(long_id, 'A', sizeof(long_id) - 1);
+    long_id[sizeof(long_id) - 1] = '\0';
+
+    char payload[256];
+    snprintf(payload, sizeof(payload),
+             "{\"agent_id\":\"%s\",\"status\":\"busy\"}", long_id);
+    meet_protocol_event_t event = make_event(
+        MEET_PROTOCOL_EVENT_AGENT_CONNECTED, 500, NULL, NULL, payload);
+    TEST_ASSERT_EQ_INT(ESP_OK, meet_state_adapter_apply_event(&adapter, &event,
+                                                              1000, &model));
+    TEST_ASSERT_EQ_INT(500, adapter.last_sequence);
+    TEST_ASSERT_EQ_INT(0, espui_view_model_agent_count(&model));
+
+    snprintf(payload, sizeof(payload),
+             "{\"session_id\":\"%s\",\"title\":\"too long\","
+             "\"status\":\"running\"}",
+             long_id);
+    event = make_event(MEET_PROTOCOL_EVENT_SESSION_CREATED, 501, NULL, NULL,
+                       payload);
+    TEST_ASSERT_EQ_INT(ESP_OK, meet_state_adapter_apply_event(&adapter, &event,
+                                                              1001, &model));
+    TEST_ASSERT_EQ_INT(501, adapter.last_sequence);
+    TEST_ASSERT_EQ_INT(0, espui_view_model_session_count(&model));
+
+    snprintf(payload, sizeof(payload),
+             "{\"permission_id\":\"per-1\",\"session_id\":\"%s\","
+             "\"description\":\"too long\"}",
+             long_id);
+    event = make_event(MEET_PROTOCOL_EVENT_PERMISSION_REQUESTED, 502, NULL,
+                       NULL, payload);
+    TEST_ASSERT_EQ_INT(ESP_OK, meet_state_adapter_apply_event(&adapter, &event,
+                                                              1002, &model));
+    TEST_ASSERT_EQ_INT(502, adapter.last_sequence);
+    TEST_ASSERT_EQ_INT(0, espui_view_model_attention_count(&model));
+
+    /* 39 chars + NUL fits ESPUI_ID_MAX (40); boundary must still work. */
+    char id39[40];
+    memset(id39, 'B', sizeof(id39) - 1);
+    id39[sizeof(id39) - 1] = '\0';
+    snprintf(payload, sizeof(payload),
+             "{\"agent_id\":\"%s\",\"status\":\"idle\"}", id39);
+    event = make_event(MEET_PROTOCOL_EVENT_AGENT_CONNECTED, 503, NULL, NULL,
+                       payload);
+    TEST_ASSERT_EQ_INT(ESP_OK, meet_state_adapter_apply_event(&adapter, &event,
+                                                              1003, &model));
+    TEST_ASSERT_NOT_NULL(espui_view_model_find_agent_const(&model, id39));
+}
+
 void test_state_adapter_run(void)
 {
     test_protocol_status_conversion();
@@ -490,4 +546,5 @@ void test_state_adapter_run(void)
     test_event_session_lifecycle();
     test_event_permission_and_alerts();
     test_event_alert_cap_and_unknown();
+    test_event_oversized_ids_are_dropped();
 }

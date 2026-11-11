@@ -6,12 +6,15 @@
 #include "espui.h"
 #include "espui_util.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 #include "freertos/task.h"
 
 static const char *TAG = "meet_mock_state";
 
 static espui_view_model_t s_model;
 static TaskHandle_t s_task;
+static SemaphoreHandle_t s_stopped_sem;
+static volatile bool s_stop_requested;
 static uint32_t s_interval_ms = 3000;
 static uint32_t s_phase;
 
@@ -109,15 +112,33 @@ static void apply_phase(void)
 static void mock_task(void *arg)
 {
     (void)arg;
-    for (;;) {
+    while (!s_stop_requested) {
         apply_phase();
+        if (s_stop_requested) {
+            break;
+        }
         esp_err_t err = espui_post_view_model(&s_model);
         if (err != ESP_OK) {
             ESP_LOGW(TAG, "post failed: %s", esp_err_to_name(err));
         }
         ++s_phase;
-        vTaskDelay(pdMS_TO_TICKS(s_interval_ms));
+
+        /* Wake at most every 50 ms so stop() is responsive without deleting
+         * the task from another context. */
+        TickType_t remaining = pdMS_TO_TICKS(s_interval_ms);
+        while (remaining > 0 && !s_stop_requested) {
+            TickType_t chunk = remaining > pdMS_TO_TICKS(50)
+                                   ? pdMS_TO_TICKS(50)
+                                   : remaining;
+            vTaskDelay(chunk);
+            remaining -= chunk;
+        }
     }
+    if (s_stopped_sem != NULL) {
+        (void)xSemaphoreGive(s_stopped_sem);
+    }
+    s_task = NULL;
+    vTaskDelete(NULL);
 }
 
 void meet_mock_state_init(espui_view_model_t *model)
@@ -146,9 +167,18 @@ esp_err_t meet_mock_state_start(uint32_t interval_ms)
         return ESP_ERR_INVALID_STATE;
     }
     s_interval_ms = interval_ms > 0 ? interval_ms : 3000;
+    s_stop_requested = false;
+    if (s_stopped_sem == NULL) {
+        s_stopped_sem = xSemaphoreCreateBinary();
+        if (s_stopped_sem == NULL) {
+            return ESP_ERR_NO_MEM;
+        }
+    }
     if (xTaskCreatePinnedToCore(mock_task, "meet_mock", 4096, NULL, 3, &s_task,
                                 tskNO_AFFINITY) != pdPASS) {
         s_task = NULL;
+        vSemaphoreDelete(s_stopped_sem);
+        s_stopped_sem = NULL;
         return ESP_ERR_NO_MEM;
     }
     return ESP_OK;
@@ -159,7 +189,14 @@ esp_err_t meet_mock_state_stop(void)
     if (s_task == NULL) {
         return ESP_OK;
     }
-    vTaskDelete(s_task);
+    s_stop_requested = true;
+    if (s_stopped_sem == NULL ||
+        xSemaphoreTake(s_stopped_sem, pdMS_TO_TICKS(1000)) != pdTRUE) {
+        ESP_LOGW(TAG, "mock task did not stop within 1s");
+        return ESP_ERR_TIMEOUT;
+    }
     s_task = NULL;
+    vSemaphoreDelete(s_stopped_sem);
+    s_stopped_sem = NULL;
     return ESP_OK;
 }
