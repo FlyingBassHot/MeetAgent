@@ -29,6 +29,7 @@ idf_component_register(
 
         "phosphor/glyph_atlas.c"
         "phosphor/glyph_frame.c"
+        "phosphor/glyph_ramp.c"
         "phosphor/glyph_rasterizer.c"
         "phosphor/orbit_geometry.c"
         "phosphor/phosphor_palette.c"

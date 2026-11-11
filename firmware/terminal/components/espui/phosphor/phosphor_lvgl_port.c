@@ -15,6 +15,10 @@
 #include "phosphor_scene.h"
 #include "phosphor_types.h"
 
+#if LV_COLOR_16_SWAP
+#error "PHOSPHOR P2 expects LV_COLOR_16_SWAP=0"
+#endif
+
 #define TAG "phosphor_lvgl"
 
 static uint16_t *s_canvas_buf;

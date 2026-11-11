@@ -1,7 +1,8 @@
 # PHOSPHOR CORE — P1.3 静态 Core（轨道可辨性）
 
 日期：2026-11-11
-状态：P1.3 静态 Core 完成，真机启动通过；实屏可读性由用户确认。未进入 P2。
+状态：P1.3 静态 Core 完成，真机启动通过；实屏可读性由用户确认。
+P2 已另行完成（Glyph Renderer/颜色/密度/合成）；P3 未开始。
 
 ## 1. 反馈与 P1.3 修正
 
@@ -109,10 +110,10 @@ syntax_check.sh    -> 41 files OK
 覆盖三轨半径 80/140/192、tilt/rotation/phase、Nucleus 2×、18×27 atlas、
 Satellite、Palette、Scene/Rasterizer、1×1 裁剪。
 
-## 7. P2 待办（不开始）
+## 7. 后续（P2 已完成）
 
-- Motion Scheduler / Idle / Working；
-- Completed / Approval / Error / Offline；
-- ViewModel 状态适配；
-- FPS/内存/长时间稳定性测量；
-- overlay 是否转为正式 Theme/Renderer 组件。
+- P2：Glyph Ramp、中心密度场、Palette/Compositor（见 `PHOSPHOR_P2.md`）；
+- P3 待办：Motion Scheduler / Idle / Working；
+- P4：Completed / Approval / Error / Offline；
+- P5：FPS/内存/长时间稳定性；
+- 后续再决定 overlay 是否转为正式 Theme/Renderer 组件。

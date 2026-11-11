@@ -4,9 +4,11 @@
 #include <stddef.h>
 
 #include "glyph_atlas.h"
+#include "glyph_ramp.h"
 #include "glyph_rasterizer.h"
 #include "orbit_geometry.h"
 #include "phosphor_palette.h"
+#include "radial_field.h"
 #include "satellite_layout.h"
 
 #define PHOSPHOR_CX 216.0f
@@ -33,28 +35,29 @@ static char outer_glyph(uint32_t i)
     return pattern[i % 4u];
 }
 
-static void draw_core_shell(glyph_frame_t *frame)
+static void draw_core_density(glyph_frame_t *frame)
 {
-    /* Sparse punctuation shell; no solid #/= rings and a clear center. */
+    /* Smooth, deterministic density gradient inside the inner orbit. The
+     * nucleus footprint is cleared later by the 2x rasterizer pass. */
     for (uint8_t row = 0; row < PHOSPHOR_GRID_H; ++row) {
         for (uint8_t col = 0; col < PHOSPHOR_GRID_W; ++col) {
-            if ((col + row) & 1u) {
-                continue;
-            }
             float x = (float)col * PHOSPHOR_CELL_W + PHOSPHOR_CELL_W / 2.0f;
             float y = (float)row * PHOSPHOR_CELL_H + PHOSPHOR_CELL_H / 2.0f;
             float dx = x - PHOSPHOR_CX;
             float dy = y - PHOSPHOR_CY;
             float distance = sqrtf(dx * dx + dy * dy);
-            float inner_ring = fabsf(distance - 46.0f);
-            float outer_ring = fabsf(distance - 68.0f);
-            if (inner_ring > 7.0f && outer_ring > 7.0f) {
+            if (distance < 30.0f || distance > 78.0f) {
                 continue;
             }
-            char glyph = inner_ring <= 7.0f ? ':' : '.';
-            glyph_frame_set(frame, col, row, glyph_atlas_index(glyph),
-                            GLYPH_COLOR_SECONDARY,
-                            inner_ring <= 7.0f ? 105 : 75,
+            float falloff = phosphor_smooth_falloff(distance, 78.0f);
+            uint8_t intensity = (uint8_t)(170.0f * falloff);
+            char glyph = glyph_ramp_char(intensity);
+            uint8_t glyph_index = glyph_atlas_index(glyph);
+            if (glyph_index == 0) {
+                continue;
+            }
+            glyph_frame_set(frame, col, row, glyph_index,
+                            GLYPH_COLOR_SECONDARY, intensity,
                             GLYPH_FLAG_FIELD);
         }
     }
@@ -98,22 +101,27 @@ static void draw_orbit_cell(glyph_frame_t *frame, int orbit_index, uint32_t i,
     if (orbit_index == 0) {
         glyph = inner_glyph(i);
         color = GLYPH_COLOR_SECONDARY;
-        intensity = 190;
+        intensity = 200;
     } else if (orbit_index == 1) {
         glyph = middle_glyph(i, dx, dy);
-        color = GLYPH_COLOR_PRIMARY;
+        color = GLYPH_COLOR_SECONDARY;
         intensity = 235;
     } else {
         glyph = outer_glyph(i);
-        color = (i % 5u == 0u) ? GLYPH_COLOR_HIGHLIGHT
-                               : GLYPH_COLOR_SECONDARY;
-        intensity = 245;
+        color = GLYPH_COLOR_PRIMARY;
+        intensity = 250;
     }
     uint8_t flags = GLYPH_FLAG_FRONT;
     if (point.depth < 0.0f) {
-        color = GLYPH_COLOR_MUTED;
-        intensity = 125;
         flags = GLYPH_FLAG_BACK;
+        if (orbit_index == 0) {
+            color = GLYPH_COLOR_MUTED;
+            intensity = 185;
+        } else if (orbit_index == 1) {
+            intensity = 175;
+        } else {
+            intensity = 185;
+        }
     }
     glyph_frame_set(frame, col, row, glyph_atlas_index(glyph), color,
                     intensity, flags);
@@ -172,8 +180,8 @@ void phosphor_scene_build_frame(glyph_frame_t *frame)
     float warning_angle = satellites.count > 1 ? satellites.items[1].angle
                                                : 3.75f;
 
-    draw_core_shell(frame);
-    /* P1.3: no ambient radial points/halo; clean orbit separation. */
+    draw_core_density(frame);
+    /* No ambient/halo points; P2 density is confined inside the inner orbit. */
 
     const phosphor_orbit_t *orbits = phosphor_orbit_defaults();
     for (int i = 0; i < 3; ++i) {

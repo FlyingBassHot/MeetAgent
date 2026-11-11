@@ -565,6 +565,25 @@ I (26244) touch_test: TOUCH release
 - Host：**2013 checks, 0 failures**；syntax **41 files OK**。
 - 实屏轨道分离度/颜色仍待用户确认；P2 未开始。
 
+### 11.16 PHOSPHOR P2 Glyph Renderer / P2 Static（2026-11-11）
+
+- 新增 `glyph_ramp.c/.h`：`" .,:-=+*#%@"`，intensity 0..255 单调映射；
+- P2 core density：中心半径 30–78，`smooth_falloff` + ramp，FIELD，
+  不进 inner orbit，不形成 halo；无 ambient 随机点。
+- Palette 8 个 RGB565 精确值 + scale565 单调；`LV_COLOR_16_SWAP=0`
+  编译期检查。
+- `glyph_frame` 优先级 NUCLEUS > SATELLITE > FRONT > BACK > FIELD；
+  Rasterizer 普通 cell + Nucleus 2× second pass + 裁剪。
+- 新截图 `docs/phosphor/p2_static.png`（480×480，2,873 B，
+  SHA-256 `9d9fc20a...64117`）。
+- 最终固件：1,267,472 B，SHA-256 `f18b6350...f10f34`，app 剩余 17%，
+  DIRAM 58.6%。
+- 真机：432×432 PSRAM=373,248；internal_free=62,887 B，
+  psram_free=6,134,552 B；snapshot 8/42；heartbeat 101ms；无 panic/OOM；
+  Wi-Fi/Node 在线。
+- Host：**3541 checks, 0 failures**；syntax **42 files OK**。
+- 实屏密度层次/颜色待用户确认；P3 未开始。
+
 ## 12. 仓库约束
 
 - 只修改 `firmware/terminal/`

@@ -3,6 +3,7 @@
 
 #include "glyph_atlas.h"
 #include "glyph_frame.h"
+#include "glyph_ramp.h"
 #include "glyph_rasterizer.h"
 #include "orbit_geometry.h"
 #include "phosphor_palette.h"
@@ -27,15 +28,49 @@ static void test_palette_rgb565(void)
     TEST_ASSERT_EQ_INT(0xDFF8, phosphor_rgb565_from_hex(0xD9FFC3));
 
     TEST_ASSERT_EQ_INT(0x0861, palette->background);
+    TEST_ASSERT_EQ_INT(0x10C2, palette->surface);
     TEST_ASSERT_EQ_INT(0xA78D, palette->primary);
+    TEST_ASSERT_EQ_INT(0x6633, palette->secondary);
+    TEST_ASSERT_EQ_INT(0x5B8C, palette->muted);
     TEST_ASSERT_EQ_INT(0xF5AB, palette->warning);
     TEST_ASSERT_EQ_INT(0xF36C, palette->error);
+    TEST_ASSERT_EQ_INT(0xDFF8, palette->highlight);
     TEST_ASSERT_EQ_INT(0xA78D,
                        phosphor_color565(palette, GLYPH_COLOR_PRIMARY));
     TEST_ASSERT_EQ_INT(0xF36C, phosphor_color565(NULL, GLYPH_COLOR_ERROR));
     TEST_ASSERT_EQ_INT(0x0000, phosphor_scale565(0xA78D, 0));
     TEST_ASSERT_EQ_INT(0xA78D, phosphor_scale565(0xA78D, 255));
-    TEST_ASSERT_TRUE(phosphor_scale565(0xA78D, 128) < 0xA78D);
+    uint16_t previous = 0;
+    for (int i = 0; i <= 255; ++i) {
+        uint16_t scaled = phosphor_scale565(0xA78D, (uint8_t)i);
+        TEST_ASSERT_TRUE(scaled >= previous);
+        previous = scaled;
+    }
+}
+
+static void test_glyph_ramp(void)
+{
+    const char *ramp = glyph_ramp();
+    TEST_ASSERT_NOT_NULL(ramp);
+    TEST_ASSERT_STR_EQ(" .,:-=+*#%@", ramp);
+    TEST_ASSERT_EQ_INT(' ', glyph_ramp_char(0));
+    TEST_ASSERT_EQ_INT('@', glyph_ramp_char(255));
+    TEST_ASSERT_EQ_INT(0, glyph_ramp_index(0));
+    TEST_ASSERT_EQ_INT(10, glyph_ramp_index(255));
+
+    uint8_t previous = 0;
+    for (int i = 0; i <= 255; ++i) {
+        uint8_t index = glyph_ramp_index((uint8_t)i);
+        char ch = glyph_ramp_char((uint8_t)i);
+        TEST_ASSERT_TRUE(index >= previous);
+        TEST_ASSERT_TRUE(index <= 10);
+        TEST_ASSERT_TRUE(ch != '\0');
+        if (ch != ' ') {
+            TEST_ASSERT_TRUE(glyph_atlas_contains(ch));
+        }
+        TEST_ASSERT_EQ_INT(glyph_atlas_index(ch), glyph_ramp_atlas((uint8_t)i));
+        previous = index;
+    }
 }
 
 static void test_glyph_atlas_coverage(void)
@@ -201,6 +236,36 @@ static void test_glyph_frame_priority(void)
     TEST_ASSERT_FALSE(glyph_frame_set(&frame, PHOSPHOR_GRID_W, 0,
                                       glyph_atlas_index('.'), GLYPH_COLOR_MUTED,
                                       1, GLYPH_FLAG_FIELD));
+
+    glyph_frame_clear(&frame);
+    TEST_ASSERT_TRUE(glyph_frame_set(&frame, 2, 2, glyph_atlas_index('.'),
+                                     GLYPH_COLOR_MUTED, 10,
+                                     GLYPH_FLAG_FIELD));
+    TEST_ASSERT_TRUE(glyph_frame_set(&frame, 2, 2, glyph_atlas_index('-'),
+                                     GLYPH_COLOR_MUTED, 80,
+                                     GLYPH_FLAG_BACK));
+    TEST_ASSERT_EQ_INT(glyph_atlas_index('-'), frame.cells[2][2].glyph);
+    TEST_ASSERT_TRUE(glyph_frame_set(&frame, 2, 2, glyph_atlas_index('='),
+                                     GLYPH_COLOR_PRIMARY, 90,
+                                     GLYPH_FLAG_FRONT));
+    TEST_ASSERT_TRUE(glyph_frame_set(&frame, 2, 2, glyph_atlas_index('?'),
+                                     GLYPH_COLOR_WARNING, 255,
+                                     GLYPH_FLAG_SATELLITE));
+    TEST_ASSERT_TRUE(glyph_frame_set(&frame, 2, 2, glyph_atlas_index('>'),
+                                     GLYPH_COLOR_HIGHLIGHT, 255,
+                                     GLYPH_FLAG_NUCLEUS));
+    TEST_ASSERT_EQ_INT(glyph_atlas_index('>'), frame.cells[2][2].glyph);
+
+    glyph_frame_clear(&frame);
+    TEST_ASSERT_TRUE(glyph_frame_set_scaled(
+        &frame, PHOSPHOR_GRID_W - 1, PHOSPHOR_GRID_H - 1,
+        glyph_atlas_index('>'), GLYPH_COLOR_HIGHLIGHT, 255,
+        GLYPH_FLAG_NUCLEUS, 2));
+    TEST_ASSERT_FALSE(glyph_frame_set_scaled(
+        &frame, 0, 0, glyph_atlas_index('>'), GLYPH_COLOR_HIGHLIGHT, 255,
+        GLYPH_FLAG_NUCLEUS, 3));
+    uint16_t edge[16] = {0};
+    phosphor_scene_render_rgb565(edge, 4, 4);
 }
 
 static void test_scene_nucleus_and_rasterizer(void)
@@ -240,6 +305,7 @@ static void test_scene_nucleus_and_rasterizer(void)
 void test_phosphor_run(void)
 {
     test_palette_rgb565();
+    test_glyph_ramp();
     test_glyph_atlas_coverage();
     test_orbit_geometry();
     test_radial_field();

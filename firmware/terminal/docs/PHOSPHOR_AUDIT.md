@@ -170,3 +170,11 @@ P0 的 288×288 / 8×12 估算作为 P1.0 基线保留；P1.1 根据实机反馈
 - Inner Secondary、Middle Secondary、Outer Primary，后侧不低于 175–185；
 - Middle 5.85 rad 缺口 + Outer warning 缺口；ambient field 移除；
 - 这是静态 P1.3 视觉迭代，不进入 P2。
+
+
+## 13. P2 Glyph Renderer / 颜色 / 合成（2026-11-11）
+
+- P1.3 视觉基线不变；P2 只加 ramp、中心密度场、Palette/Compositor 验证；
+- `glyph_ramp` 为纯模块；P2 密度场限制在中心 30–78，不进轨道/无 halo；
+- Palette RGB565 精确值已测试；`LV_COLOR_16_SWAP=0` 编译期检查；
+- P2 仍是静态，不含 P3 动画。
