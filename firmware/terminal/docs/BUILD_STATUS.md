@@ -668,6 +668,24 @@ I (26244) touch_test: TOUCH release
 - Host：**3624 checks, 0 failures**；syntax **45 files OK**。
 - P4 未开始。
 
+### 11.22 PHOSPHOR P3.5 Outer 字符串运输（2026-11-11）
+
+- Outer 主带改为 `"0101+#%@=/<>"`（len 12），`idx=(i+bucket)%12`；
+  0/1 约 33%、`%` 约 8%；不再 hash 闪变。
+- 内侧 band 改为 `"0101+#%@"`（len 8），`idx=(i+bucket+3)%8`；
+  0/1 约 50%、`%` 约 12.5%。
+- bucket 仍 Working 300ms / Idle 800ms；字符整体平移形成数据串；
+  半径/密度/缺口/Inner/Middle/P3.4 中心减量保持。
+- 新截图 `p3_idle_v6.png` / `p3_working_v6.png`；
+  v5→v6 changed pixels Idle 8,206 / Working 7,784。
+- 最终固件：1,273,056 B，SHA-256 `8e6ab088...32ecd2`，app 剩余 17%，
+  DIRAM 204,423/341,760 (59.81%)。
+- 真机：internal_free 49,611→65,095 B，PSRAM ~6,133,276 B；
+  Idle 7 FPS，Working 7 FPS（Working 仍低于目标，P5）；
+  Wi-Fi/Node 在线；无 panic/OOM。
+- Host：**3624 checks, 0 failures**；syntax **45 files OK**。
+- P4 未开始。
+
 ## 12. 仓库约束
 
 - 只修改 `firmware/terminal/`

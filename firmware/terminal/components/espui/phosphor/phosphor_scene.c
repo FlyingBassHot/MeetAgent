@@ -30,16 +30,6 @@ static char middle_glyph(uint32_t i, float dx, float dy)
     return dx * dy >= 0.0f ? '\\' : '/';
 }
 
-static uint32_t binary_hash(uint32_t value)
-{
-    value ^= value >> 16;
-    value *= 0x7feb352du;
-    value ^= value >> 15;
-    value *= 0x846ca68bu;
-    value ^= value >> 16;
-    return value;
-}
-
 static uint32_t binary_bucket(const phosphor_motion_state_t *motion)
 {
     uint32_t interval = motion != NULL && motion->mode_mix > 0.5f ? 300u
@@ -51,17 +41,12 @@ static uint32_t binary_bucket(const phosphor_motion_state_t *motion)
 static char outer_glyph(uint32_t i,
                         const phosphor_motion_state_t *motion)
 {
-    static const char pattern[] = "+#%@";
-    float mix = motion != NULL ? motion->mode_mix : 0.0f;
+    /* Cyclic data pattern shifted by time bucket: a visible string moving
+     * along the orbit instead of per-cell hash flicker. */
+    static const char pattern[] = "0101+#%@=/<>";
     uint32_t bucket = binary_bucket(motion);
-    uint32_t hash = binary_hash((i + 1u) * 0x9e3779b9u ^
-                                (bucket + 1u) * 0x85ebca6bu ^
-                                0xa5a5a5a5u);
-    uint32_t threshold = 12u + (uint32_t)(mix * 33.0f); /* 12..45% */
-    if (hash % 100u < threshold) {
-        return (hash & 0x80000000u) ? '0' : '1';
-    }
-    return pattern[i % 4u];
+    uint32_t len = (uint32_t)(sizeof(pattern) - 1);
+    return pattern[(i + bucket) % len];
 }
 
 static void draw_core_density(glyph_frame_t *frame,
@@ -115,7 +100,13 @@ static bool in_gap(float theta, float gap_angle, float half_width)
 }
 
 static char sideband_glyph(uint32_t i,
-                           const phosphor_motion_state_t *motion);
+                           const phosphor_motion_state_t *motion)
+{
+    static const char pattern[] = "0101+#%@";
+    uint32_t bucket = binary_bucket(motion);
+    uint32_t len = (uint32_t)(sizeof(pattern) - 1);
+    return pattern[(i + bucket + 3u) % len];
+}
 
 static char inner_band_glyph(uint32_t i)
 {
@@ -321,21 +312,6 @@ static void draw_orbit(glyph_frame_t *frame,
                             p0.x + dx * t, p0.y + dy * t, low_fill);
         }
     }
-}
-
-static char sideband_glyph(uint32_t i,
-                           const phosphor_motion_state_t *motion)
-{
-    float mix = motion != NULL ? motion->mode_mix : 0.0f;
-    uint32_t bucket = binary_bucket(motion);
-    uint32_t hash = binary_hash((i + 31u) * 0x9e3779b9u ^
-                                (bucket + 5u) * 0x85ebca6bu ^
-                                0x3c3c3c3cu);
-    uint32_t threshold = 25u + (uint32_t)(mix * 20.0f); /* 25..45% 0/1 */
-    if (hash % 100u < threshold) {
-        return (hash & 0x80000000u) ? '0' : '1';
-    }
-    return (hash & 0x40000000u) ? '+' : '%';
 }
 
 static void draw_activity_particles(glyph_frame_t *frame,

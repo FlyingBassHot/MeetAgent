@@ -7,7 +7,7 @@
 | Core / Node | 主会话 | M0 + M1 + M4 Core | 完成；审计/限流/重连边界加固 | M6 可选增强 |
 | Protocol v2 | 主会话 | M0 | 完成 | 随实现补兼容测试 |
 | Mobile | omp | M5b + UX P0/P1/P2 | 视觉与原生交互改造完成（信息层级/聊天流/触感/键盘/返回键/下拉刷新/视觉打磨） | iOS/Release |
-| Terminal / ESPUI | pi | E0–E3a + LCD-4 Bring-up + E4a + E4b-1/2/3 + PHOSPHOR P1/P2/P3.4 + net QA fixes | 真机启动成功；Wi-Fi/WS/事件/命令链路已验证；PHOSPHOR P3.4 中心密度减量 25.7%、外围厚带保持已上屏（Idle 6–7 FPS；Working 7 FPS，目标 10–15 未达） | P4 六态、P5 性能、interrupt/permission 实机、AP portal `/save` |
+| Terminal / ESPUI | pi | E0–E3a + LCD-4 Bring-up + E4a + E4b-1/2/3 + PHOSPHOR P1/P2/P3.5 + net QA fixes | 真机启动成功；Wi-Fi/WS/事件/命令链路已验证；PHOSPHOR P3.5 Outer 多字符数据流/0-1-符号串已上屏（Idle 7 FPS；Working 7 FPS，目标 10–15 未达） | P4 六态、P5 性能、interrupt/permission 实机、AP portal `/save` |
 | Cloud relay | 主会话 | 可选 | 保留 V1 实现 | M6 再验证混合模式 |
 
 ## 已完成
@@ -38,6 +38,7 @@
 - Terminal PHOSPHOR P3.2（2026-11-11）：删除外围零散 0/1 点；Outer 增加连续内侧副带（radius 176、96 采样、`0/1/+/%`、warning 缺口、FIELD），形成约 2-cell 厚外圈；Inner 64→96 采样、`;:;:;+;`、radius 80 不变；Middle 不变；host tests 3620/3620；Idle 6–7 FPS / Working 7 FPS；截图 `p3_idle_v3.png`/`p3_working_v3.png`
 - Terminal PHOSPHOR P3.3（2026-11-11）：改用相邻 cell 加厚（Outer 向心 +23 cells、Inner 向外 +6 cells）；warning gap 0.22→0.11 rad 并低亮度填充，Middle gap 0.23→0.04 rad 并填充；Inner 在 Middle/Outer 后绘制；host tests 3624/3624；v3→v4 changed pixels 约 5.5–5.7k；Idle 6 FPS / Working 7 FPS；截图 `p3_idle_v4.png`/`p3_working_v4.png`
 - Terminal PHOSPHOR P3.4（2026-11-11）：核心密度场 30–78→48–64、强度 170→108–120、1/17 稀疏；Inner 外侧 band 110–150；Middle 强度 215；外围 P3.3 保持；中心 r<80 非空 cell 35→26（-25.7%）；host tests 3624/3624；Idle 6–7 FPS / Working 7 FPS；截图 `p3_idle_v5.png`/`p3_working_v5.png`
+- Terminal PHOSPHOR P3.5（2026-11-11）：Outer 主带 `0101+#%@=/<>` + bucket 平移（Working 300ms / Idle 800ms），`%` 8.3%、0/1 33.3%；Outer band `0101+#%@@` 平移；字符成串沿轨道运输，不再只有 `%`；v5→v6 changed pixels 7.8–8.2k；Idle 7 FPS / Working 7 FPS；截图 `p3_idle_v6.png`/`p3_working_v6.png`
 - Terminal network QA fixes（2026-11-11）：F1 welcome 空/缺失 events、F3 stale pairing code、F5 mock stop、F7 字符串 NUL、F8 heartbeat 时序、F10 node_url 变化清 token 已合并；组合固件 0x135f00 / 17% free；启动日志 token=set、pairing_code=empty、welcome 49KB、snapshot applied、heartbeat RTT 298ms；host tests 3589/3589；F9/F4/F6/F2 仍待后续
 - Terminal 硬件目标确定为 **Waveshare ESP32-S3-Touch-LCD-4 V4**（480×480 RGB LCD + GT911 + CH32V003 helper）；真实 BSP 已接入，显示/触摸方向/PSRAM 待实物验证
 
