@@ -22,9 +22,9 @@
 
 - **真机 bring-up 成功（2026-11-11）**：ESP-IDF v5.5.5 构建、烧录、启动通过；180° 显示旋转已修正并重新烧录
 - 启动证据：16MB QIO Flash、8MB Octal PSRAM 80MHz、240MHz、ST7701 480×480、GT911 0x14、ESPUI 初始化
-- 固件：`meetagent_terminal.bin` 1,276,752 bytes（SHA-256 `cf2ac813...da7e78`）；app 分区剩余 17%
+- 固件：`meetagent_terminal.bin` 1,281,328 bytes（SHA-256 `1ad08cf9...41993f3`）；app 分区剩余 17%
 - 原厂 16MB Flash 已备份：`/home/perch/esp/backups/lcd4-factory-2026-11-11-1132.bin`
-- 主机测试：`3648 checks, 0 failure(s)`（ASan/UBSan + `-Werror`）
+- 主机测试：`3683 checks, 0 failure(s)`（ASan/UBSan + `-Werror`）
 - 主机语法检查：47 个固件 C 文件通过（board_lcd4.c / wifi_prov.c / net_client.c / phosphor_lvgl_port.c 由真实 IDF 构建验证）
 - E3a 帧预览：`make preview STATE=working FRAMES=3 DELAY=300`
 - 启动日志：`/tmp/opencode/esp-lcd4-boot.log`

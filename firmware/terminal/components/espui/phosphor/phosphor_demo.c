@@ -5,19 +5,19 @@
 phosphor_demo_phase_t phosphor_demo_phase_at(uint32_t elapsed_ms)
 {
     uint32_t t = elapsed_ms % PHOSPHOR_DEMO_CYCLE_MS;
-    if (t < 4000u) {
+    if (t < 6000u) {
         return PHOSPHOR_DEMO_IDLE;
     }
-    if (t < 8000u) {
+    if (t < 12000u) {
         return PHOSPHOR_DEMO_WORKING;
     }
-    if (t < 12000u) {
+    if (t < 18000u) {
         return PHOSPHOR_DEMO_APPROVAL;
     }
-    if (t < 16000u) {
+    if (t < 24000u) {
         return PHOSPHOR_DEMO_ERROR;
     }
-    if (t < 18000u) {
+    if (t < 26000u) {
         return PHOSPHOR_DEMO_COMPLETED;
     }
     return PHOSPHOR_DEMO_OFFLINE;
@@ -67,21 +67,31 @@ void phosphor_demo_build_input(phosphor_demo_phase_t phase, uint32_t cycle,
         add_session(input, "demo-idle", PHOSPHOR_SESSION_IDLE);
         break;
     case PHOSPHOR_DEMO_WORKING:
-        add_session(input, "demo-run", PHOSPHOR_SESSION_RUNNING);
+        add_session(input, "run-a", PHOSPHOR_SESSION_RUNNING);
+        add_session(input, "run-b", PHOSPHOR_SESSION_RUNNING);
+        add_session(input, "run-c", PHOSPHOR_SESSION_RUNNING);
+        add_session(input, "run-d", PHOSPHOR_SESSION_RUNNING);
         break;
     case PHOSPHOR_DEMO_APPROVAL:
-        add_session(input, "demo-run", PHOSPHOR_SESSION_RUNNING);
-        add_session(input, "demo-wait", PHOSPHOR_SESSION_WAITING);
-        input->approval_count = 1;
+        add_session(input, "run-a", PHOSPHOR_SESSION_RUNNING);
+        add_session(input, "run-b", PHOSPHOR_SESSION_RUNNING);
+        add_session(input, "wait-a", PHOSPHOR_SESSION_WAITING);
+        add_session(input, "wait-b", PHOSPHOR_SESSION_WAITING);
+        input->approval_count = 2;
         break;
     case PHOSPHOR_DEMO_ERROR:
-        add_session(input, "demo-run", PHOSPHOR_SESSION_RUNNING);
-        add_session(input, "demo-error", PHOSPHOR_SESSION_ERROR);
+        add_session(input, "run-a", PHOSPHOR_SESSION_RUNNING);
+        add_session(input, "run-b", PHOSPHOR_SESSION_RUNNING);
+        add_session(input, "error-a", PHOSPHOR_SESSION_ERROR);
+        add_session(input, "idle-a", PHOSPHOR_SESSION_IDLE);
         input->error_count = 1;
         input->error_event_id = (uint64_t)cycle * 32u + 2u;
         break;
     case PHOSPHOR_DEMO_COMPLETED:
-        add_session(input, "demo-run", PHOSPHOR_SESSION_RUNNING);
+        add_session(input, "run-a", PHOSPHOR_SESSION_RUNNING);
+        add_session(input, "run-b", PHOSPHOR_SESSION_RUNNING);
+        add_session(input, "run-c", PHOSPHOR_SESSION_RUNNING);
+        add_session(input, "run-d", PHOSPHOR_SESSION_RUNNING);
         input->completed_event_id = (uint64_t)cycle * 32u + 1u;
         break;
     case PHOSPHOR_DEMO_OFFLINE:

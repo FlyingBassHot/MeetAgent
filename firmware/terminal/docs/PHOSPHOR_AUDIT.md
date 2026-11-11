@@ -234,8 +234,10 @@ P0 的 288×288 / 8×12 估算作为 P1.0 基线保留；P1.1 根据实机反馈
 - v6→v7 changed pixels 16,772/16,207；P4 未开始。
 
 
-## 21. P4 六态（2026-11-11）
+## 21. P4 六态重构（2026-11-11）
 
 - `phosphor_state` resolver + `phosphor_demo`；
-- offline 优先，approval/error 叠加，completed 900ms 去重，error 300ms；
-- six goldens；真机 FPS ~7；P5/P6 未开始。
+- offline 优先，approval/error 叠加，completed 900ms 去重，error 220ms；
+- 无静态 satellite；Approval 0.65rad 缺口+2 `?`；Error 5 字符断裂；
+  Completed 3 层波；Offline 解体+NO LINK+label；
+- six goldens + contact sheet；真机 FPS ~7；P5/P6 未开始。

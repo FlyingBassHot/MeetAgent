@@ -84,11 +84,11 @@ static void test_glyph_atlas_coverage(void)
     TEST_ASSERT_EQ_INT(24, PHOSPHOR_GRID_W);
     TEST_ASSERT_EQ_INT(16, PHOSPHOR_GRID_H);
     TEST_ASSERT_EQ_INT(432, PHOSPHOR_CANVAS_W);
-    const char *required = " .,:-=+*#%@/\\|<>^v;[]{}?_!o01";
+    const char *required = " .,:-=+*#%@/\\|<>^v;[]{}?_!o0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZx";
     for (size_t i = 0; required[i] != '\0'; ++i) {
         TEST_ASSERT_TRUE(glyph_atlas_contains(required[i]));
     }
-    TEST_ASSERT_FALSE(glyph_atlas_contains('M'));
+    TEST_ASSERT_FALSE(glyph_atlas_contains('~'));
     TEST_ASSERT_EQ_INT(' ', glyph_atlas_char_at(0));
     uint8_t greater_bits = 0;
     uint8_t underscore_bits = 0;

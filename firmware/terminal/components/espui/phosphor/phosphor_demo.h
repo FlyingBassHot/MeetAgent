@@ -8,7 +8,7 @@
 extern "C" {
 #endif
 
-#define PHOSPHOR_DEMO_CYCLE_MS 22000u
+#define PHOSPHOR_DEMO_CYCLE_MS 30000u
 
 typedef enum {
     PHOSPHOR_DEMO_IDLE = 0,

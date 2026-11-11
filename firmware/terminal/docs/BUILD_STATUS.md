@@ -703,22 +703,24 @@ I (26244) touch_test: TOUCH release
 - Host：**3624 checks, 0 failures**；syntax **45 files OK**。
 - P4 未开始。
 
-### 11.24 PHOSPHOR P4 六态（2026-11-11）
+### 11.24 PHOSPHOR P4 六态重构（2026-11-11）
 
-- 新增 `phosphor_state` resolver：offline 优先，approval/error 可叠加在
-  working；completed 900ms 去重 pulse；error 300ms glitch；4 satellites
-  稳定 slot + overflow。
-- 新增 `phosphor_demo`：Idle4→Working4→Approval4→Error4→Completed2→Offline4
-  循环；ESP32 phase 日志；PC keys 1–6。
-- Scene 增加 visual 叠层：`?` warning、红色 `!` + glitch、Completed 径向波、
-  Offline dim；保持 P3.6/P3.4 基线。
-- Golden：`p4_idle/working/approval/error/offline/completed.png`。
-- 最终固件：1,276,752 B，SHA-256 `cf2ac813...da7e78`，app 剩余 17%，
+- 新增 `phosphor_state` resolver：offline 优先；approval/error 可叠加
+  working；completed 900ms 去重 pulse；error 220ms glitch；4 satellite
+  stable slot + overflow。
+- `phosphor_demo`：Idle6→Working6→Approval6→Error6→Completed2→Offline4；
+  demo 4 sessions：working 4 running，approval 2 running+2 waiting，
+  error 2 running+1 error+1 idle。
+- Visual 路径清除 P3 静态卫星；Approval 0.65rad 缺口 + 2 warning `?`；
+  Error 5 个红色局部断裂 + glitch；Completed 3 层径向波 + 8 外轨粒子；
+  Offline 轨道解体 + NO LINK / LAST SYNC；顶部 state label。
+- 六态 goldens + `p4_contact.png`；pixel diff vs Working：
+  Approval 5,144 / Error 3,240 / Offline 23,464 / Completed 25,595。
+- 最终固件：1,281,328 B，SHA-256 `1ad08cf9...41993f3`，app 剩余 17%，
   DIRAM 204,623/341,760 (59.87%)。
-- 真机：demo 六态 phase 日志完整；FPS ~7（Working 目标未达，P5）；
-  internal_free 49.4→64.9KB，PSRAM ~6,132,908 B；
-  无 panic/OOM；Wi-Fi/Node 在线。
-- Host：**3648 checks, 0 failures**；syntax **47 files OK**。
+- 真机：FPS ~7；Working 目标仍未达，P5；internal_free 49.4→64.9KB，
+  PSRAM ~6,130,004 B；Wi-Fi/Node 在线；无 panic/OOM。
+- Host：**3683 checks, 0 failures**；syntax **47 files OK**。
 - P5/P6 未开始。
 
 ## 12. 仓库约束

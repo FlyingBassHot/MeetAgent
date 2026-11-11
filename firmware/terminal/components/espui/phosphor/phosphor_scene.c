@@ -2,6 +2,7 @@
 
 #include <math.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "glyph_atlas.h"
@@ -475,7 +476,7 @@ static void draw_visual_satellites(
     const phosphor_visual_state_t *visual)
 {
     static const float slot_angle[PHOSPHOR_MAX_SATELLITES] = {
-        0.65f, 3.75f, 1.85f, 5.30f,
+        0.65f, 5.10f, 3.40f, 4.05f,
     };
     (void)visual_status_to_satellite;
     const phosphor_orbit_t *outer = &phosphor_orbit_defaults()[2];
@@ -526,20 +527,31 @@ static void draw_visual_satellites(
         }
         glyph_frame_set(frame, col, row, glyph_atlas_index(glyph), color,
                         intensity, GLYPH_FLAG_SATELLITE);
-        if (visual->error_glitch_active &&
-            sat->status == PHOSPHOR_SESSION_ERROR) {
-            /* Short, local glitch: two adjacent error marks, then gone. */
-            uint8_t gc = (uint8_t)((int)col + 1);
-            if (gc < PHOSPHOR_GRID_W) {
-                glyph_frame_set(frame, gc, row, glyph_atlas_index('!'),
-                                GLYPH_COLOR_ERROR, 210,
+        if (sat->status == PHOSPHOR_SESSION_ERROR) {
+            /* Local red break: 5 glyphs across the slot, not a single ! */
+            for (int j = -2; j <= 2; ++j) {
+                float ea = angle + phase + (float)j * 0.035f;
+                phosphor_point_t ep;
+                phosphor_orbit_point(outer, ea, PHOSPHOR_CX, PHOSPHOR_CY,
+                                     &ep);
+                uint8_t ec = 0;
+                uint8_t er = 0;
+                if (!phosphor_point_to_cell(ep.x, ep.y, &ec, &er)) {
+                    continue;
+                }
+                char eg = j == 0 ? '!' : (j & 1 ? '-' : 'x');
+                glyph_frame_set(frame, ec, er, glyph_atlas_index(eg),
+                                GLYPH_COLOR_ERROR,
+                                visual->error_glitch_active ? 235 : 190,
                                 GLYPH_FLAG_FRONT);
             }
-            uint8_t gr = (uint8_t)((int)row + 1);
-            if (gr < PHOSPHOR_GRID_H) {
-                glyph_frame_set(frame, col, gr, glyph_atlas_index('!'),
-                                GLYPH_COLOR_ERROR, 190,
-                                GLYPH_FLAG_FRONT);
+            if (visual->error_glitch_active) {
+                uint8_t gc = (uint8_t)((int)col + 1);
+                if (gc < PHOSPHOR_GRID_W) {
+                    glyph_frame_set(frame, gc, row, glyph_atlas_index('!'),
+                                    GLYPH_COLOR_ERROR, 220,
+                                    GLYPH_FLAG_FRONT);
+                }
             }
         }
     }
@@ -569,21 +581,43 @@ static void draw_completion_overlay(glyph_frame_t *frame,
     if (p > 1.0f) {
         p = 1.0f;
     }
-    uint8_t intensity = (uint8_t)(220.0f * (1.0f - p) + 15.0f);
-    for (int i = 0; i < 12; ++i) {
-        float angle = PHOSPHOR_TWO_PI * (float)i / 12.0f;
-        float radius = 40.0f + 120.0f * p;
+    uint8_t intensity = (uint8_t)(235.0f * (1.0f - p) + 15.0f);
+    static const int counts[3] = {16, 24, 32};
+    for (int layer = 0; layer < 3; ++layer) {
+        float radius = 34.0f + (float)layer * 30.0f + 100.0f * p;
+        for (int i = 0; i < counts[layer]; ++i) {
+            float angle = PHOSPHOR_TWO_PI * (float)i / (float)counts[layer] +
+                          (float)layer * 0.15f;
+            phosphor_point_t point;
+            point.x = PHOSPHOR_CX + cosf(angle) * radius;
+            point.y = PHOSPHOR_CY + sinf(angle) * radius;
+            uint8_t col = 0;
+            uint8_t row = 0;
+            if (!phosphor_point_to_cell(point.x, point.y, &col, &row)) {
+                continue;
+            }
+            char glyph = (i & 1) ? '*' : '+';
+            glyph_frame_set(frame, col, row, glyph_atlas_index(glyph),
+                            GLYPH_COLOR_HIGHLIGHT,
+                            intensity > 25 ? intensity - layer * 15 : 20,
+                            GLYPH_FLAG_FRONT);
+        }
+    }
+    /* Outer particles released during the pulse. */
+    const phosphor_orbit_t *outer = &phosphor_orbit_defaults()[2];
+    for (int i = 0; i < 8; ++i) {
+        float angle = PHOSPHOR_TWO_PI * (float)i / 8.0f + p * 0.8f;
         phosphor_point_t point;
-        point.x = PHOSPHOR_CX + cosf(angle) * radius;
-        point.y = PHOSPHOR_CY + sinf(angle) * radius;
+        phosphor_orbit_point(outer, angle, PHOSPHOR_CX, PHOSPHOR_CY,
+                             &point);
         uint8_t col = 0;
         uint8_t row = 0;
-        if (!phosphor_point_to_cell(point.x, point.y, &col, &row)) {
-            continue;
+        if (phosphor_point_to_cell(point.x, point.y, &col, &row)) {
+            glyph_frame_set(frame, col, row, glyph_atlas_index('*'),
+                            GLYPH_COLOR_HIGHLIGHT,
+                            intensity > 30 ? intensity : 30,
+                            GLYPH_FLAG_FRONT);
         }
-        char glyph = (i & 1) ? '*' : '+';
-        glyph_frame_set(frame, col, row, glyph_atlas_index(glyph),
-                        GLYPH_COLOR_HIGHLIGHT, intensity, GLYPH_FLAG_FRONT);
     }
 }
 
@@ -592,12 +626,67 @@ static void dim_for_offline(glyph_frame_t *frame)
     for (uint8_t row = 0; row < PHOSPHOR_GRID_H; ++row) {
         for (uint8_t col = 0; col < PHOSPHOR_GRID_W; ++col) {
             glyph_cell_t *cell = &frame->cells[row][col];
-            if (cell->glyph != 0) {
+            if (cell->glyph == 0) {
+                continue;
+            }
+            if ((((unsigned)row * 3u + (unsigned)col * 5u) & 3u) == 0u) {
+                memset(cell, 0, sizeof(*cell)); /* disintegrate */
+            } else {
                 uint16_t dim = (uint16_t)cell->intensity * 35u / 100u;
                 cell->intensity = (uint8_t)(dim < 25 ? 25 : dim);
             }
         }
     }
+}
+
+static void draw_state_text(glyph_frame_t *frame, uint8_t row, uint8_t col,
+                            const char *text, glyph_color_id_t color,
+                            uint8_t intensity)
+{
+    for (uint8_t i = 0; text != NULL && text[i] != '\0'; ++i) {
+        if (col + i >= PHOSPHOR_GRID_W) {
+            break;
+        }
+        uint8_t gi = glyph_atlas_index(text[i]);
+        if (gi == 0) {
+            continue;
+        }
+        glyph_frame_set(frame, (uint8_t)(col + i), row, gi, color,
+                        intensity, GLYPH_FLAG_FRONT);
+    }
+}
+
+static void draw_visual_label(glyph_frame_t *frame,
+                              const phosphor_visual_state_t *visual)
+{
+    char text[16];
+    glyph_color_id_t color = GLYPH_COLOR_SECONDARY;
+    if (visual->activity == PHOSPHOR_ACTIVITY_OFFLINE) {
+        draw_state_text(frame, 0, 7, "NO LINK", GLYPH_COLOR_MUTED, 210);
+        draw_state_text(frame, 2, 5, "LAST SYNC --", GLYPH_COLOR_MUTED, 150);
+        return;
+    }
+    if (visual->completion_active) {
+        snprintf(text, sizeof(text), "COMPLETED");
+        color = GLYPH_COLOR_HIGHLIGHT;
+    } else if (visual->attention & PHOSPHOR_ATTENTION_APPROVAL) {
+        snprintf(text, sizeof(text), "APPROVAL %u",
+                 (unsigned)visual->waiting_count);
+        color = GLYPH_COLOR_WARNING;
+    } else if (visual->attention & PHOSPHOR_ATTENTION_ERROR) {
+        snprintf(text, sizeof(text), "ERROR %u",
+                 (unsigned)visual->error_count);
+        color = GLYPH_COLOR_ERROR;
+    } else if (visual->activity == PHOSPHOR_ACTIVITY_WORKING) {
+        snprintf(text, sizeof(text), "WORKING");
+        color = GLYPH_COLOR_PRIMARY;
+    } else {
+        snprintf(text, sizeof(text), "IDLE");
+        color = GLYPH_COLOR_SECONDARY;
+    }
+    uint8_t len = (uint8_t)strlen(text);
+    uint8_t col = len < PHOSPHOR_GRID_W ? (PHOSPHOR_GRID_W - len) / 2 : 0;
+    draw_state_text(frame, 0, col, text, color, 255);
 }
 
 void phosphor_scene_build_frame_visual(
@@ -610,8 +699,20 @@ void phosphor_scene_build_frame_visual(
     }
     clear_satellite_cells(frame);
     if (visual->attention & PHOSPHOR_ATTENTION_APPROVAL) {
-        /* Wider, visible approval gap; the warning satellite is redrawn. */
-        clear_outer_arc(frame, motion, 3.75f, 0.20f);
+        /* 30–40 degree approval gap, warning satellites remain visible. */
+        clear_outer_arc(frame, motion, 3.75f, 0.65f);
+    }
+    for (uint8_t i = 0; i < visual->satellite_count; ++i) {
+        if (visual->satellites[i].status != PHOSPHOR_SESSION_ERROR) {
+            continue;
+        }
+        static const float slot_angle[PHOSPHOR_MAX_SATELLITES] = {
+            0.65f, 5.10f, 3.40f, 4.05f,
+        };
+        clear_outer_arc(frame, motion,
+                        slot_angle[visual->satellites[i].slot %
+                                   PHOSPHOR_MAX_SATELLITES],
+                        0.18f);
     }
     draw_visual_satellites(frame, motion, visual);
     draw_completion_overlay(frame, visual);
@@ -635,6 +736,7 @@ void phosphor_scene_build_frame_visual(
             }
         }
     }
+    draw_visual_label(frame, visual);
 }
 
 void phosphor_scene_render_motion_rgb565(
