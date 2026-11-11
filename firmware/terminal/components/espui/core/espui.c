@@ -253,7 +253,9 @@ static void handle_view_model(espui_context_t *ctx,
     espui_view_model_copy_business(&ctx->model, incoming);
     ctx->model.uptime_ms = espui_uptime_ms(ctx);
 
-    uint16_t attention = espui_view_model_attention_count(&ctx->model);
+    /* Only approvals may force/pin Attention. Errors and completions are
+     * transient and must not trap the user in the scene. */
+    uint16_t attention = espui_view_model_safety_attention_count(&ctx->model);
     espui_input_router_set_attention_count(&ctx->input_router, attention);
     espui_scene_manager_set_attention_count(&ctx->scenes, attention);
 

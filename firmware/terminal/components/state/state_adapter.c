@@ -15,6 +15,27 @@ _Static_assert(MEET_PROTOCOL_MAX_SESSIONS <= ESPUI_MAX_SESSIONS,
 _Static_assert(MEET_PROTOCOL_MAX_PERMISSIONS <= ESPUI_MAX_ATTENTION,
                "protocol permission capacity must fit the ViewModel");
 
+/*
+ * Conservative truncation test. The source may already be capped by the
+ * protocol struct (48 bytes); a full source buffer is treated as truncated
+ * because the original text may have been longer.
+ */
+static bool summary_is_truncated(const char *source, size_t source_size)
+{
+    if (source == NULL || source[0] == '\0') {
+        return true;
+    }
+    size_t length = 0;
+    while (length < source_size && source[length] != '\0') {
+        ++length;
+    }
+    size_t limit = sizeof(((espui_attention_view_t *)0)->summary);
+    if (source_size <= limit) {
+        return length + 1 >= source_size;
+    }
+    return length >= limit;
+}
+
 static espui_node_status_t map_node(meet_node_status_t status)
 {
     switch (status) {
@@ -160,6 +181,8 @@ esp_err_t meet_state_adapter_apply_snapshot(
                       sizeof(attention->session_id));
         espui_strlcpy(attention->summary, permission->summary,
                       sizeof(attention->summary));
+        attention->summary_truncated = summary_is_truncated(
+            permission->summary, sizeof(permission->summary));
         attention->created_at_ms = now_ms;
     }
 
@@ -444,8 +467,8 @@ static void apply_permission_event(const meet_protocol_event_t *event,
         return;
     }
 
-    char description[ESPUI_TITLE_MAX];
-    char action[ESPUI_TITLE_MAX];
+    char description[128];
+    char action[128];
     event_json_get_string(event->payload_json, "description", description,
                           sizeof(description));
     event_json_get_string(event->payload_json, "action", action,
@@ -467,9 +490,10 @@ static void apply_permission_event(const meet_protocol_event_t *event,
     }
     espui_strlcpy(attention->session_id, session_id,
                   sizeof(attention->session_id));
-    espui_strlcpy(attention->summary,
-                  description[0] != '\0' ? description : action,
-                  sizeof(attention->summary));
+    const char *summary = description[0] != '\0' ? description : action;
+    espui_strlcpy(attention->summary, summary, sizeof(attention->summary));
+    attention->summary_truncated =
+        summary_is_truncated(summary, sizeof(description));
     attention->created_at_ms = now_ms;
 }
 

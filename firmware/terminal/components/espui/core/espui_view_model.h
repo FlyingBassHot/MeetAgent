@@ -51,6 +51,8 @@ typedef struct {
     char permission_id[ESPUI_ID_MAX];
     char session_id[ESPUI_ID_MAX];
     char summary[ESPUI_TITLE_MAX];
+    /* The source summary did not fit in summary[] (or was empty). */
+    bool summary_truncated;
     espui_attention_kind_t kind;
     uint32_t created_at_ms;
 } espui_attention_view_t;
@@ -134,6 +136,13 @@ uint16_t espui_view_model_session_count(const espui_view_model_t *model);
 uint16_t espui_view_model_active_session_count(
     const espui_view_model_t *model);
 uint16_t espui_view_model_attention_count(const espui_view_model_t *model);
+
+/*
+ * Safety attention only: pending approvals. Transient errors/completions are
+ * deliberately excluded so they cannot force or pin the Attention scene.
+ */
+uint16_t espui_view_model_safety_attention_count(
+    const espui_view_model_t *model);
 
 /* Fixed 8-entry recent-activity ring (oldest first, no allocation). */
 void espui_view_model_push_activity(espui_view_model_t *model,

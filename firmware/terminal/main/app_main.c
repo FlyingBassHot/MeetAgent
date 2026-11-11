@@ -9,6 +9,7 @@
  */
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
 #include "freertos/task.h"
 
 #include "espui.h"
@@ -23,9 +24,51 @@
 static const char *TAG = "app_main";
 static meet_net_client_t s_net;
 
+#define ACTION_QUEUE_LENGTH 4
+#define ACTION_WORKER_STACK 8192
+#define ACTION_WORKER_PRIORITY 4
+
+static QueueHandle_t s_action_queue;
+static volatile bool s_action_worker_running;
+
+/*
+ * UI task side: never touch the network here. A full queue is reported to the
+ * theme immediately so it can show BUSY/retry instead of blocking LVGL.
+ */
 static esp_err_t send_action(const espui_action_t *action, void *user_ctx)
 {
-    return meet_net_client_send_action((meet_net_client_t *)user_ctx, action);
+    (void)user_ctx;
+    if (action == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (s_action_queue == NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (xQueueSend(s_action_queue, action, 0) != pdTRUE) {
+        return ESP_ERR_TIMEOUT;
+    }
+    return ESP_OK;
+}
+
+static void action_worker(void *arg)
+{
+    meet_net_client_t *client = (meet_net_client_t *)arg;
+    espui_action_t action;
+
+    while (s_action_worker_running) {
+        if (xQueueReceive(s_action_queue, &action, portMAX_DELAY) != pdTRUE) {
+            continue;
+        }
+        esp_err_t err = meet_net_client_send_action(client, &action);
+        if (err != ESP_OK) {
+            /* The network client reports a user-visible result for every
+             * failure path; this log is only diagnostics. */
+            ESP_LOGW(TAG, "action send failed: type=%s err=%s",
+                     espui_action_type_name(action.type),
+                     esp_err_to_name(err));
+        }
+    }
+    vTaskDelete(NULL);
 }
 
 static void on_net_state(meet_net_state_t state, void *user_ctx)
@@ -134,6 +177,20 @@ void app_main(void)
         ESP_LOGW(TAG, "network client init failed: %s", esp_err_to_name(err));
     }
 
+    s_action_worker_running = true;
+    s_action_queue = xQueueCreate(ACTION_QUEUE_LENGTH, sizeof(espui_action_t));
+    if (s_action_queue == NULL) {
+        ESP_LOGE(TAG, "action queue allocation failed");
+    } else if (xTaskCreatePinnedToCore(action_worker, "espui_action",
+                                       ACTION_WORKER_STACK, &s_net,
+                                       ACTION_WORKER_PRIORITY, NULL,
+                                       tskNO_AFFINITY) != pdPASS) {
+        ESP_LOGE(TAG, "action worker creation failed");
+        vQueueDelete(s_action_queue);
+        s_action_queue = NULL;
+        s_action_worker_running = false;
+    }
+
     espui_view_model_t initial_model;
     meet_mock_state_init(&initial_model);
 
@@ -142,7 +199,7 @@ void app_main(void)
         .initial_model = &initial_model,
         .initial_theme_id = "terminal_aesthetic",
         .action_send = send_action,
-        .action_send_ctx = &s_net,
+        .action_send_ctx = NULL,
         .ui_task_stack = 8192,
         .ui_task_priority = 5,
         .ui_task_core = -1,

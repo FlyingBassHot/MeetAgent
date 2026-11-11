@@ -11,6 +11,7 @@
 
 #include "espui.h"
 #include "espui_theme.h"
+#include "espui_util.h"
 #include "phosphor_lvgl_port.h"
 
 static const espui_manifest_t s_manifest = {
@@ -49,7 +50,6 @@ typedef struct {
     espui_ui_scene_t *scene;
     espui_ui_widget_t *background;
     espui_ui_widget_t *core_panel;
-    espui_ui_widget_t *info_panel;
     espui_ui_widget_t *header;
     espui_ui_widget_t *scene_label;
     espui_ui_widget_t *core;
@@ -62,18 +62,66 @@ typedef struct {
     espui_ui_widget_t *focus_status;
     espui_ui_widget_t *focus_duration;
     espui_ui_widget_t *focus_recent;
+    espui_ui_widget_t *focus_action_bg;
     espui_ui_widget_t *focus_action;
     espui_ui_widget_t *activity_title;
     espui_ui_widget_t *activity_body;
     espui_ui_widget_t *attention_title;
-    espui_ui_widget_t *attention_list;
+    espui_ui_widget_t *attention_row[3];
     espui_ui_widget_t *attention_detail;
+    espui_ui_widget_t *attention_button_bg[3];
+    espui_ui_widget_t *attention_button_label[3];
+    espui_ui_widget_t *attention_hint;
     espui_widget_spec_t status_spec;
     espui_widget_spec_t strip_spec;
     espui_widget_spec_t core_panel_spec;
+    espui_widget_spec_t focus_action_spec;
+    espui_widget_spec_t attention_button_spec[3];
     bool canvas_attached;
     espui_scene_id_t current_scene;
+
+    /* Focus selection: survives ViewModel updates while the session exists. */
+    char focus_session_id[ESPUI_ID_MAX];
+
+    /* Attention selection and approval state. */
+    char selected_permission_id[ESPUI_ID_MAX];
+    bool selected_is_approval;
+    bool selected_summary_blocked;
+    bool approval_pending;
+    char pending_permission_id[ESPUI_ID_MAX];
+    espui_permission_decision_t pending_decision;
+    bool approval_acked;
+    char acked_permission_id[ESPUI_ID_MAX];
+    bool always_confirm_armed;
+    uint32_t always_confirm_deadline_ms;
+    char attention_status[ESPUI_LABEL_MAX];
+
+    /* Interrupt button state, scoped to the selected session. */
+    char interrupt_session_id[ESPUI_ID_MAX];
+    bool interrupt_pending;
+    bool interrupt_sent;
+    char interrupt_status[ESPUI_LABEL_MAX];
 } terminal_theme_state_t;
+
+#define ATTENTION_ROWS 3
+#define ATTENTION_ROW_Y 106
+#define ATTENTION_ROW_PITCH 44
+#define ATTENTION_ROW_HEIGHT 40
+#define ATTENTION_DETAIL_Y 240
+#define ATTENTION_DETAIL_HEIGHT 68
+#define ATTENTION_BUTTON_Y 314
+#define ATTENTION_BUTTON_HEIGHT 44
+#define ATTENTION_BUTTON_WIDTH 144
+#define ATTENTION_BUTTON_X(i) (16 + (i) * 152)
+#define ATTENTION_HINT_Y 364
+#define ATTENTION_HINT_HEIGHT 40
+#define ALWAYS_CONFIRM_TIMEOUT_MS 5000
+#define FOCUS_CONTENT_Y0 60
+#define FOCUS_CONTENT_Y1 300
+#define FOCUS_INTERRUPT_Y 320
+#define FOCUS_INTERRUPT_HEIGHT 44
+#define FOCUS_INTERRUPT_WIDTH 200
+#define FOCUS_INTERRUPT_X 140
 
 static terminal_theme_state_t s_state;
 
@@ -149,18 +197,23 @@ static void apply_scene_visibility(espui_scene_id_t scene)
     set_visible(s_state.status, ambient && !s_state.canvas_attached);
     set_visible(s_state.strip, ambient);
     set_visible(s_state.footer, !ambient);
-    set_visible(s_state.info_panel, false);
     set_visible(s_state.focus_title, focus);
     set_visible(s_state.focus_agent, focus);
     set_visible(s_state.focus_status, focus);
     set_visible(s_state.focus_duration, focus);
     set_visible(s_state.focus_recent, focus);
+    set_visible(s_state.focus_action_bg, focus);
     set_visible(s_state.focus_action, focus);
     set_visible(s_state.activity_title, activity);
     set_visible(s_state.activity_body, activity);
     set_visible(s_state.attention_title, attention);
-    set_visible(s_state.attention_list, attention);
+    for (int i = 0; i < ATTENTION_ROWS; ++i) {
+        set_visible(s_state.attention_row[i], false);
+        set_visible(s_state.attention_button_bg[i], false);
+        set_visible(s_state.attention_button_label[i], false);
+    }
     set_visible(s_state.attention_detail, attention);
+    set_visible(s_state.attention_hint, false);
 
     if (s_state.core_panel != NULL) {
         espui_widget_spec_t panel = s_state.core_panel_spec;
@@ -181,39 +234,69 @@ static void apply_scene_visibility(espui_scene_id_t scene)
 }
 
 
-static const espui_session_view_t *selected_session(
-    const espui_view_model_t *model)
+static bool session_is_active(const espui_session_view_t *session)
 {
-    const espui_session_view_t *list[ESPUI_MAX_SESSIONS];
+    return session != NULL &&
+           (session->status == ESPUI_SESSION_RUNNING ||
+            session->status == ESPUI_SESSION_WAITING_APPROVAL);
+}
+
+static size_t collect_sessions(const espui_view_model_t *model,
+                               const espui_session_view_t **list,
+                               size_t capacity, bool active_only)
+{
     size_t count = 0;
-    size_t index = 0;
+    if (model == NULL || list == NULL || capacity == 0) {
+        return 0;
+    }
 
     /* Active sessions first, then completed/interrupted/unknown. */
-    for (size_t i = 0; i < ESPUI_MAX_SESSIONS; ++i) {
+    for (size_t i = 0; i < ESPUI_MAX_SESSIONS && count < capacity; ++i) {
         const espui_session_view_t *session = &model->sessions[i];
-        if (!session->in_use) {
-            continue;
-        }
-        if (session->status == ESPUI_SESSION_RUNNING ||
-            session->status == ESPUI_SESSION_WAITING_APPROVAL) {
-            list[count++] = session;
-        }
-    }
-    for (size_t i = 0; i < ESPUI_MAX_SESSIONS; ++i) {
-        const espui_session_view_t *session = &model->sessions[i];
-        if (!session->in_use) {
-            continue;
-        }
-        if (session->status == ESPUI_SESSION_RUNNING ||
-            session->status == ESPUI_SESSION_WAITING_APPROVAL) {
+        if (!session->in_use || !session_is_active(session)) {
             continue;
         }
         list[count++] = session;
     }
+    if (active_only) {
+        return count;
+    }
+    for (size_t i = 0; i < ESPUI_MAX_SESSIONS && count < capacity; ++i) {
+        const espui_session_view_t *session = &model->sessions[i];
+        if (!session->in_use || session_is_active(session)) {
+            continue;
+        }
+        list[count++] = session;
+    }
+    return count;
+}
+
+static const espui_session_view_t *selected_session(
+    const espui_view_model_t *model)
+{
+    const espui_session_view_t *list[ESPUI_MAX_SESSIONS];
+    size_t count = collect_sessions(model, list, ESPUI_MAX_SESSIONS, false);
     if (count == 0) {
+        s_state.focus_session_id[0] = '\0';
         return NULL;
     }
-    index = espui_focus_index(s_state.ctx) % count;
+
+    size_t index = count;
+    bool had_selection = s_state.focus_session_id[0] != '\0';
+    for (size_t i = 0; i < count; ++i) {
+        if (had_selection &&
+            strcmp(list[i]->session_id, s_state.focus_session_id) == 0) {
+            index = i;
+            break;
+        }
+    }
+    if (index >= count) {
+        /* A disappeared selection falls back to the first session; the very
+         * first render still honours the global focus accessor. */
+        index = had_selection ? 0 : (espui_focus_index(s_state.ctx) % count);
+        espui_strlcpy(s_state.focus_session_id, list[index]->session_id,
+                      sizeof(s_state.focus_session_id));
+    }
     return list[index];
 }
 
@@ -273,16 +356,70 @@ static void update_ambient(const espui_view_model_t *model)
     set_text(s_state.strip, strip);
 }
 
+static void sync_interrupt_target(const espui_session_view_t *session)
+{
+    const char *id = session != NULL ? session->session_id : "";
+    if (strcmp(s_state.interrupt_session_id, id) != 0) {
+        espui_strlcpy(s_state.interrupt_session_id, id,
+                      sizeof(s_state.interrupt_session_id));
+        s_state.interrupt_pending = false;
+        s_state.interrupt_sent = false;
+        s_state.interrupt_status[0] = '\0';
+    }
+    if (!session_is_active(session)) {
+        s_state.interrupt_pending = false;
+        s_state.interrupt_sent = false;
+        s_state.interrupt_status[0] = '\0';
+    }
+}
+
+static void render_focus_action(const espui_session_view_t *session)
+{
+    if (s_state.focus_action == NULL || s_state.renderer == NULL) {
+        return;
+    }
+    bool in_scene = s_state.current_scene == ESPUI_SCENE_FOCUS;
+    bool eligible = session_is_active(session);
+    set_visible(s_state.focus_action_bg, eligible && in_scene);
+
+    espui_widget_spec_t spec = s_state.focus_action_spec;
+    const char *text = "INTERRUPT UNAVAILABLE";
+    if (session == NULL) {
+        text = "NO ACTIVE SESSION";
+    } else if (eligible) {
+        bool same = strcmp(s_state.interrupt_session_id,
+                           session->session_id) == 0;
+        text = "INTERRUPT";
+        spec.fg_color = s_state.tokens->colors.primary;
+        if (same && s_state.interrupt_pending) {
+            text = "INTERRUPTING...";
+            spec.fg_color = s_state.tokens->colors.muted;
+        } else if (same && s_state.interrupt_sent) {
+            text = "INTERRUPT SENT";
+            spec.fg_color = s_state.tokens->colors.warning;
+        } else if (same && s_state.interrupt_status[0] != '\0') {
+            text = s_state.interrupt_status;
+            spec.fg_color = s_state.tokens->colors.error;
+        }
+    } else {
+        spec.fg_color = s_state.tokens->colors.muted;
+    }
+    (void)s_state.renderer->widget_set_spec(s_state.focus_action, &spec);
+    set_text(s_state.focus_action, text);
+    set_visible(s_state.focus_action, in_scene);
+}
+
 static void update_focus(const espui_view_model_t *model)
 {
     const espui_session_view_t *session = selected_session(model);
+    sync_interrupt_target(session);
     if (session == NULL) {
         set_text(s_state.focus_title, "NO ACTIVE SESSION");
         set_text(s_state.focus_agent, "AGENT: -");
         set_text(s_state.focus_status, "STATUS: -");
         set_text(s_state.focus_duration, "DURATION: --:--");
         set_text(s_state.focus_recent, "RECENT: NO EVENT");
-        set_text(s_state.focus_action, "[ INTERRUPT: STAGE 3 ]");
+        render_focus_action(NULL);
         return;
     }
 
@@ -319,7 +456,7 @@ static void update_focus(const espui_view_model_t *model)
         snprintf(line, sizeof(line), "RECENT: NO EVENT");
     }
     set_text(s_state.focus_recent, line);
-    set_text(s_state.focus_action, "[ INTERRUPT: STAGE 3 ]");
+    render_focus_action(session);
 }
 
 static void update_activity(const espui_view_model_t *model)
@@ -354,64 +491,295 @@ static void update_activity(const espui_view_model_t *model)
     set_text(s_state.activity_body, body);
 }
 
-static void update_attention(const espui_view_model_t *model)
+static uint8_t collect_attention(const espui_view_model_t *model,
+                                 const espui_attention_view_t **items,
+                                 uint8_t capacity)
 {
-    char list[512];
-    size_t offset = 0;
-    uint8_t shown = 0;
-    uint8_t total = 0;
-    const espui_attention_view_t *first = NULL;
-
-    for (size_t i = 0; i < ESPUI_MAX_ATTENTION; ++i) {
-        const espui_attention_view_t *attention = &model->attention[i];
-        if (!attention->in_use) {
-            continue;
-        }
-        ++total;
-        if (first == NULL) {
-            first = attention;
-        }
-        if (shown >= 3 || offset >= sizeof(list)) {
-            continue;
-        }
-        uint32_t age_s = 0;
-        if (model->uptime_ms > attention->created_at_ms) {
-            age_s = (model->uptime_ms - attention->created_at_ms) / 1000u;
-        }
-        int written = snprintf(
-            list + offset, sizeof(list) - offset, "[%s] %s  %.18s  T+%lus\n",
-            espui_attention_kind_name(attention->kind),
-            attention->session_id[0] != '\0' ? attention->session_id : "-",
-            attention->summary[0] != '\0' ? attention->summary : "(no summary)",
-            (unsigned long)age_s);
-        if (written < 0) {
-            break;
-        }
-        offset += (size_t)written;
-        ++shown;
+    uint8_t count = 0;
+    if (model == NULL || items == NULL) {
+        return 0;
     }
+    for (size_t i = 0; i < ESPUI_MAX_ATTENTION && count < capacity; ++i) {
+        if (model->attention[i].in_use) {
+            items[count++] = &model->attention[i];
+        }
+    }
+    return count;
+}
 
-    if (total == 0) {
-        set_text(s_state.attention_list, "NO PENDING ATTENTION");
-        set_text(s_state.attention_detail, "DETAIL / ACTIONS: STAGE 3");
+static bool attention_list_has(const espui_attention_view_t **items,
+                               uint8_t count, const char *permission_id)
+{
+    if (permission_id == NULL || permission_id[0] == '\0') {
+        return false;
+    }
+    for (uint8_t i = 0; i < count; ++i) {
+        if (strcmp(items[i]->permission_id, permission_id) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static void set_action_button(int index, const char *text, bool visible,
+                              uint32_t bg_color, bool disabled)
+{
+    if (index < 0 || index >= 3 || s_state.renderer == NULL) {
         return;
     }
-    if (total > shown && offset < sizeof(list)) {
-        (void)snprintf(list + offset, sizeof(list) - offset, "+%u MORE\n",
-                       (unsigned)(total - shown));
+    espui_ui_widget_t *background = s_state.attention_button_bg[index];
+    espui_ui_widget_t *label = s_state.attention_button_label[index];
+    set_visible(background, visible);
+    set_visible(label, visible);
+    if (!visible || background == NULL || label == NULL) {
+        return;
     }
-    list[sizeof(list) - 1] = '\0';
-    set_text(s_state.attention_list, list);
 
-    char detail[256];
-    if (first != NULL) {
-        snprintf(detail, sizeof(detail), "PERMISSION: %s\nSESSION: %s\n%.36s\n"
-                                         "DETAIL / ACTIONS: STAGE 3",
-                 first->permission_id, first->session_id, first->summary);
-    } else {
-        snprintf(detail, sizeof(detail), "NO PENDING ATTENTION");
+    espui_widget_spec_t rect = s_state.attention_button_spec[index];
+    rect.x = ATTENTION_BUTTON_X(index);
+    rect.y = ATTENTION_BUTTON_Y;
+    rect.width = ATTENTION_BUTTON_WIDTH;
+    rect.height = ATTENTION_BUTTON_HEIGHT;
+    rect.visible = true;
+    rect.transparent_bg = false;
+    rect.fg_color = bg_color;
+    rect.bg_color = bg_color;
+    (void)s_state.renderer->widget_set_spec(background, &rect);
+
+    espui_widget_spec_t spec = rect;
+    spec.x = (int16_t)(rect.x + 4);
+    spec.y = (int16_t)(rect.y + 10);
+    spec.width = (int16_t)(rect.width - 8);
+    spec.height = 24;
+    spec.transparent_bg = true;
+    spec.fg_color = disabled ? s_state.tokens->colors.muted
+                             : s_state.tokens->colors.background;
+    spec.align = ESPUI_TEXT_ALIGN_CENTER;
+    (void)s_state.renderer->widget_set_spec(label, &spec);
+    set_text(label, text);
+}
+
+static void update_attention(const espui_view_model_t *model)
+{
+    const espui_attention_view_t *items[ESPUI_MAX_ATTENTION];
+    uint8_t count = collect_attention(model, items, ESPUI_MAX_ATTENTION);
+    bool in_scene = s_state.current_scene == ESPUI_SCENE_ATTENTION;
+
+    if (!attention_list_has(items, count, s_state.pending_permission_id)) {
+        s_state.approval_pending = false;
+        s_state.pending_permission_id[0] = '\0';
     }
+    if (!attention_list_has(items, count, s_state.acked_permission_id)) {
+        s_state.approval_acked = false;
+        s_state.acked_permission_id[0] = '\0';
+    }
+
+    if (count == 0) {
+        s_state.selected_permission_id[0] = '\0';
+        s_state.selected_is_approval = false;
+        s_state.selected_summary_blocked = false;
+        s_state.always_confirm_armed = false;
+        s_state.attention_status[0] = '\0';
+        for (int i = 0; i < ATTENTION_ROWS; ++i) {
+            set_visible(s_state.attention_row[i], false);
+            set_visible(s_state.attention_button_bg[i], false);
+            set_visible(s_state.attention_button_label[i], false);
+        }
+        set_text(s_state.attention_detail, "NO PENDING ATTENTION");
+        espui_widget_spec_t hint_spec = {
+            .x = 28,
+            .y = ATTENTION_HINT_Y,
+            .width = 424,
+            .height = ATTENTION_HINT_HEIGHT,
+            .fg_color = s_state.tokens->colors.muted,
+            .transparent_bg = true,
+            .font_scale_percent = 100,
+            .align = ESPUI_TEXT_ALIGN_CENTER,
+            .visible = in_scene,
+        };
+        (void)s_state.renderer->widget_set_spec(s_state.attention_hint,
+                                                &hint_spec);
+        set_text(s_state.attention_hint, "APPROVALS APPEAR HERE");
+        set_visible(s_state.attention_hint, in_scene);
+        return;
+    }
+
+    uint8_t selected = 0;
+    bool found = false;
+    for (uint8_t i = 0; i < count; ++i) {
+        if (s_state.selected_permission_id[0] != '\0' &&
+            strcmp(items[i]->permission_id,
+                   s_state.selected_permission_id) == 0) {
+            selected = i;
+            found = true;
+            break;
+        }
+    }
+    if (!found) {
+        selected = 0;
+    }
+
+    bool selection_changed =
+        strcmp(s_state.selected_permission_id, items[selected]->permission_id) !=
+        0;
+    if (selection_changed) {
+        espui_strlcpy(s_state.selected_permission_id,
+                      items[selected]->permission_id,
+                      sizeof(s_state.selected_permission_id));
+        s_state.always_confirm_armed = false;
+        s_state.attention_status[0] = '\0';
+    }
+
+    const espui_attention_view_t *item = items[selected];
+    s_state.selected_is_approval = item->kind == ESPUI_ATTENTION_APPROVAL;
+    s_state.selected_summary_blocked =
+        s_state.selected_is_approval &&
+        (item->summary_truncated || item->summary[0] == '\0');
+
+    char line[ESPUI_LABEL_MAX];
+    for (int i = 0; i < ATTENTION_ROWS; ++i) {
+        if (!in_scene || i >= (int)count) {
+            set_visible(s_state.attention_row[i], false);
+            continue;
+        }
+        const espui_attention_view_t *row = items[i];
+        uint32_t age_s = 0;
+        if (model->uptime_ms > row->created_at_ms) {
+            age_s = (model->uptime_ms - row->created_at_ms) / 1000u;
+        }
+        bool row_pending =
+            s_state.approval_pending &&
+            strcmp(row->permission_id, s_state.pending_permission_id) == 0;
+        snprintf(line, sizeof(line), "%c %u/%u %-10.10s %.14s T+%lus%s",
+                 i == selected ? '>' : ' ', (unsigned)(i + 1),
+                 (unsigned)count, espui_attention_kind_name(row->kind),
+                 row->session_id[0] != '\0' ? row->session_id : "-",
+                 (unsigned long)age_s, row_pending ? " PEND" : "");
+
+        espui_widget_spec_t spec = {
+            .x = 28,
+            .y = (int16_t)(ATTENTION_ROW_Y + i * ATTENTION_ROW_PITCH),
+            .width = 424,
+            .height = ATTENTION_ROW_HEIGHT,
+            .fg_color = i == selected ? s_state.tokens->colors.warning
+                                      : s_state.tokens->colors.secondary,
+            .transparent_bg = true,
+            .font_scale_percent = 100,
+            .align = ESPUI_TEXT_ALIGN_LEFT,
+            .visible = true,
+        };
+        (void)s_state.renderer->widget_set_spec(s_state.attention_row[i],
+                                                &spec);
+        set_text(s_state.attention_row[i], line);
+        set_visible(s_state.attention_row[i], true);
+    }
+
+    uint32_t age_s = 0;
+    if (model->uptime_ms > item->created_at_ms) {
+        age_s = (model->uptime_ms - item->created_at_ms) / 1000u;
+    }
+    char detail[192];
+    snprintf(detail, sizeof(detail),
+             "PERM %u/%u  %-10.10s  T+%lus\nSES %.20s  ID %.18s\nSUMMARY: %.34s",
+             (unsigned)(selected + 1), (unsigned)count,
+             espui_attention_kind_name(item->kind), (unsigned long)age_s,
+             item->session_id[0] != '\0' ? item->session_id : "-",
+             item->permission_id[0] != '\0' ? item->permission_id : "-",
+             item->summary[0] != '\0' ? item->summary : "(empty)");
     set_text(s_state.attention_detail, detail);
+
+    bool selected_acked =
+        s_state.approval_acked &&
+        strcmp(s_state.acked_permission_id, item->permission_id) == 0;
+    bool disabled = s_state.approval_pending || selected_acked;
+    bool show_reject = s_state.selected_is_approval;
+    bool show_approve = s_state.selected_is_approval &&
+                        !s_state.selected_summary_blocked;
+
+    if (in_scene && show_reject) {
+        bool reject_pending = s_state.approval_pending &&
+                              s_state.pending_decision == ESPUI_PERMISSION_REJECT;
+        set_action_button(0, reject_pending ? "PENDING" : "REJECT", true,
+                          disabled ? s_state.tokens->colors.surface
+                                   : s_state.tokens->colors.error,
+                          disabled);
+    } else {
+        set_action_button(0, "REJECT", false, 0, true);
+    }
+
+    if (in_scene && show_approve) {
+        bool once_pending = s_state.approval_pending &&
+                            s_state.pending_decision == ESPUI_PERMISSION_ONCE;
+        set_action_button(1, once_pending ? "PENDING" : "APPROVE ONCE", true,
+                          disabled ? s_state.tokens->colors.surface
+                                   : s_state.tokens->colors.secondary,
+                          disabled);
+        const char *always_text = "APPROVE ALWAYS";
+        if (s_state.approval_pending &&
+            s_state.pending_decision == ESPUI_PERMISSION_ALWAYS) {
+            always_text = "PENDING";
+        } else if (s_state.always_confirm_armed) {
+            always_text = "CONFIRM ALWAYS";
+        }
+        set_action_button(2, always_text, true,
+                          disabled ? s_state.tokens->colors.surface
+                                   : (s_state.always_confirm_armed
+                                          ? s_state.tokens->colors.highlight
+                                          : s_state.tokens->colors.warning),
+                          disabled);
+    } else {
+        set_action_button(1, "APPROVE ONCE", false, 0, true);
+        set_action_button(2, "APPROVE ALWAYS", false, 0, true);
+    }
+
+    if (!in_scene) {
+        set_visible(s_state.attention_hint, false);
+        return;
+    }
+    if (s_state.selected_summary_blocked) {
+        set_text(s_state.attention_hint, "OPEN MOBILE > APPROVALS");
+    } else if (s_state.approval_pending) {
+        set_text(s_state.attention_hint, "PENDING // WAIT FOR NODE");
+    } else if (s_state.always_confirm_armed) {
+        set_text(s_state.attention_hint, "CONFIRM ALWAYS: TAP AGAIN (5s)");
+    } else if (s_state.attention_status[0] != '\0') {
+        set_text(s_state.attention_hint, s_state.attention_status);
+    } else if (selected_acked) {
+        set_text(s_state.attention_hint, "ACK");
+    } else if (!s_state.selected_is_approval) {
+        set_text(s_state.attention_hint, "NO TERMINAL ACTION");
+    } else if (count > ATTENTION_ROWS) {
+        snprintf(line, sizeof(line), "+%u MORE // OPEN MOBILE",
+                 (unsigned)(count - ATTENTION_ROWS));
+        set_text(s_state.attention_hint, line);
+    } else {
+        set_text(s_state.attention_hint, "REJECT IS ALWAYS SAFE");
+    }
+    uint32_t hint_color = s_state.tokens->colors.muted;
+    if (s_state.selected_summary_blocked) {
+        hint_color = s_state.tokens->colors.warning;
+    } else if (s_state.approval_pending) {
+        hint_color = s_state.tokens->colors.primary;
+    } else if (s_state.always_confirm_armed) {
+        hint_color = s_state.tokens->colors.highlight;
+    } else if (strncmp(s_state.attention_status, "ACK", 3) == 0) {
+        hint_color = s_state.tokens->colors.primary;
+    } else if (s_state.attention_status[0] != '\0') {
+        hint_color = s_state.tokens->colors.error;
+    }
+    espui_widget_spec_t hint_spec = {
+        .x = 28,
+        .y = ATTENTION_HINT_Y,
+        .width = 424,
+        .height = ATTENTION_HINT_HEIGHT,
+        .fg_color = hint_color,
+        .transparent_bg = true,
+        .font_scale_percent = 100,
+        .align = ESPUI_TEXT_ALIGN_CENTER,
+        .visible = true,
+    };
+    (void)s_state.renderer->widget_set_spec(s_state.attention_hint, &hint_spec);
+    set_visible(s_state.attention_hint, true);
 }
 
 static void update_state(const espui_view_model_t *model)
@@ -424,7 +792,8 @@ static void update_state(const espui_view_model_t *model)
     update_focus(model);
     update_activity(model);
     update_attention(model);
-    (void)s_state.renderer->scene_commit(s_state.scene);
+    /* No full-screen commit here: widget_set_text/spec/visible invalidate
+     * locally. Re-loading the root at 4 Hz caused avoidable full redraws. */
 }
 
 static esp_err_t terminal_init(const espui_context_t *ctx)
@@ -488,24 +857,6 @@ static esp_err_t terminal_init(const espui_context_t *ctx)
     };
     s_state.core_panel = make_rect(&s_state, &core_panel_spec);
     if (s_state.core_panel == NULL) {
-        destroy_scene();
-        return ESP_ERR_NO_MEM;
-    }
-
-    espui_widget_spec_t info_panel_spec = {
-        .x = 16,
-        .y = 326,
-        .width = 448,
-        .height = 96,
-        .fg_color = tokens->colors.surface,
-        .bg_color = tokens->colors.surface,
-        .transparent_bg = false,
-        .font_scale_percent = 100,
-        .align = ESPUI_TEXT_ALIGN_LEFT,
-        .visible = true,
-    };
-    s_state.info_panel = make_rect(&s_state, &info_panel_spec);
-    if (s_state.info_panel == NULL) {
         destroy_scene();
         return ESP_ERR_NO_MEM;
     }
@@ -636,12 +987,29 @@ static esp_err_t terminal_init(const espui_context_t *ctx)
     focus_spec.height = 56;
     focus_spec.fg_color = tokens->colors.secondary;
     s_state.focus_recent = make_widget(&s_state, &focus_spec, "RECENT: NO EVENT");
+    espui_widget_spec_t focus_action_bg_spec = {
+        .x = FOCUS_INTERRUPT_X,
+        .y = FOCUS_INTERRUPT_Y,
+        .width = FOCUS_INTERRUPT_WIDTH,
+        .height = FOCUS_INTERRUPT_HEIGHT,
+        .fg_color = tokens->colors.surface,
+        .bg_color = tokens->colors.surface,
+        .transparent_bg = false,
+        .font_scale_percent = 100,
+        .align = ESPUI_TEXT_ALIGN_CENTER,
+        .visible = false,
+    };
+    s_state.focus_action_bg = make_rect(&s_state, &focus_action_bg_spec);
+
+    focus_spec.x = FOCUS_INTERRUPT_X;
     focus_spec.y = 330;
-    focus_spec.height = 28;
-    focus_spec.fg_color = tokens->colors.warning;
+    focus_spec.width = FOCUS_INTERRUPT_WIDTH;
+    focus_spec.height = 24;
+    focus_spec.fg_color = tokens->colors.primary;
     focus_spec.align = ESPUI_TEXT_ALIGN_CENTER;
+    s_state.focus_action_spec = focus_spec;
     s_state.focus_action =
-        make_widget(&s_state, &focus_spec, "[ INTERRUPT: STAGE 3 ]");
+        make_widget(&s_state, &focus_spec, "INTERRUPT");
 
     espui_widget_spec_t activity_spec = {
         .x = 28,
@@ -675,27 +1043,98 @@ static esp_err_t terminal_init(const espui_context_t *ctx)
     };
     s_state.attention_title =
         make_widget(&s_state, &attention_spec, "ATTENTION REQUIRED");
-    attention_spec.y = 106;
-    attention_spec.height = 170;
-    s_state.attention_list =
-        make_widget(&s_state, &attention_spec, "NO PENDING ATTENTION");
-    attention_spec.y = 282;
-    attention_spec.height = 118;
+
+    for (int i = 0; i < ATTENTION_ROWS; ++i) {
+        espui_widget_spec_t row_spec = {
+            .x = 28,
+            .y = (int16_t)(ATTENTION_ROW_Y + i * ATTENTION_ROW_PITCH),
+            .width = 424,
+            .height = ATTENTION_ROW_HEIGHT,
+            .fg_color = tokens->colors.secondary,
+            .transparent_bg = true,
+            .font_scale_percent = 100,
+            .align = ESPUI_TEXT_ALIGN_LEFT,
+            .visible = false,
+        };
+        s_state.attention_row[i] =
+            make_widget(&s_state, &row_spec, "NO PENDING ATTENTION");
+    }
+
+    attention_spec.y = ATTENTION_DETAIL_Y;
+    attention_spec.height = ATTENTION_DETAIL_HEIGHT;
     attention_spec.fg_color = tokens->colors.muted;
     s_state.attention_detail = make_widget(
-        &s_state, &attention_spec, "DETAIL / ACTIONS: STAGE 3");
+        &s_state, &attention_spec, "NO PENDING ATTENTION");
+
+    /* Backgrounds are created before labels so the text stays on top. */
+    for (int i = 0; i < 3; ++i) {
+        espui_widget_spec_t button_spec = {
+            .x = ATTENTION_BUTTON_X(i),
+            .y = ATTENTION_BUTTON_Y,
+            .width = ATTENTION_BUTTON_WIDTH,
+            .height = ATTENTION_BUTTON_HEIGHT,
+            .fg_color = tokens->colors.surface,
+            .bg_color = tokens->colors.surface,
+            .transparent_bg = false,
+            .font_scale_percent = 100,
+            .align = ESPUI_TEXT_ALIGN_CENTER,
+            .visible = false,
+        };
+        s_state.attention_button_spec[i] = button_spec;
+        s_state.attention_button_bg[i] = make_rect(&s_state, &button_spec);
+    }
+    static const char *BUTTON_TEXT[3] = {"REJECT", "APPROVE ONCE",
+                                         "APPROVE ALWAYS"};
+    for (int i = 0; i < 3; ++i) {
+        espui_widget_spec_t label_spec = s_state.attention_button_spec[i];
+        label_spec.x = (int16_t)(label_spec.x + 4);
+        label_spec.y = (int16_t)(label_spec.y + 10);
+        label_spec.width = (int16_t)(label_spec.width - 8);
+        label_spec.height = 24;
+        label_spec.transparent_bg = true;
+        label_spec.fg_color = tokens->colors.background;
+        s_state.attention_button_label[i] =
+            make_widget(&s_state, &label_spec, BUTTON_TEXT[i]);
+    }
+
+    espui_widget_spec_t hint_spec = {
+        .x = 28,
+        .y = ATTENTION_HINT_Y,
+        .width = 424,
+        .height = ATTENTION_HINT_HEIGHT,
+        .fg_color = tokens->colors.muted,
+        .transparent_bg = true,
+        .font_scale_percent = 100,
+        .align = ESPUI_TEXT_ALIGN_CENTER,
+        .visible = false,
+    };
+    s_state.attention_hint =
+        make_widget(&s_state, &hint_spec, "APPROVALS APPEAR HERE");
     if (s_state.header == NULL || s_state.scene_label == NULL ||
         s_state.core == NULL || s_state.status == NULL ||
         s_state.strip == NULL || s_state.footer == NULL ||
-        s_state.core_panel == NULL || s_state.info_panel == NULL ||
-        s_state.focus_title == NULL || s_state.focus_agent == NULL ||
-        s_state.focus_status == NULL || s_state.focus_duration == NULL ||
-        s_state.focus_recent == NULL || s_state.focus_action == NULL ||
+        s_state.core_panel == NULL || s_state.focus_title == NULL ||
+        s_state.focus_agent == NULL || s_state.focus_status == NULL ||
+        s_state.focus_duration == NULL || s_state.focus_recent == NULL ||
+        s_state.focus_action_bg == NULL || s_state.focus_action == NULL ||
         s_state.activity_title == NULL || s_state.activity_body == NULL ||
-        s_state.attention_title == NULL || s_state.attention_list == NULL ||
-        s_state.attention_detail == NULL) {
+        s_state.attention_title == NULL || s_state.attention_detail == NULL ||
+        s_state.attention_hint == NULL) {
         destroy_scene();
         return ESP_ERR_NO_MEM;
+    }
+    for (int i = 0; i < ATTENTION_ROWS; ++i) {
+        if (s_state.attention_row[i] == NULL) {
+            destroy_scene();
+            return ESP_ERR_NO_MEM;
+        }
+    }
+    for (int i = 0; i < 3; ++i) {
+        if (s_state.attention_button_bg[i] == NULL ||
+            s_state.attention_button_label[i] == NULL) {
+            destroy_scene();
+            return ESP_ERR_NO_MEM;
+        }
     }
 
     apply_scene_visibility(ESPUI_SCENE_AMBIENT);
@@ -716,6 +1155,8 @@ static esp_err_t terminal_enter_scene(espui_scene_id_t scene,
         return ESP_ERR_INVALID_STATE;
     }
     s_state.current_scene = scene;
+    s_state.always_confirm_armed = false;
+    s_state.always_confirm_deadline_ms = 0;
     if (s_state.scene_label != NULL) {
         char buffer[ESPUI_LABEL_MAX];
         snprintf(buffer, sizeof(buffer), "SCENE: %s", espui_scene_name(scene));
@@ -724,6 +1165,8 @@ static esp_err_t terminal_enter_scene(espui_scene_id_t scene,
     apply_scene_visibility(scene);
     phosphor_lvgl_port_set_active(scene == ESPUI_SCENE_AMBIENT &&
                                   s_state.canvas_attached);
+    /* The single root was loaded by scene_commit() in terminal_init(); scene
+     * changes only toggle widget visibility and invalidate those areas. */
     update_state(model);
     return ESP_OK;
 }
@@ -733,14 +1176,195 @@ static void terminal_update(const espui_view_model_t *model)
     update_state(model);
 }
 
+static bool point_in_rect(uint16_t x, uint16_t y, int16_t rx, int16_t ry,
+                          int16_t rw, int16_t rh)
+{
+    return x >= rx && x < (int32_t)rx + rw && y >= ry &&
+           y < (int32_t)ry + rh;
+}
+
+static void focus_cycle_session(void)
+{
+    const espui_view_model_t *model = espui_view_model(s_state.ctx);
+    if (model == NULL) {
+        return;
+    }
+    const espui_session_view_t *active[ESPUI_MAX_SESSIONS];
+    size_t count = collect_sessions(model, active, ESPUI_MAX_SESSIONS, true);
+    if (count < 2) {
+        return;
+    }
+
+    size_t current = count;
+    for (size_t i = 0; i < count; ++i) {
+        if (strcmp(active[i]->session_id, s_state.focus_session_id) == 0) {
+            current = i;
+            break;
+        }
+    }
+    size_t next = current < count ? (current + 1) % count : 0;
+    espui_strlcpy(s_state.focus_session_id, active[next]->session_id,
+                  sizeof(s_state.focus_session_id));
+    update_focus(model);
+}
+
+static void focus_handle_tap(uint16_t x, uint16_t y)
+{
+    const espui_view_model_t *model = espui_view_model(s_state.ctx);
+    if (model == NULL) {
+        return;
+    }
+
+    if (point_in_rect(x, y, FOCUS_INTERRUPT_X, FOCUS_INTERRUPT_Y,
+                      FOCUS_INTERRUPT_WIDTH, FOCUS_INTERRUPT_HEIGHT)) {
+        const espui_session_view_t *session = selected_session(model);
+        if (!session_is_active(session) || s_state.interrupt_pending ||
+            s_state.interrupt_sent) {
+            return;
+        }
+        espui_action_t action = espui_action_interrupt(session->session_id);
+        esp_err_t err = espui_dispatch_action(s_state.ctx, &action);
+        if (err != ESP_OK) {
+            espui_strlcpy(s_state.interrupt_status, "INTERRUPT BUSY",
+                          sizeof(s_state.interrupt_status));
+            update_focus(model);
+            return;
+        }
+        espui_strlcpy(s_state.interrupt_session_id, session->session_id,
+                      sizeof(s_state.interrupt_session_id));
+        s_state.interrupt_pending = true;
+        s_state.interrupt_sent = false;
+        s_state.interrupt_status[0] = '\0';
+        update_focus(model);
+        return;
+    }
+
+    if (y >= FOCUS_CONTENT_Y0 && y < FOCUS_CONTENT_Y1) {
+        focus_cycle_session();
+    }
+}
+
+static void attention_handle_tap(uint16_t x, uint16_t y)
+{
+    const espui_view_model_t *model = espui_view_model(s_state.ctx);
+    if (model == NULL) {
+        return;
+    }
+    const espui_attention_view_t *items[ESPUI_MAX_ATTENTION];
+    uint8_t count = collect_attention(model, items, ESPUI_MAX_ATTENTION);
+    if (count == 0) {
+        return;
+    }
+
+    if (y >= ATTENTION_ROW_Y &&
+        y < ATTENTION_ROW_Y + ATTENTION_ROWS * ATTENTION_ROW_PITCH) {
+        int row = (y - ATTENTION_ROW_Y) / ATTENTION_ROW_PITCH;
+        if (row >= 0 && row < ATTENTION_ROWS && row < (int)count) {
+            espui_strlcpy(s_state.selected_permission_id,
+                          items[row]->permission_id,
+                          sizeof(s_state.selected_permission_id));
+            s_state.always_confirm_armed = false;
+            s_state.attention_status[0] = '\0';
+            update_attention(model);
+        }
+        return;
+    }
+
+    if (y < ATTENTION_BUTTON_Y ||
+        y >= ATTENTION_BUTTON_Y + ATTENTION_BUTTON_HEIGHT) {
+        return;
+    }
+    int button = -1;
+    for (int i = 0; i < 3; ++i) {
+        if (x >= ATTENTION_BUTTON_X(i) &&
+            x < ATTENTION_BUTTON_X(i) + ATTENTION_BUTTON_WIDTH) {
+            button = i;
+            break;
+        }
+    }
+    if (button < 0 || !s_state.selected_is_approval) {
+        return;
+    }
+    if (s_state.approval_pending) {
+        return;
+    }
+    if (s_state.selected_summary_blocked && button != 0) {
+        /* Approve/Always are not offered for a truncated/empty summary. */
+        return;
+    }
+    if (s_state.approval_acked &&
+        strcmp(s_state.acked_permission_id,
+               s_state.selected_permission_id) == 0) {
+        return;
+    }
+
+    if (button == 2) {
+        uint32_t now = espui_uptime_ms(s_state.ctx);
+        if (!s_state.always_confirm_armed ||
+            (int32_t)(now - s_state.always_confirm_deadline_ms) >= 0) {
+            s_state.always_confirm_armed = true;
+            s_state.always_confirm_deadline_ms = now + ALWAYS_CONFIRM_TIMEOUT_MS;
+            s_state.attention_status[0] = '\0';
+            update_attention(model);
+            return;
+        }
+    } else {
+        s_state.always_confirm_armed = false;
+    }
+
+    espui_permission_decision_t decision =
+        button == 0 ? ESPUI_PERMISSION_REJECT
+                    : (button == 1 ? ESPUI_PERMISSION_ONCE
+                                   : ESPUI_PERMISSION_ALWAYS);
+    espui_action_t action = espui_action_permission(
+        s_state.selected_permission_id, decision);
+    esp_err_t err = espui_dispatch_action(s_state.ctx, &action);
+    if (err != ESP_OK) {
+        espui_strlcpy(s_state.attention_status, "SUBMIT FAILED // RETRY",
+                      sizeof(s_state.attention_status));
+        update_attention(model);
+        return;
+    }
+
+    s_state.approval_pending = true;
+    s_state.pending_decision = decision;
+    espui_strlcpy(s_state.pending_permission_id,
+                  s_state.selected_permission_id,
+                  sizeof(s_state.pending_permission_id));
+    s_state.always_confirm_armed = false;
+    s_state.attention_status[0] = '\0';
+    update_attention(model);
+}
+
 static void terminal_on_tick(uint32_t delta_ms)
 {
     (void)delta_ms;
+    if (!s_state.always_confirm_armed) {
+        return;
+    }
+    uint32_t now = espui_uptime_ms(s_state.ctx);
+    if ((int32_t)(now - s_state.always_confirm_deadline_ms) < 0) {
+        return;
+    }
+    s_state.always_confirm_armed = false;
+    if (s_state.current_scene == ESPUI_SCENE_ATTENTION) {
+        const espui_view_model_t *model = espui_view_model(s_state.ctx);
+        if (model != NULL) {
+            update_attention(model);
+        }
+    }
 }
 
 static void terminal_on_input(const espui_input_event_t *event)
 {
-    (void)event;
+    if (event == NULL || event->type != ESPUI_INPUT_TAP) {
+        return;
+    }
+    if (s_state.current_scene == ESPUI_SCENE_FOCUS) {
+        focus_handle_tap(event->x, event->y);
+    } else if (s_state.current_scene == ESPUI_SCENE_ATTENTION) {
+        attention_handle_tap(event->x, event->y);
+    }
 }
 
 static void terminal_on_action_result(const espui_action_result_t *result)
@@ -748,13 +1372,88 @@ static void terminal_on_action_result(const espui_action_result_t *result)
     if (result == NULL || s_state.scene == NULL || s_state.renderer == NULL) {
         return;
     }
+    const espui_action_t *action = &result->action;
+    const char *status_text = "ERR";
+    if (result->status == ESPUI_ACTION_STATUS_OK) {
+        status_text = "ACK";
+    } else if (result->status == ESPUI_ACTION_STATUS_REJECTED) {
+        status_text = "REJECTED";
+    } else if (result->status == ESPUI_ACTION_STATUS_TIMEOUT) {
+        status_text = "TIMEOUT";
+    }
     char buffer[ESPUI_LABEL_MAX];
-    snprintf(buffer, sizeof(buffer), "%s // %.48s",
-             result->status == ESPUI_ACTION_STATUS_OK ? "ACK" : "ERR",
-             result->message[0] != '\0' ? result->message
-                                        : espui_action_type_name(result->action.type));
-    s_state.renderer->widget_set_text(s_state.footer, buffer);
-    s_state.renderer->scene_commit(s_state.scene);
+    snprintf(buffer, sizeof(buffer), "%s // %.48s", status_text,
+             result->message[0] != '\0'
+                 ? result->message
+                 : espui_action_type_name(action->type));
+    set_text(s_state.footer, buffer);
+
+    if (action->type == ESPUI_ACTION_RESPOND_PERMISSION) {
+        bool selected_match =
+            strcmp(action->permission_id, s_state.selected_permission_id) == 0;
+        bool pending_match =
+            s_state.approval_pending &&
+            strcmp(action->permission_id, s_state.pending_permission_id) == 0;
+        if (pending_match) {
+            s_state.approval_pending = false;
+        }
+        if (selected_match) {
+            if (result->status == ESPUI_ACTION_STATUS_OK) {
+                espui_strlcpy(s_state.attention_status, "ACK",
+                              sizeof(s_state.attention_status));
+            } else if (result->status == ESPUI_ACTION_STATUS_TIMEOUT) {
+                espui_strlcpy(s_state.attention_status, "TIMEOUT",
+                              sizeof(s_state.attention_status));
+            } else if (result->status == ESPUI_ACTION_STATUS_REJECTED) {
+                snprintf(s_state.attention_status,
+                         sizeof(s_state.attention_status), "REJECTED // %.36s",
+                         result->message[0] != '\0' ? result->message
+                                                    : "already handled");
+            } else {
+                snprintf(s_state.attention_status,
+                         sizeof(s_state.attention_status), "ERR // %.40s",
+                         result->message[0] != '\0' ? result->message
+                                                    : "failed");
+            }
+        }
+        if (pending_match && result->status == ESPUI_ACTION_STATUS_OK) {
+            /* Do not remove attention optimistically; wait for
+             * permission.resolved / the next snapshot. */
+            s_state.approval_acked = true;
+            espui_strlcpy(s_state.acked_permission_id, action->permission_id,
+                          sizeof(s_state.acked_permission_id));
+        }
+        if (s_state.current_scene == ESPUI_SCENE_ATTENTION) {
+            const espui_view_model_t *model = espui_view_model(s_state.ctx);
+            if (model != NULL) {
+                update_attention(model);
+            }
+        }
+    } else if (action->type == ESPUI_ACTION_INTERRUPT_SESSION) {
+        if (strcmp(action->session_id, s_state.interrupt_session_id) == 0) {
+            s_state.interrupt_pending = false;
+            s_state.interrupt_status[0] = '\0';
+            if (result->status == ESPUI_ACTION_STATUS_OK) {
+                s_state.interrupt_sent = true;
+            } else if (result->status == ESPUI_ACTION_STATUS_TIMEOUT) {
+                espui_strlcpy(s_state.interrupt_status, "INTERRUPT TIMEOUT",
+                              sizeof(s_state.interrupt_status));
+            } else if (result->status == ESPUI_ACTION_STATUS_REJECTED) {
+                espui_strlcpy(s_state.interrupt_status, "INTERRUPT REJECTED",
+                              sizeof(s_state.interrupt_status));
+            } else {
+                espui_strlcpy(s_state.interrupt_status, "INTERRUPT FAILED",
+                              sizeof(s_state.interrupt_status));
+            }
+        }
+        if (s_state.current_scene == ESPUI_SCENE_FOCUS) {
+            const espui_view_model_t *model = espui_view_model(s_state.ctx);
+            if (model != NULL) {
+                update_focus(model);
+            }
+        }
+    }
+    /* widget_set_text invalidates its own area; no full-screen commit here. */
 }
 
 static void terminal_destroy(void)

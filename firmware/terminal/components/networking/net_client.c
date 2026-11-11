@@ -563,6 +563,23 @@ static void deliver_action_result(const espui_action_t *action,
     s_client->callbacks.on_action_result(&result, s_client->user_ctx);
 }
 
+/*
+ * Every precheck failure must produce a result, otherwise the theme stays in
+ * PENDING forever. Send failures already report through their own path.
+ */
+static esp_err_t fail_action(const espui_action_t *action, esp_err_t err,
+                             const char *reason)
+{
+    if (action != NULL) {
+        ESP_LOGW(TAG, "action failed: type=%s err=%s reason=%s",
+                 espui_action_type_name(action->type), esp_err_to_name(err),
+                 reason != NULL ? reason : "unknown");
+        deliver_action_result(action, ESPUI_ACTION_STATUS_FAILED,
+                              reason != NULL ? reason : "unknown");
+    }
+    return err;
+}
+
 static void expire_pending_commands(void)
 {
     if (s_cmd_lock == NULL) {
@@ -1828,12 +1845,14 @@ esp_err_t meet_net_client_send_action(meet_net_client_t *client,
 {
     if (client == NULL || !client->initialized || action == NULL ||
         action->type == ESPUI_ACTION_NONE) {
+        if (action != NULL && action->type != ESPUI_ACTION_NONE) {
+            (void)fail_action(action, ESP_ERR_INVALID_ARG,
+                              "client not initialized");
+        }
         return ESP_ERR_INVALID_ARG;
     }
     if (s_client == NULL || s_client->state != MEET_NET_ONLINE) {
-        ESP_LOGW(TAG, "action rejected: websocket not online type=%s",
-                 espui_action_type_name(action->type));
-        return ESP_ERR_INVALID_STATE;
+        return fail_action(action, ESP_ERR_INVALID_STATE, "offline");
     }
 
     const char *command_type = NULL;
@@ -1847,12 +1866,12 @@ esp_err_t meet_net_client_send_action(meet_net_client_t *client,
         command_type = MEET_PROTOCOL_COMMAND_SESSION_INTERRUPT;
         copy_str(session_id, sizeof(session_id), action->session_id);
         if (session_id[0] == '\0') {
-            ESP_LOGW(TAG, "action rejected: interrupt without session_id");
-            return ESP_ERR_INVALID_ARG;
+            return fail_action(action, ESP_ERR_INVALID_ARG,
+                               "missing session_id");
         }
         if (s_model_lock == NULL ||
             xSemaphoreTake(s_model_lock, portMAX_DELAY) != pdTRUE) {
-            return ESP_ERR_INVALID_STATE;
+            return fail_action(action, ESP_ERR_INVALID_STATE, "state busy");
         }
         {
             const espui_session_view_t *session =
@@ -1863,9 +1882,8 @@ esp_err_t meet_net_client_send_action(meet_net_client_t *client,
         }
         (void)xSemaphoreGive(s_model_lock);
         if (agent_id[0] == '\0') {
-            ESP_LOGW(TAG, "action rejected: session not found id=%s",
-                     session_id);
-            return ESP_ERR_NOT_FOUND;
+            return fail_action(action, ESP_ERR_NOT_FOUND,
+                               "session not found");
         }
         break;
 
@@ -1874,13 +1892,12 @@ esp_err_t meet_net_client_send_action(meet_net_client_t *client,
         copy_str(permission_id, sizeof(permission_id),
                  action->permission_id);
         if (permission_id[0] == '\0') {
-            ESP_LOGW(TAG,
-                     "action rejected: permission response without permission_id");
-            return ESP_ERR_INVALID_ARG;
+            return fail_action(action, ESP_ERR_INVALID_ARG,
+                               "missing permission_id");
         }
         if (s_model_lock == NULL ||
             xSemaphoreTake(s_model_lock, portMAX_DELAY) != pdTRUE) {
-            return ESP_ERR_INVALID_STATE;
+            return fail_action(action, ESP_ERR_INVALID_STATE, "state busy");
         }
         {
             bool found_attention = false;
@@ -1903,18 +1920,14 @@ esp_err_t meet_net_client_send_action(meet_net_client_t *client,
             }
             if (!found_attention) {
                 (void)xSemaphoreGive(s_model_lock);
-                ESP_LOGW(TAG,
-                         "action rejected: permission not found id=%s",
-                         permission_id);
-                return ESP_ERR_NOT_FOUND;
+                return fail_action(action, ESP_ERR_NOT_FOUND,
+                                   "permission not found");
             }
         }
         (void)xSemaphoreGive(s_model_lock);
         if (session_id[0] == '\0' || agent_id[0] == '\0') {
-            ESP_LOGW(TAG,
-                     "action rejected: permission session not found id=%s",
-                     permission_id);
-            return ESP_ERR_NOT_FOUND;
+            return fail_action(action, ESP_ERR_NOT_FOUND,
+                               "permission session not found");
         }
         decision = espui_permission_decision_name(action->decision);
         break;
@@ -1924,9 +1937,8 @@ esp_err_t meet_net_client_send_action(meet_net_client_t *client,
         break;
 
     default:
-        ESP_LOGW(TAG, "action unsupported type=%s",
-                 espui_action_type_name(action->type));
-        return ESP_ERR_NOT_SUPPORTED;
+        return fail_action(action, ESP_ERR_NOT_SUPPORTED,
+                           "unsupported action");
     }
 
     char command_id[MEET_PENDING_COMMAND_ID_MAX];
@@ -1937,15 +1949,16 @@ esp_err_t meet_net_client_send_action(meet_net_client_t *client,
                                     agent_id, session_id, permission_id,
                                     decision);
     if (json == NULL) {
-        ESP_LOGE(TAG, "command JSON build failed type=%s", command_type);
-        return ESP_ERR_NO_MEM;
+        return fail_action(action, ESP_ERR_NO_MEM,
+                           "json allocation failed");
     }
 
     uint32_t sent_ms = (uint32_t)(esp_timer_get_time() / 1000);
     if (s_cmd_lock == NULL ||
         xSemaphoreTake(s_cmd_lock, portMAX_DELAY) != pdTRUE) {
         cJSON_free(json);
-        return ESP_ERR_INVALID_STATE;
+        return fail_action(action, ESP_ERR_INVALID_STATE,
+                           "command table busy");
     }
     esp_err_t add_err = meet_pending_commands_add(
         &s_pending_commands, command_id, action, sent_ms);
@@ -1954,7 +1967,13 @@ esp_err_t meet_net_client_send_action(meet_net_client_t *client,
         ESP_LOGW(TAG, "command not queued cmd=%s err=%s", command_id,
                  esp_err_to_name(add_err));
         cJSON_free(json);
-        return add_err;
+        if (add_err == ESP_ERR_NO_MEM) {
+            return fail_action(action, add_err, "command table full");
+        }
+        if (add_err == ESP_ERR_INVALID_STATE) {
+            return fail_action(action, add_err, "duplicate command");
+        }
+        return fail_action(action, add_err, "command not queued");
     }
 
     size_t length = strlen(json);

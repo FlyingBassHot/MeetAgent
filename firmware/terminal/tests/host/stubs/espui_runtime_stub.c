@@ -7,9 +7,17 @@
  */
 #include "espui.h"
 
+#include <string.h>
+
 static const espui_view_model_t *s_test_model;
 static const espui_renderer_ops_t *s_test_renderer;
 static uint16_t s_test_focus_index;
+static uint32_t s_test_uptime_ms;
+static esp_err_t s_test_dispatch_result = ESP_OK;
+
+#define HOST_STUB_MAX_ACTIONS 16
+static espui_action_t s_test_actions[HOST_STUB_MAX_ACTIONS];
+static int s_test_action_count;
 
 void host_espui_stub_set_model(const espui_view_model_t *model)
 {
@@ -24,6 +32,36 @@ void host_espui_stub_set_renderer(const espui_renderer_ops_t *ops)
 void host_espui_stub_set_focus_index(uint16_t index)
 {
     s_test_focus_index = index;
+}
+
+void host_espui_stub_set_uptime_ms(uint32_t uptime_ms)
+{
+    s_test_uptime_ms = uptime_ms;
+}
+
+void host_espui_stub_set_dispatch_result(esp_err_t result)
+{
+    s_test_dispatch_result = result;
+}
+
+void host_espui_stub_reset_actions(void)
+{
+    memset(s_test_actions, 0, sizeof(s_test_actions));
+    s_test_action_count = 0;
+    s_test_dispatch_result = ESP_OK;
+}
+
+int host_espui_stub_action_count(void)
+{
+    return s_test_action_count;
+}
+
+const espui_action_t *host_espui_stub_action_at(int index)
+{
+    if (index < 0 || index >= s_test_action_count) {
+        return NULL;
+    }
+    return &s_test_actions[index];
 }
 
 const espui_view_model_t *espui_view_model(const espui_context_t *ctx)
@@ -74,8 +112,10 @@ esp_err_t espui_dispatch_action(const espui_context_t *ctx,
                                 const espui_action_t *action)
 {
     (void)ctx;
-    (void)action;
-    return ESP_ERR_NOT_SUPPORTED;
+    if (action != NULL && s_test_action_count < HOST_STUB_MAX_ACTIONS) {
+        s_test_actions[s_test_action_count++] = *action;
+    }
+    return s_test_dispatch_result;
 }
 
 bool espui_motion_enabled(const espui_context_t *ctx)
@@ -93,5 +133,5 @@ uint16_t espui_focus_index(const espui_context_t *ctx)
 uint32_t espui_uptime_ms(const espui_context_t *ctx)
 {
     (void)ctx;
-    return 0;
+    return s_test_uptime_ms;
 }

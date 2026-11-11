@@ -1,6 +1,7 @@
 #include <string.h>
 
 #include "test_assert.h"
+#include "espui_scene.h"
 #include "espui_view_model.h"
 
 static void test_view_model_init_and_reset(void)
@@ -172,6 +173,57 @@ static void test_view_model_attention(void)
                        espui_view_model_attention_count(&model));
 }
 
+static void test_safety_attention_count(void)
+{
+    espui_view_model_t model;
+    espui_view_model_init(&model);
+
+    TEST_ASSERT_EQ_INT(0, espui_view_model_safety_attention_count(&model));
+    TEST_ASSERT_EQ_INT(0, espui_view_model_safety_attention_count(NULL));
+
+    espui_view_model_note_completion(&model);
+    TEST_ASSERT_EQ_INT(1, espui_view_model_attention_count(&model));
+    TEST_ASSERT_EQ_INT(0, espui_view_model_safety_attention_count(&model));
+
+    espui_view_model_note_error(&model);
+    TEST_ASSERT_EQ_INT(2, espui_view_model_attention_count(&model));
+    TEST_ASSERT_EQ_INT(0, espui_view_model_safety_attention_count(&model));
+
+    TEST_ASSERT_NOT_NULL(espui_view_model_push_attention(
+        &model, "err-1", ESPUI_ATTENTION_ERROR));
+    TEST_ASSERT_NOT_NULL(espui_view_model_push_attention(
+        &model, "done-1", ESPUI_ATTENTION_COMPLETION));
+    TEST_ASSERT_EQ_INT(0, espui_view_model_safety_attention_count(&model));
+
+    espui_attention_view_t *approval = espui_view_model_push_attention(
+        &model, "per-1", ESPUI_ATTENTION_APPROVAL);
+    TEST_ASSERT_NOT_NULL(approval);
+    TEST_ASSERT_EQ_INT(1, espui_view_model_safety_attention_count(&model));
+
+    TEST_ASSERT_TRUE(espui_view_model_resolve_attention(&model, "per-1"));
+    TEST_ASSERT_EQ_INT(0, espui_view_model_safety_attention_count(&model));
+
+    /* Completion/error alerts must not force or pin the Attention scene. */
+    espui_scene_manager_t scenes;
+    espui_scene_manager_init(&scenes, NULL, NULL);
+    TEST_ASSERT_EQ_INT(ESP_OK, espui_scene_manager_request(
+                                   &scenes, ESPUI_SCENE_FOCUS,
+                                   ESPUI_SCENE_SOURCE_USER));
+    TEST_ASSERT_EQ_INT(ESP_OK, espui_scene_manager_set_attention_count(
+                                   &scenes,
+                                   espui_view_model_safety_attention_count(
+                                       &model)));
+    TEST_ASSERT_EQ_INT(ESPUI_SCENE_FOCUS, scenes.current);
+
+    TEST_ASSERT_NOT_NULL(espui_view_model_push_attention(
+        &model, "per-2", ESPUI_ATTENTION_APPROVAL));
+    TEST_ASSERT_EQ_INT(ESP_OK, espui_scene_manager_set_attention_count(
+                                   &scenes,
+                                   espui_view_model_safety_attention_count(
+                                       &model)));
+    TEST_ASSERT_EQ_INT(ESPUI_SCENE_ATTENTION, scenes.current);
+}
+
 static void test_view_model_copy_and_touch(void)
 {
     espui_view_model_t model;
@@ -252,6 +304,7 @@ void test_view_model_run(void)
     test_view_model_agents();
     test_view_model_sessions();
     test_view_model_attention();
+    test_safety_attention_count();
     test_view_model_copy_and_touch();
     test_shared_type_helpers();
 }

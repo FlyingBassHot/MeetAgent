@@ -173,6 +173,7 @@ static void test_apply_snapshot(void)
     TEST_ASSERT_EQ_INT(1, espui_view_model_attention_count(&model));
     TEST_ASSERT_EQ_INT(1, model.approval_count);
     TEST_ASSERT_STR_EQ("read /tmp/file", model.attention[0].summary);
+    TEST_ASSERT_FALSE(model.attention[0].summary_truncated);
     TEST_ASSERT_STR_EQ("ses-1", model.attention[0].session_id);
     TEST_ASSERT_EQ_INT(ESPUI_ATTENTION_APPROVAL, model.attention[0].kind);
     TEST_ASSERT_EQ_INT(1234, model.attention[0].created_at_ms);
@@ -438,6 +439,78 @@ static void test_event_permission_and_alerts(void)
     TEST_ASSERT_EQ_INT(2, model.completion_count);
 }
 
+static const espui_attention_view_t *find_attention(
+    const espui_view_model_t *model, const char *permission_id)
+{
+    for (size_t i = 0; i < ESPUI_MAX_ATTENTION; ++i) {
+        if (model->attention[i].in_use &&
+            strcmp(model->attention[i].permission_id, permission_id) == 0) {
+            return &model->attention[i];
+        }
+    }
+    return NULL;
+}
+
+static void test_summary_truncation(void)
+{
+    meet_state_adapter_t adapter;
+    meet_state_adapter_init(&adapter);
+    espui_view_model_t model;
+    espui_view_model_init(&model);
+
+    /* Snapshot: a full 48-byte protocol field is conservatively unsafe. */
+    meet_protocol_snapshot_t snapshot = make_snapshot();
+    memset(snapshot.permissions[0].summary, 'x',
+           sizeof(snapshot.permissions[0].summary) - 1);
+    snapshot.permissions[0].summary[sizeof(snapshot.permissions[0].summary) - 1] =
+        '\0';
+    TEST_ASSERT_EQ_INT(ESP_OK, meet_state_adapter_apply_snapshot(
+                                   &adapter, &snapshot, 100, &model));
+    const espui_attention_view_t *attention =
+        find_attention(&model, "per-1");
+    TEST_ASSERT_NOT_NULL(attention);
+    TEST_ASSERT_TRUE(attention->summary_truncated);
+
+    /* Event extraction keeps a longer local buffer, so >=48 is detectable. */
+    meet_state_adapter_init(&adapter);
+    espui_view_model_init(&model);
+    char long_summary[80];
+    memset(long_summary, 'y', sizeof(long_summary) - 1);
+    long_summary[sizeof(long_summary) - 1] = '\0';
+    char payload[256];
+    snprintf(payload, sizeof(payload),
+             "{\"permission_id\":\"per-1\",\"description\":\"%s\"}",
+             long_summary);
+    meet_protocol_event_t event = make_event(
+        MEET_PROTOCOL_EVENT_PERMISSION_REQUESTED, 600, "agent-1", "ses-1",
+        payload);
+    TEST_ASSERT_EQ_INT(ESP_OK, meet_state_adapter_apply_event(&adapter, &event,
+                                                              1100, &model));
+    attention = find_attention(&model, "per-1");
+    TEST_ASSERT_NOT_NULL(attention);
+    TEST_ASSERT_TRUE(attention->summary_truncated);
+    TEST_ASSERT_EQ_INT(ESPUI_TITLE_MAX - 1, strlen(attention->summary));
+
+    /* Re-pushing the same permission clears the stale truncation flag. */
+    TEST_ASSERT_NOT_NULL(espui_view_model_push_attention(
+        &model, "per-1", ESPUI_ATTENTION_APPROVAL));
+    attention = find_attention(&model, "per-1");
+    TEST_ASSERT_NOT_NULL(attention);
+    TEST_ASSERT_FALSE(attention->summary_truncated);
+
+    /* Short event summaries stay actionable. */
+    event = make_event(MEET_PROTOCOL_EVENT_PERMISSION_REQUESTED, 601,
+                       "agent-1", "ses-1",
+                       "{\"permission_id\":\"per-2\","
+                       "\"description\":\"read .env\"}");
+    TEST_ASSERT_EQ_INT(ESP_OK, meet_state_adapter_apply_event(&adapter, &event,
+                                                              1200, &model));
+    attention = find_attention(&model, "per-2");
+    TEST_ASSERT_NOT_NULL(attention);
+    TEST_ASSERT_FALSE(attention->summary_truncated);
+    TEST_ASSERT_STR_EQ("read .env", attention->summary);
+}
+
 static void test_event_alert_cap_and_unknown(void)
 {
     meet_state_adapter_t adapter;
@@ -546,5 +619,6 @@ void test_state_adapter_run(void)
     test_event_session_lifecycle();
     test_event_permission_and_alerts();
     test_event_alert_cap_and_unknown();
+    test_summary_truncation();
     test_event_oversized_ids_are_dropped();
 }

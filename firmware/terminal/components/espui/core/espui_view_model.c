@@ -173,6 +173,8 @@ espui_attention_view_t *espui_view_model_push_attention(
             strcmp(model->attention[i].permission_id, permission_id) == 0) {
             attention = &model->attention[i];
             attention->kind = kind;
+            /* A re-push will refill the summary; do not keep stale safety. */
+            attention->summary_truncated = false;
             break;
         }
     }
@@ -363,6 +365,15 @@ uint16_t espui_view_model_attention_count(const espui_view_model_t *model)
     }
     return (uint16_t)(model->approval_count + model->error_count +
                       model->completion_count);
+}
+
+uint16_t espui_view_model_safety_attention_count(
+    const espui_view_model_t *model)
+{
+    if (model == NULL) {
+        return 0;
+    }
+    return model->approval_count;
 }
 
 void espui_view_model_push_activity(espui_view_model_t *model,
