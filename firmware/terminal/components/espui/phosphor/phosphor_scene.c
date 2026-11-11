@@ -5,6 +5,7 @@
 
 #include "glyph_atlas.h"
 #include "glyph_ramp.h"
+#include "phosphor_lut.h"
 #include "glyph_rasterizer.h"
 #include "orbit_geometry.h"
 #include "phosphor_palette.h"
@@ -29,9 +30,37 @@ static char middle_glyph(uint32_t i, float dx, float dy)
     return dx * dy >= 0.0f ? '\\' : '/';
 }
 
-static char outer_glyph(uint32_t i)
+static uint32_t binary_hash(uint32_t value)
+{
+    value ^= value >> 16;
+    value *= 0x7feb352du;
+    value ^= value >> 15;
+    value *= 0x846ca68bu;
+    value ^= value >> 16;
+    return value;
+}
+
+static uint32_t binary_bucket(const phosphor_motion_state_t *motion)
+{
+    uint32_t interval = motion != NULL && motion->mode_mix > 0.5f ? 300u
+                                                                  : 800u;
+    uint32_t time_ms = motion != NULL ? motion->time_ms : 0u;
+    return time_ms / interval;
+}
+
+static char outer_glyph(uint32_t i,
+                        const phosphor_motion_state_t *motion)
 {
     static const char pattern[] = "+#%@";
+    float mix = motion != NULL ? motion->mode_mix : 0.0f;
+    uint32_t bucket = binary_bucket(motion);
+    uint32_t hash = binary_hash((i + 1u) * 0x9e3779b9u ^
+                                (bucket + 1u) * 0x85ebca6bu ^
+                                0xa5a5a5a5u);
+    uint32_t threshold = 12u + (uint32_t)(mix * 33.0f); /* 12..45% */
+    if (hash % 100u < threshold) {
+        return (hash & 0x80000000u) ? '0' : '1';
+    }
     return pattern[i % 4u];
 }
 
@@ -112,7 +141,7 @@ static void draw_orbit_cell(glyph_frame_t *frame,
         color = GLYPH_COLOR_SECONDARY;
         intensity = 235;
     } else {
-        glyph = outer_glyph(i);
+        glyph = outer_glyph(i, motion);
         color = GLYPH_COLOR_PRIMARY;
         intensity = 250;
     }
@@ -191,6 +220,48 @@ static void draw_orbit(glyph_frame_t *frame,
     }
 }
 
+static void draw_binary_specks(glyph_frame_t *frame,
+                               const phosphor_motion_state_t *motion)
+{
+    if (frame == NULL) {
+        return;
+    }
+    /* A few isolated 0/1 points in the 160..200 annulus. They are not a
+     * ring: fixed irregular angles/radii and field priority, so orbits win. */
+    static const float angles[8] = {
+        0.35f, 1.15f, 2.45f, 3.30f, 4.15f, 5.05f, 5.55f, 0.95f,
+    };
+    static const float radii[8] = {
+        166.0f, 184.0f, 176.0f, 198.0f, 170.0f, 190.0f, 162.0f, 194.0f,
+    };
+    uint8_t count = 4;
+    if (motion != NULL) {
+        count += (uint8_t)(motion->activity_energy * 4.0f);
+    }
+    if (count > 8) {
+        count = 8;
+    }
+    uint32_t bucket = binary_bucket(motion);
+    for (uint8_t i = 0; i < count; ++i) {
+        uint32_t hash = binary_hash((i + 11u) * 0x9e3779b9u ^
+                                    (bucket + 7u) * 0x85ebca6bu ^
+                                    0x5a5a5a5au);
+        char glyph = (hash & 1u) ? '0' : '1';
+        float x = PHOSPHOR_CX + phosphor_lut_cos(angles[i]) * radii[i];
+        float y = PHOSPHOR_CY + phosphor_lut_sin(angles[i]) * radii[i];
+        uint8_t col = 0;
+        uint8_t row = 0;
+        if (!phosphor_point_to_cell(x, y, &col, &row)) {
+            continue;
+        }
+        glyph_frame_set(frame, col, row, glyph_atlas_index(glyph),
+                        (i & 1u) ? GLYPH_COLOR_MUTED
+                                 : GLYPH_COLOR_SECONDARY,
+                        (uint8_t)(75u + (hash % 35u)),
+                        GLYPH_FLAG_FIELD);
+    }
+}
+
 static void draw_activity_particles(glyph_frame_t *frame,
                                     const phosphor_motion_state_t *motion)
 {
@@ -236,6 +307,7 @@ void phosphor_scene_build_frame_motion(glyph_frame_t *frame,
                                                : 3.75f;
 
     draw_core_density(frame, motion);
+    draw_binary_specks(frame, motion);
     const phosphor_orbit_t *orbits = phosphor_orbit_defaults();
     for (int i = 0; i < 3; ++i) {
         draw_orbit(frame, motion, &orbits[i], i, warning_angle);

@@ -601,6 +601,22 @@ I (26244) touch_test: TOUCH release
 - 真机 Wi-Fi/Node 在线，无 panic/OOM；实屏动画待用户确认。
 - P4 未开始。
 
+### 11.18 PHOSPHOR P3.1 二进制流/密度（2026-11-11）
+
+- atlas 增加 `0/1`（29 glyphs，18×27 Bold+dilate，2,349 B）；
+- Outer 采样 64→96；字符 `+ # % @ 0 1`；0/1 由 index+time hash
+  确定性选择，Working 300ms bucket（≈3.3Hz，45%），Idle 800ms（12%）；
+- 外围 4–8 个不规则稀疏 0/1 点（162–198 annulus，field 低亮度，无 halo）；
+- Working speeds +0.25/-0.62/+0.36（约 +13%），density 0.85；
+- 新截图 `p3_idle_v2.png` / `p3_working_v2.png`；
+- 最终固件：1,272,736 B，SHA-256 `c487e15b...05e241b`，app 剩余 17%，
+  DIRAM 204,423/341,760 (59.81%)。
+- 真机：internal_free 45,255→65,135 B，PSRAM ~6,133,260 B；
+  Idle 6–7 FPS，Working 7 FPS（仍低于 10–15 目标，P5 优化）；
+  Wi-Fi/Node 在线；无 panic/OOM。
+- Host：**3619 checks, 0 failures**；syntax **45 files OK**。
+- P4 未开始。
+
 ## 12. 仓库约束
 
 - 只修改 `firmware/terminal/`

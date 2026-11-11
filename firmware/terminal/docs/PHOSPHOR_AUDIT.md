@@ -186,3 +186,11 @@ P0 的 288×288 / 8×12 估算作为 P1.0 基线保留；P1.1 根据实机反馈
 - 平台单任务 demo 6s Idle/6s Working；
 - 实测 Idle 7 FPS，Working 7 FPS（目标 10–15 未达成，P5 再优化）；
 - P3 未进入 P4。
+
+
+## 15. P3.1 二进制流/密度（2026-11-11）
+
+- Atlas 增加 0/1；Outer 96 采样，字符 `+ # % @ 0 1`；
+- 0/1 使用 index/time hash，Working 300ms/Idle 800ms bucket；
+- 8 个不规则稀疏外围 0/1 点，无整圈 halo；
+- 实测 Working 7 FPS，仍低于目标；P5 优化。

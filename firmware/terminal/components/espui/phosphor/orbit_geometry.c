@@ -13,7 +13,7 @@ static const phosphor_orbit_t s_orbits[3] = {
     /* Middle: tilted to the upper right. */
     {140.0f, 0.25f, 0.85f, 1.90f, 64},
     /* Outer: tilted the other way; carries satellites. */
-    {192.0f, 1.30f, -0.65f, 3.80f, 64},
+    {192.0f, 1.30f, -0.65f, 3.80f, 96},
 };
 
 const phosphor_orbit_t *phosphor_orbit_defaults(void)

@@ -82,7 +82,7 @@ static void test_glyph_atlas_coverage(void)
     TEST_ASSERT_EQ_INT(24, PHOSPHOR_GRID_W);
     TEST_ASSERT_EQ_INT(16, PHOSPHOR_GRID_H);
     TEST_ASSERT_EQ_INT(432, PHOSPHOR_CANVAS_W);
-    const char *required = " .,:-=+*#%@/\\|<>^v;[]{}?_!o";
+    const char *required = " .,:-=+*#%@/\\|<>^v;[]{}?_!o01";
     for (size_t i = 0; required[i] != '\0'; ++i) {
         TEST_ASSERT_TRUE(glyph_atlas_contains(required[i]));
     }
@@ -90,6 +90,8 @@ static void test_glyph_atlas_coverage(void)
     TEST_ASSERT_EQ_INT(' ', glyph_atlas_char_at(0));
     uint8_t greater_bits = 0;
     uint8_t underscore_bits = 0;
+    uint8_t zero_bits = 0;
+    uint8_t one_bits = 0;
     for (int y = 0; y < GLYPH_ATLAS_H; ++y) {
         for (int x = 0; x < GLYPH_ATLAS_W; ++x) {
             TEST_ASSERT_FALSE(glyph_atlas_pixel(0, (uint8_t)x, (uint8_t)y));
@@ -97,10 +99,16 @@ static void test_glyph_atlas_coverage(void)
                                                (uint8_t)x, (uint8_t)y);
             underscore_bits |= glyph_atlas_pixel(glyph_atlas_index('_'),
                                                   (uint8_t)x, (uint8_t)y);
+            zero_bits |= glyph_atlas_pixel(glyph_atlas_index('0'),
+                                            (uint8_t)x, (uint8_t)y);
+            one_bits |= glyph_atlas_pixel(glyph_atlas_index('1'),
+                                           (uint8_t)x, (uint8_t)y);
         }
     }
     TEST_ASSERT_TRUE(greater_bits != 0);
     TEST_ASSERT_TRUE(underscore_bits != 0);
+    TEST_ASSERT_TRUE(zero_bits != 0);
+    TEST_ASSERT_TRUE(one_bits != 0);
 }
 
 static void test_orbit_geometry(void)
@@ -120,7 +128,8 @@ static void test_orbit_geometry(void)
     TEST_ASSERT_TRUE(NEAR(orbits[1].phase, 1.90f));
     TEST_ASSERT_TRUE(NEAR(orbits[2].phase, 3.80f));
     TEST_ASSERT_TRUE(orbits[0].samples >= 48);
-    TEST_ASSERT_TRUE(orbits[2].samples <= 72);
+    TEST_ASSERT_TRUE(orbits[2].samples >= 80);
+    TEST_ASSERT_TRUE(orbits[2].samples <= 100);
 
     for (int o = 0; o < 3; ++o) {
         for (int i = 0; i < 64; ++i) {
@@ -278,9 +287,10 @@ static void test_motion_and_scene(void)
     TEST_ASSERT_TRUE(NEAR(idle->speeds[0], 0.08f));
     TEST_ASSERT_TRUE(NEAR(idle->speeds[1], -0.045f));
     TEST_ASSERT_TRUE(NEAR(idle->speeds[2], 0.025f));
-    TEST_ASSERT_TRUE(NEAR(working->speeds[0], 0.22f));
-    TEST_ASSERT_TRUE(NEAR(working->speeds[1], -0.55f));
-    TEST_ASSERT_TRUE(NEAR(working->speeds[2], 0.32f));
+    TEST_ASSERT_TRUE(NEAR(working->speeds[0], 0.25f));
+    TEST_ASSERT_TRUE(NEAR(working->speeds[1], -0.62f));
+    TEST_ASSERT_TRUE(NEAR(working->speeds[2], 0.36f));
+    TEST_ASSERT_TRUE(NEAR(working->density, 0.85f));
     TEST_ASSERT_TRUE(working->density > idle->density);
     TEST_ASSERT_TRUE(working->brightness >= idle->brightness);
 

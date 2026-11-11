@@ -1,7 +1,7 @@
-# PHOSPHOR CORE — P3 Idle / Working 动画
+# PHOSPHOR CORE — P3.1 Idle / Working 密度与二进制流
 
 日期：2026-11-11
-状态：P3 Idle/Working 动效实现并真机运行；未进入 P4。实屏动画由用户确认。
+状态：P3.1 在 P3 动画上增加 0/1 二进制流与外圈密度；未进入 P4。实屏由用户确认。
 
 ## 1. 保持 P1.3/P2 基线
 
@@ -17,7 +17,7 @@
 | Profile | Inner rad/s | Middle rad/s | Outer rad/s | Breath | Density | Brightness |
 |---|---:|---:|---:|---:|---:|---:|
 | Idle | +0.08 | -0.045 | +0.025 | 8s | 0.30 | 0.82 |
-| Working | +0.22 | -0.55 | +0.32 | 5s | 0.75 | 1.00 |
+| Working | +0.25 | -0.62 | +0.36 | 5s | 0.85 | 1.00 |
 
 - `mode_mix` 0..1，状态切换 1.0s 平滑；
 - `activity_energy` 450ms 低通；
@@ -35,6 +35,11 @@
 - orbit phase 叠加 motion 相位；
 - Idle 慢速、低密度；Working 中轨快速、核心密度提高；
 - Working 添加 2–7 个固定相位 `+`/`%` 活动粒子（不使用 `*`，保持 Satellite 唯一）；
+- **P3.1**：Outer 采样 64→96，字符集 `+ # % @ 0 1`；
+- 0/1 由 index + time bucket hash 确定性选择，Working 300ms 更新（≈3.3Hz），
+  Idle 800ms；Working 比例约 45%，Idle 约 12%；
+- **P3.1**：outer 外侧/内侧 8 个不规则稀疏 0/1 点（半径 162–198，
+  field 低亮度，不是整圈 halo）；Working 显示 8 个，Idle 4 个；
 - Satellite 位置固定，不随机换位；
 - Nucleus 2× 固定中心，亮度随呼吸 235–255；
 - 静态 API `phosphor_scene_build_frame()` 保留为 P2 回归/基准路径。
@@ -53,8 +58,8 @@
 ### 实测（真机）
 
 ```text
-Idle    fps=7  render_avg=32–76ms  period=141–146ms
-Working fps=7  render_avg=76–106ms period=132–135ms
+Idle    fps=6–7  render_avg=42–80ms  period=141–153ms
+Working fps=7    render_avg=72–110ms period=133–136ms
 ```
 
 - **Idle 达到 6–8 FPS 目标。**
@@ -69,49 +74,51 @@ Working fps=7  render_avg=76–106ms period=132–135ms
 cd firmware/terminal/tools/phosphor_sim
 make
 ./build/phosphor_sim                         # 动画窗口；1=Idle 2=Working ESC=退出
-SDL_VIDEODRIVER=dummy ./build/phosphor_sim --screenshot build/p3_idle.bmp --state idle --time-ms 3000
-SDL_VIDEODRIVER=dummy ./build/phosphor_sim --screenshot build/p3_working.bmp --state working --time-ms 3000
-convert build/p3_idle.bmp ../../docs/phosphor/p3_idle.png
-convert build/p3_working.bmp ../../docs/phosphor/p3_working.png
+SDL_VIDEODRIVER=dummy ./build/phosphor_sim --screenshot build/p3_idle_v2.bmp --state idle --time-ms 3000
+SDL_VIDEODRIVER=dummy ./build/phosphor_sim --screenshot build/p3_working_v2.bmp --state working --time-ms 3000
+convert build/p3_idle_v2.bmp ../../docs/phosphor/p3_idle_v2.png
+convert build/p3_working_v2.bmp ../../docs/phosphor/p3_working_v2.png
 ```
 
 Golden：
 
 ```text
-docs/phosphor/p3_idle.png
-480x480 PNG, 2,902 B
-sha256 f06bb976e77e2aad7c114ba42887f2fefa2ea82f021d9a7ff075358393e6d0fc
+docs/phosphor/p3_idle_v2.png
+480x480 PNG, 3,063 B
+sha256 23fc73adea882d42264465c756493317f13ede444d0b2a98e0ee0faf1e3cd289
 
-docs/phosphor/p3_working.png
-480x480 PNG, 3,073 B
-sha256 d8be9dc3f26705da8505eddae61f3cf386981c63b378c1365fa5f5a2b7f86099
+docs/phosphor/p3_working_v2.png
+480x480 PNG, 3,556 B
+sha256 967e852bc6d7e63639725a78d3a6b532ea7771c1dc41cf634a4207c363142cd6
+
+旧 P3.0 截图保留：p3_idle.png / p3_working.png。
 ```
 
 ## 6. 构建 / 内存
 
 ```text
-app size : 1,271,872 B
-sha256   : b7c7bec7e6972b97c41a320ed2631cba8646214aafafe4f1d1fa9a7e240777f8
-app free : 0x40890 (17%)
+app size : 1,272,736 B (0x136ba0)
+sha256   : c487e15b1b77321862ff3843c668e8a41e2f32b0be796bc5226ba412305e241b
+app free : 0x40460 (17%)
 DIRAM    : 204,423 / 341,760 B (59.81%)
 IRAM     : 16,384/16,384（size 固定窗口；链接断言通过）
 PSRAM canvas: 373,248 B（一次分配）
 ```
 
-真机启动日志 `/tmp/phosphor-p3-boot6.log`：
+真机启动日志 `/tmp/phosphor-p3b-boot.log`：
 
 ```text
 P3 animation started: demo 6s Idle / 6s Working
-welcome memory: internal_free=53,927 psram_free=6,133,656
+welcome memory: internal_free=45,255 psram_free=6,133,432
 network state: online
 ```
 
-后续统计 internal_free 55.9–65.1KB，PSRAM ~6,133,484 B；无持续下降。
+后续统计 internal_free 55.9–65.1KB，PSRAM ~6,133,260 B；无持续下降。
 
 ## 7. Host 验证
 
 ```text
-make test          -> 3613 checks, 0 failures
+make test          -> 3619 checks, 0 failures
 syntax_check.sh    -> 45 files OK
 ```
 
@@ -121,6 +128,7 @@ syntax_check.sh    -> 45 files OK
 - 同 time/state 可复现（含 `memcmp`）；
 - Idle/Working frame 不同、非空、P2/P1.3 回归；
 - LUT sin/cos 边界；
+- P3.1 atlas 0/1、outer 96 采样、Working 0.85 density/速度回归；
 - 既有 ramp/palette/compositor/Nucleus/Satellite 测试。
 
 ## 8. P4 待办（不开始）

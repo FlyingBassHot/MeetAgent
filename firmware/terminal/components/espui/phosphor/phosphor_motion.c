@@ -16,9 +16,9 @@ static const phosphor_motion_profile_t s_idle = {
 };
 
 static const phosphor_motion_profile_t s_working = {
-    .speeds = {0.22f, -0.55f, 0.32f},
+    .speeds = {0.25f, -0.62f, 0.36f},
     .breath_period_ms = 5000.0f,
-    .density = 0.75f,
+    .density = 0.85f,
     .brightness = 1.00f,
 };
 
