@@ -76,12 +76,15 @@ static void draw_core_density(glyph_frame_t *frame,
             float dx = x - PHOSPHOR_CX;
             float dy = y - PHOSPHOR_CY;
             float distance = sqrtf(dx * dx + dy * dy);
-            if (distance < 30.0f || distance > 78.0f) {
+            if (distance < 48.0f || distance > 64.0f) {
                 continue;
             }
-            float falloff = phosphor_smooth_falloff(distance, 78.0f);
-            float density = motion != NULL ? motion->density : 0.30f;
-            uint8_t intensity = (uint8_t)((70.0f + 120.0f * density) *
+            if ((((unsigned)col * 7u + (unsigned)row * 11u) % 17u) != 0u) {
+                continue; /* Very sparse, deterministic core punctuation. */
+            }
+            float mix = motion != NULL ? motion->mode_mix : 0.0f;
+            float falloff = phosphor_smooth_falloff(distance - 48.0f, 16.0f);
+            uint8_t intensity = (uint8_t)((108.0f + 12.0f * mix) *
                                           falloff);
             char glyph = glyph_ramp_char(intensity);
             uint8_t glyph_index = glyph_atlas_index(glyph);
@@ -166,7 +169,7 @@ static void put_band_neighbor(glyph_frame_t *frame,
                             ? (orbit_index == 2 ? 105 : 95)
                             : (orbit_index == 2
                                    ? (uint8_t)(150.0f + 65.0f * mix)
-                                   : (uint8_t)(130.0f + 40.0f * mix));
+                                   : (uint8_t)(110.0f + 40.0f * mix));
     uint8_t band = orbit_index == 2 ? GLYPH_FLAG_OUTER_BAND
                                     : GLYPH_FLAG_INNER_BAND;
     for (uint8_t k = 0; k < candidate_count; ++k) {
@@ -174,6 +177,18 @@ static void put_band_neighbor(glyph_frame_t *frame,
         uint8_t nrow = candidates[k][1];
         if (ncol >= PHOSPHOR_GRID_W || nrow >= PHOSPHOR_GRID_H) {
             continue;
+        }
+        /* Keep the dense center clear: bands only thicken the outer/inner
+         * annuli, not the middle 80px region. */
+        float nx = (float)ncol * PHOSPHOR_CELL_W + PHOSPHOR_CELL_W / 2.0f;
+        float ny = (float)nrow * PHOSPHOR_CELL_H + PHOSPHOR_CELL_H / 2.0f;
+        if (fabsf(nx - PHOSPHOR_CX) < 80.0f &&
+            fabsf(ny - PHOSPHOR_CY) < 80.0f) {
+            float ndx = nx - PHOSPHOR_CX;
+            float ndy = ny - PHOSPHOR_CY;
+            if (sqrtf(ndx * ndx + ndy * ndy) < 80.0f) {
+                continue;
+            }
         }
         if (glyph_frame_set(frame, ncol, nrow, glyph_atlas_index(glyph),
                             GLYPH_COLOR_SECONDARY, intensity,
@@ -223,7 +238,7 @@ static void draw_orbit_cell(glyph_frame_t *frame,
     } else if (orbit_index == 1) {
         glyph = middle_glyph(i, dx, dy);
         color = GLYPH_COLOR_SECONDARY;
-        intensity = 235;
+        intensity = 215;
     } else {
         glyph = outer_glyph(i, motion);
         color = GLYPH_COLOR_PRIMARY;

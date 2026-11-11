@@ -16,13 +16,13 @@
 - E4b-1：真实 Node WebSocket、pairing_code→token、welcome/snapshot、heartbeat、自动重连
 - E4b-2：真实事件 apply、sequence 去重、replay 重建、4Hz ViewModel 节流、active-first session 截断
 - E4b-3：command gateway、pending command 表、15s 超时、断线失败、session.list 安全刷新、action result → footer
-- PHOSPHOR P0/P1/P1.1/P1.2/P1.3/P2/P3/P3.1/P3.2/P3.3：审计、24×16 Glyph Frame、三轨 Orbit、2× Nucleus、18×27 Bold Atlas、密度 Ramp、Palette/Compositor、Idle/Working motion、0/1 二进制流、Outer 相邻 cell 加厚、Inner 密集带、SDL2 动画/截图、ESP32 432 canvas overlay
+- PHOSPHOR P0/P1/P1.1/P1.2/P1.3/P2/P3/P3.1/P3.2/P3.3/P3.4：审计、24×16 Glyph Frame、三轨 Orbit、2× Nucleus、18×27 Bold Atlas、密度 Ramp、Palette/Compositor、Idle/Working motion、0/1 二进制流、Outer 相邻 cell 加厚、Inner 密集带、中心减量、SDL2 动画/截图、ESP32 432 canvas overlay
 
 已验证：
 
 - **真机 bring-up 成功（2026-11-11）**：ESP-IDF v5.5.5 构建、烧录、启动通过；180° 显示旋转已修正并重新烧录
 - 启动证据：16MB QIO Flash、8MB Octal PSRAM 80MHz、240MHz、ST7701 480×480、GT911 0x14、ESPUI 初始化
-- 固件：`meetagent_terminal.bin` 1,273,072 bytes（SHA-256 `311428dc...6260`）；app 分区剩余 17%
+- 固件：`meetagent_terminal.bin` 1,273,280 bytes（SHA-256 `eb8e1931...a2e356d2`）；app 分区剩余 17%
 - 原厂 16MB Flash 已备份：`/home/perch/esp/backups/lcd4-factory-2026-11-11-1132.bin`
 - 主机测试：`3624 checks, 0 failure(s)`（ASan/UBSan + `-Werror`）
 - 主机语法检查：45 个固件 C 文件通过（board_lcd4.c / wifi_prov.c / net_client.c / phosphor_lvgl_port.c 由真实 IDF 构建验证）
@@ -160,7 +160,7 @@ firmware/terminal/
 - `docs/PHOSPHOR_AUDIT.md`：P0 依赖/屏幕/内存/集成审计
 - `docs/PHOSPHOR_P1.md`：P1/P1.1/P1.2/P1.3 静态 Core、18×27 Bold、三轨可辨性、模拟器、截图、真机结果
 - `docs/PHOSPHOR_P2.md`：P2 Glyph Ramp、核心密度场、Palette、前后合成、模拟器/真机
-- `docs/PHOSPHOR_P3.md`：P3/P3.1/P3.2/P3.3 Idle/Working motion、0/1 二进制流、相邻 cell 加厚、FPS/内存、SDL golden
+- `docs/PHOSPHOR_P3.md`：P3/P3.1/P3.2/P3.3/P3.4 Idle/Working motion、0/1、相邻 cell、中心减量、FPS/内存、SDL golden
 - `docs/BUILD_STATUS.md`：构建/测试结果、阻塞与下一步
 
 ## 未实现（明确不在本次范围）

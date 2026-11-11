@@ -209,3 +209,11 @@ P0 的 288×288 / 8×12 估算作为 P1.0 基线保留；P1.1 根据实机反馈
 - warning gap 0.11 / middle gap 0.04，低亮度填充；
 - v3→v4 changed pixels 5,740/5,510；Inner/Outer band cells 6/23；
 - P3 仍静态，P4 未开始。
+
+
+## 18. P3.4 中心减量（2026-11-11）
+
+- Core density 48–64、1/17 cell、108–120；中心 band 清除；
+- 中心非空 cell 35→26（-25.7%），外圈保持；
+- v4→v5 changed pixels 2,814/2,014；
+- P4 未开始。

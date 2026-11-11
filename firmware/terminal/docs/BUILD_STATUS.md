@@ -652,6 +652,22 @@ I (26244) touch_test: TOUCH release
 - Host：**3624 checks, 0 failures**；syntax **45 files OK**。
 - P4 未开始。
 
+### 11.21 PHOSPHOR P3.4 中心减量（2026-11-11）
+
+- Core density 收窄到半径 48–64，1/17 cell 稀疏，强度 108–120；
+  中心 <80 不再加 band FIELD；Inner band 110–150；Middle 215；
+  Outer 主带/副带/0/1/缺口完全保持。
+- 中心 radius<80 非空 cell：35→26（-25.7%），未变空；
+  center 黑像素比例 Idle 71.07→76.27%，Working 72.85→74.51%。
+- 新截图 `p3_idle_v5.png` / `p3_working_v5.png`。
+- 最终固件：1,273,280 B，SHA-256 `eb8e1931...a2e356d2`，app 剩余 17%，
+  DIRAM 204,423/341,760 (59.81%)。
+- 真机：internal_free 49,599→65,119 B，PSRAM ~6,133,308 B；
+  Idle 6–7 FPS，Working 7 FPS（仍低于 10–15 目标，P5）；
+  Wi-Fi/Node 在线；无 panic/OOM。
+- Host：**3624 checks, 0 failures**；syntax **45 files OK**。
+- P4 未开始。
+
 ## 12. 仓库约束
 
 - 只修改 `firmware/terminal/`

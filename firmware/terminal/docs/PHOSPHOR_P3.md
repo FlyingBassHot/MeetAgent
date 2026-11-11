@@ -1,7 +1,7 @@
-# PHOSPHOR CORE — P3.3 Idle / Working 相邻 cell 密度
+# PHOSPHOR CORE — P3.4 Idle / Working 中心减量
 
 日期：2026-11-11
-状态：P3.3 用相邻 cell 增加可见字符，修正 Outer/Inner/缺口空白；未进入 P4。实屏由用户确认。
+状态：P3.4 温和减少中心填充，保留外围与三轨；未进入 P4。实屏由用户确认。
 
 ## 1. 保持 P1.3/P2 基线
 
@@ -45,6 +45,9 @@
   缺口内用低亮度 `0/1/./+` 连续填充，不留大块黑；
 - Inner 半径 80、96 采样；Middle 不变；
 - 主 Outer 仍 96 采样、`+#%@01`，Working 300ms bucket；副带/缺口填充连续；
+- **P3.4**：core density 收窄到半径 48–64，1/17 cell 稀疏覆盖，
+  最高强度约 108–120（Idle/Working）；中心 <80 不生成 band FIELD；
+  Inner band 110–150，Middle 强度 215；Outer 完全保持；
 - Satellite 位置固定，不随机换位；
 - Nucleus 2× 固定中心，亮度随呼吸 235–255；
 - 静态 API `phosphor_scene_build_frame()` 保留为 P2 回归/基准路径。
@@ -63,7 +66,7 @@
 ### 实测（真机）
 
 ```text
-Idle    fps=6    render_avg=60–82ms  period=142–149ms
+Idle    fps=6–7  render_avg=40–76ms  period=143–146ms
 Working fps=7    render_avg=75–116ms period=135–138ms
 ```
 
@@ -79,42 +82,42 @@ Working fps=7    render_avg=75–116ms period=135–138ms
 cd firmware/terminal/tools/phosphor_sim
 make
 ./build/phosphor_sim                         # 动画窗口；1=Idle 2=Working ESC=退出
-SDL_VIDEODRIVER=dummy ./build/phosphor_sim --screenshot build/p3_idle_v4.bmp --state idle --time-ms 3000
-SDL_VIDEODRIVER=dummy ./build/phosphor_sim --screenshot build/p3_working_v4.bmp --state working --time-ms 3000
-convert build/p3_idle_v4.bmp ../../docs/phosphor/p3_idle_v4.png
-convert build/p3_working_v4.bmp ../../docs/phosphor/p3_working_v4.png
+SDL_VIDEODRIVER=dummy ./build/phosphor_sim --screenshot build/p3_idle_v5.bmp --state idle --time-ms 3000
+SDL_VIDEODRIVER=dummy ./build/phosphor_sim --screenshot build/p3_working_v5.bmp --state working --time-ms 3000
+convert build/p3_idle_v5.bmp ../../docs/phosphor/p3_idle_v5.png
+convert build/p3_working_v5.bmp ../../docs/phosphor/p3_working_v5.png
 ```
 
 Golden：
 
 ```text
-docs/phosphor/p3_idle_v4.png
-480x480 PNG, 3,740 B
-sha256 3cb9de827cf0cd46f61f084da3426ce88fd475029dc63c108e705b373c533f43
+docs/phosphor/p3_idle_v5.png
+480x480 PNG, 3,579 B
+sha256 6352b8998b9e817bd4f02d6f3d1dce52d22cf8bc1a83f58094beec89467f5455
 
-docs/phosphor/p3_working_v4.png
-480x480 PNG, 3,622 B
-sha256 bfa1fd5db030e0d267cf086aa6d4204a5780a8da4c02191cd5a59ec1588b3cce
+docs/phosphor/p3_working_v5.png
+480x480 PNG, 3,537 B
+sha256 6d7a54a570535eb2a7132c19dd27f5c94b583569764348abb43bd6f1387ac9d9
 
-历史 P3.0–P3.2 截图保留。
+历史 P3.0–P3.3 截图保留。
 ```
 
 ## 6. 构建 / 内存
 
 ```text
-app size : 1,273,072 B (0x136cf0)
-sha256   : 311428dca127233645196156e32425678c56abc667001ea16a77f74fbeec6260
-app free : 0x40310 (17%)
+app size : 1,273,280 B (0x136dc0)
+sha256   : eb8e19316bc0303ddd7a2633edaaaabf4c332c6063440c7c6c2f1ab3a2e356d2
+app free : 0x40240 (17%)
 DIRAM    : 204,423 / 341,760 B (59.81%)
 IRAM     : 16,384/16,384（size 固定窗口；链接断言通过）
 PSRAM canvas: 373,248 B（一次分配）
 ```
 
-真机启动日志 `/tmp/phosphor-p3d-boot.log`：
+真机启动日志 `/tmp/phosphor-p3e-boot.log`：
 
 ```text
 P3 animation started: demo 6s Idle / 6s Working
-welcome memory: internal_free=43,475 psram_free=6,133,480
+welcome memory: internal_free=49,599 psram_free=6,133,480
 network state: online
 ```
 
