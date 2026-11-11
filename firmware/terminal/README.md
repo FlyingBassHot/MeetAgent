@@ -12,18 +12,20 @@
 - E1：ESP-IDF 工程骨架、LVGL 渲染器接入点、HAL 接口、UI Task + 事件队列、Theme Registry、安全主题
 - E2：Manifest 校验、Design Tokens、Scene Manager、Motion Scheduler、两个内置主题、主题切换与回退
 - E3a：字符网格、glyph ramp 密度场、ASCII Geometry、六态 Motion、Completed 有限脉冲、Scheduler/Scene 绑定、host CLI
+- E4a：Wi-Fi NVS 配网、SoftAP portal、STA/断线重连、Node `/api/v2/info` 可达性
 
 已验证：
 
 - **真机 bring-up 成功（2026-11-11）**：ESP-IDF v5.5.5 构建、烧录、启动通过；180° 显示旋转已修正并重新烧录
 - 启动证据：16MB QIO Flash、8MB Octal PSRAM 80MHz、240MHz、ST7701 480×480、GT911 0x14、ESPUI 初始化
-- 固件：`meetagent_terminal.bin` 506,928 bytes（SHA-256 `bd13bf91...c7c09ed`）；app 分区剩余 67%
+- 固件：`meetagent_terminal.bin` 1,212,272 bytes（SHA-256 `0183dedd...30d157d`）；app 分区剩余 21%
 - 原厂 16MB Flash 已备份：`/home/perch/esp/backups/lcd4-factory-2026-11-11-1132.bin`
 - 主机测试：`807 checks, 0 failure(s)`（ASan/UBSan + `-Werror`）
-- 主机语法检查：33 个固件 C 文件通过（board_lcd4.c 由真实 IDF 构建验证）
+- 主机语法检查：33 个固件 C 文件通过（board_lcd4.c 与 wifi_prov.c 由真实 IDF 构建验证）
 - E3a 帧预览：`make preview STATE=working FRAMES=3 DELAY=300`
 - 启动日志：`/tmp/opencode/esp-lcd4-boot.log`
-- **待人工确认**：旋转后屏幕实际方向/颜色、GT911 触摸命中、背光亮度
+- E4a 实测：STA 172.20.10.2，Node developer-machine/2.1.0，`/status` node_reachable=true
+- **待人工确认**：旋转后屏幕实际方向/颜色、GT911 触摸命中、背光亮度；AP portal `/save` 需第二台设备
 
 当前环境：
 
@@ -36,6 +38,7 @@ BSP      : waveshare/esp32_s3_touch_lcd_4 3.0.0
 构建     : idf.py build 成功
 烧录     : idf.py -p /dev/ttyACM0 flash 成功
 启动     : 成功，无 panic/assert/reset loop
+Wi-Fi    : E4a 配网/STA/Node 可达已验证
 串口     : /dev/ttyACM0 (28:84:85:ac:74:6c)
 ```
 
@@ -143,13 +146,14 @@ firmware/terminal/
 - `docs/VIEWMODEL.md`：ViewModel 维度、容量、所有权与状态适配
 - `docs/HARDWARE.md`：HAL 契约、stub 板、待确认硬件项
 - `docs/ASCII_RENDERER.md`：E3a 字符网格、几何、六态 Motion、CLI 与集成
+- `docs/NETWORK.md`：E4a Wi-Fi 配网、STA 重连、Node 可达性、NVS 清理、portal 验证
 - `docs/BUILD_STATUS.md`：本次构建/测试结果、阻塞与下一步
 
 ## 未实现（明确不在本次范围）
 
 - E3b：把 ASCII 帧接到 LVGL 字符网格 widget、字体/颜色 Token 映射、局部刷新
 - E3 剩余：Focus / Activity / Settings 完整场景布局、文本打字/滚动动效、真机 FPS/内存验收
-- E4 真实 Node：Wi-Fi 配网、mDNS、HTTP 配对、WSS、hello/welcome/snapshot/event/command、心跳与重连
+- E4b 真实 Node：WebSocket/pairing/snapshot/event/command、心跳与重连（E4a 仅 Wi-Fi + `/api/v2/info`）
 - E5：主题设置持久化、亮度/夜间模式、低功耗、OTA
 - 语音 / STT、本地 AI、完整聊天、文件浏览、长历史
 - 真机 LCD / 触摸 / 旋钮驱动与引脚定义

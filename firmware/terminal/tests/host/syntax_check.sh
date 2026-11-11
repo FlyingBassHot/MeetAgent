@@ -28,10 +28,11 @@ CFLAGS=(
     -I../../main
 )
 
-# board_lcd4.c needs the managed Waveshare BSP/LVGL headers and is verified
-# by the real idf.py build instead of host stubs.
+# board_lcd4.c needs the managed Waveshare BSP/LVGL headers and wifi_prov.c
+# needs ESP-IDF Wi-Fi/HTTP/NVS headers; both are verified by the real build.
 mapfile -t files < <(find "${COMPONENTS}" ../../main -name '*.c' \
-    ! -path '*/main/board_lcd4.c' | sort)
+    ! -path '*/main/board_lcd4.c' \
+    ! -path '*/components/networking/wifi_prov.c' | sort)
 for file in "${files[@]}"; do
     echo "[syntax] ${file}"
     "${CC}" "${CFLAGS[@]}" "${file}"

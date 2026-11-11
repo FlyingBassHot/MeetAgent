@@ -33,6 +33,7 @@ Excluded from the host syntax check (needs managed BSP/LVGL headers, verified
 by `idf.py build` instead):
 
 - `main/board_lcd4.c`
+- `components/networking/wifi_prov.c`
 
 Excluded from the test binary (need FreeRTOS/LVGL):
 

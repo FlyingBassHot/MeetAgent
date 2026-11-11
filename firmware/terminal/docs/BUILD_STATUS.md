@@ -3,7 +3,7 @@
 日期：2026-11-11  
 范围：`firmware/terminal/` only  
 目标：Waveshare ESP32-S3-Touch-LCD-4 V4.0（ESP32-S3N16R8）  
-状态：**180° 旋转修正后已重新烧录并成功启动**；颜色/触摸命中仍需人工确认
+状态：**E4a Wi-Fi/STA/Node 已验证**；180° 旋转已修正；屏幕颜色/触摸命中仍需人工确认
 
 ## 1. 真机信息
 
@@ -79,8 +79,8 @@ idf.py size
 
 ```text
 build/meetagent_terminal.bin
-  size   : 506,928 bytes (0x7BC30)
-  sha256 : bd13bf91d6ae286b6c70199c0abeefc0abd004d50922b2c87970fdbe7c7c09ed
+  size   : 1,212,272 bytes (0x127F70)
+  sha256 : 0183deddbe2cf84d7bed35f8221fcc74358e7b1f657b9cc17aeff4bfa30d157d
 
 build/bootloader/bootloader.bin
   size   : 22,272 bytes (0x5700)
@@ -94,10 +94,10 @@ build/partition_table/partition-table.bin
 `idf.py size`：
 
 ```text
-Total image size : 506,819 bytes
-Flash Code       : 323,464 bytes
-Flash Data       :  86,160 bytes
-DIRAM            : 141,179 / 341,760 bytes (41.31%)
+Total image size : 1,212,151 bytes
+Flash Code       : 900,468 bytes
+Flash Data       : 175,236 bytes
+DIRAM            : 195,895 / 341,760 bytes (57.32%)
 IRAM (size 工具) :  16,384 / 16,384 bytes (100.0%)
 ```
 
@@ -105,11 +105,11 @@ App 分区：
 
 ```text
 Smallest app partition : 0x177000 bytes
-Free                   : 0xFB3D0 bytes (67%)
+Free                   : 0x4F090 bytes (21%)
 ```
 
 IRAM 说明：size 工具表里的 16,384 与链接脚本 `iram0_0_seg = 0x57700` 口径不同；
-实际 `.iram0.text` 为 81,547 bytes，链接断言通过，未发生 IRAM 溢出。该行仍需后续核对。
+实际 `.iram0.text` 远小于 `iram0_0_seg`，链接断言通过，未发生 IRAM 溢出。该行仍需后续核对。
 
 ## 5. 烧录
 
@@ -253,7 +253,7 @@ idf.py flash: SUCCESS (exit 0)
 - [ ] CH32V003 电池 ADC → 电量映射
 - [ ] 多点触控（BSP port 只注册 1 点）
 - [ ] 长时间运行、内存泄漏、FPS
-- [ ] E3b LVGL 字符网格 / E4 网络
+- [ ] E3b LVGL 字符网格 / E4b WebSocket/pairing/snapshot
 
 ## 10. 风险
 
@@ -263,7 +263,83 @@ idf.py flash: SUCCESS (exit 0)
 - `idf.py size` IRAM 行口径待核对；实际链接断言通过。
 - `sdkconfig.defaults` 的 16MB/Octal 已由启动日志验证为 16MB/8MB，但具体模组批次仍需记录。
 
-## 11. 仓库约束
+## 11. E4a Wi-Fi provisioning（2026-11-11）
+
+### 11.1 实现
+
+- 新增 `components/networking/wifi_prov.c/.h`
+- NVS namespace `meet_wifi`，keys `wifi_ssid` / `wifi_pass` / `node_url` / `pairing_code`
+- 无配置：开放 SoftAP `MeetAgent-<MAC后4位>` + HTTP portal `192.168.4.1:80`
+- 有配置：STA 最多 3 次 × 15s，失败回退 SoftAP
+- STA 成功后启动 `:80 /status`，GET `<node_url>/api/v2/info`
+- 断线监控：30s 轮询 IP，断线后重连；重连 3 次失败才回退 AP
+- `/save` 在 STA 返回 403，仅 SoftAP 可配网
+- 不打印 Wi-Fi 密码/pairing code；`/status` 不返回密码/token
+
+### 11.2 构建/烧录
+
+```text
+ESP-IDF : v5.5.5
+app bin : 1,212,272 bytes (0x127F70)
+sha256  : 0183deddbe2cf84d7bed35f8221fcc74358e7b1f657b9cc17aeff4bfa30d157d
+Total image size : 1,212,151 bytes
+Flash Code       : 900,468 bytes
+Flash Data       : 175,236 bytes
+DIRAM            : 195,895 / 341,760 bytes (57.32%)
+App partition    : 0x177000, free 0x4F090 (21%)
+```
+
+- `idf.py build` 成功，无项目 warning/error
+- 先 NVS 备份：`/tmp/opencode/nvs-backup.bin`，24,576 bytes，
+  SHA-256 `bff03118be311fd9574a34b5f294a62b81126c97b9266a6e30d3a17b7fa549f1`
+- 生成 NVS 镜像后只写 `0x9000`；随后 `idf.py app-flash` 写 `0x10000`
+- 未 erase-flash，未动分区表，原厂 16MB 备份未动
+
+### 11.3 STA / Node 验证
+
+验证方式：NVS 预置（主机全程保持手机热点 172.20.10.5，未切换 Wi-Fi）。
+
+```text
+ESP32 STA IP: 172.20.10.2
+Node info   : developer-machine / 2.1.0 / protocol=1 / schema=1
+```
+
+ESP32 串口：
+
+```text
+wifi_prov: config: has_config=1 ssid='...' node_url='http://172.20.10.5:8787' ...
+wifi_prov: STA got IP: 172.20.10.2
+wifi_prov: Node reachable: name=developer-machine version=2.1.0 protocol=1 schema=1
+```
+
+主机验证：
+
+```json
+{"wifi_state":"connected","ip":"172.20.10.2","node_url":"http://172.20.10.5:8787","has_config":true,"node_reachable":true,"node_name":"developer-machine","node_version":"2.1.0","protocol_version":1,"schema_version":1}
+```
+
+- `/status` 无 password/pairing/token 字段
+- STA `POST /save` → 403
+- 重启（monitor DTR hard reset）后自动从 NVS 重连，再次 Node 可达
+- 主机未使用校园网 SSID（需网页认证），未执行 nmcli 网络切换（收到约束后）
+- ufw 已由用户放行 `172.20.10.0/28 → TCP 8787`
+
+### 11.4 Portal 状态
+
+- 在主机网络约束前，曾短暂连接 AP 读取 `/` 与 `/status`；**未提交 `/save`**，随后立即恢复手机热点。
+- 最终 STA/Node 验证全部使用 NVS 预置，未再切换主机网络。
+- AP portal `POST /save` 实机保存未验证；第二台设备步骤见 `docs/NETWORK.md`。
+
+### 11.5 未验证 / 风险
+
+- [ ] AP portal `/save` 实机保存（需第二台设备）
+- [ ] 强制断线重连（代码有 30s 监控 + 重连循环；未主动断开热点）
+- [ ] DHCP 短租约续租（lwIP 自动续租；未等租约到期）
+- [ ] NVS/Flash 加密；当前密码以 NVS 明文保存
+- [ ] 开放 AP 仅用于配网；若 STA 连续失败会保持 AP
+- [ ] E4b WebSocket/pairing/snapshot
+
+## 12. 仓库约束
 
 - 只修改 `firmware/terminal/`
 - 未修改 Node / 协议 / mobile / 根文档

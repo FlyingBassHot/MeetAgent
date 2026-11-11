@@ -16,6 +16,8 @@
 #include "board_lcd4.h"
 #include "mock_state.h"
 #include "net_client.h"
+#include "wifi_prov.h"
+#include "nvs_flash.h"
 
 static const char *TAG = "app_main";
 static meet_net_client_t s_net;
@@ -30,6 +32,20 @@ static void on_net_state(meet_net_state_t state, void *user_ctx)
     (void)state; /* used by ESP_LOGI in the firmware build */
     (void)user_ctx;
     ESP_LOGI(TAG, "network state: %s", meet_net_state_name(state));
+}
+
+static esp_err_t init_nvs(void)
+{
+    esp_err_t err = nvs_flash_init();
+    if (err == ESP_ERR_NVS_NO_FREE_PAGES ||
+        err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        ESP_LOGW(TAG, "NVS needs erase (%s); erasing NVS", esp_err_to_name(err));
+        err = nvs_flash_erase();
+        if (err == ESP_OK) {
+            err = nvs_flash_init();
+        }
+    }
+    return err;
 }
 
 static esp_err_t init_board(const espui_board_hal_t *board)
@@ -71,6 +87,11 @@ void app_main(void)
     esp_err_t err = init_board(board);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "board bring-up failed; stopping");
+        return;
+    }
+    err = init_nvs();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "NVS init failed: %s", esp_err_to_name(err));
         return;
     }
 
@@ -123,7 +144,13 @@ void app_main(void)
         ESP_LOGW(TAG, "mock state not started: %s", esp_err_to_name(err));
     }
 
+    err = meet_wifi_prov_start();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Wi-Fi provisioning start failed: %s",
+                 esp_err_to_name(err));
+    }
+
     ESP_LOGI(TAG, "terminal scaffold running (LCD-4 BSP, mock state)");
-    ESP_LOGI(TAG, "Wi-Fi/WSS/Node integration is E4 work; no network started");
+    ESP_LOGI(TAG, "Wi-Fi provisioning started; WSS/pairing is E4b");
     vTaskDelay(pdMS_TO_TICKS(10000));
 }

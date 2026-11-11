@@ -6,5 +6,6 @@ idf_component_register(
         protocol
         state
         networking
+        nvs_flash
         waveshare__esp32_s3_touch_lcd_4
 )
