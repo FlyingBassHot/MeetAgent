@@ -40,6 +40,8 @@ idf_component_register(
         "phosphor/phosphor_motion.c"
         "phosphor/phosphor_lut.c"
         "phosphor/phosphor_state.c"
+        "phosphor/phosphor_view_model_adapter.c"
+        "phosphor/phosphor_input_publisher.c"
         "phosphor/phosphor_demo.c"
         "phosphor/phosphor_lvgl_port.c"
 

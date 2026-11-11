@@ -24,6 +24,8 @@
 #include "freertos/task.h"
 #include "mock_state.h"
 #include "nvs.h"
+#include "phosphor_input_publisher.h"
+#include "phosphor_view_model_adapter.h"
 #include "state_adapter.h"
 #include "welcome_elision.h"
 #include "wifi_prov.h"
@@ -83,6 +85,9 @@ static int s_rx_len;
 static int s_rx_expected;
 static bool s_rx_active;
 
+static bool s_phosphor_ready;
+static phosphor_connection_state_t s_phosphor_connection;
+
 static meet_state_adapter_t s_adapter;
 static espui_view_model_t s_model;
 static meet_protocol_snapshot_t *s_snapshot;
@@ -118,6 +123,52 @@ static void copy_str(char *dst, size_t size, const char *src)
     dst[length] = '\0';
 }
 
+static phosphor_connection_state_t map_phosphor_connection(
+    meet_net_state_t state)
+{
+    switch (state) {
+    case MEET_NET_ONLINE:
+        return PHOSPHOR_CONNECTION_ONLINE;
+    case MEET_NET_WIFI_CONNECTING:
+    case MEET_NET_NODE_CONNECTING:
+        return PHOSPHOR_CONNECTION_CONNECTING;
+    case MEET_NET_ERROR:
+        return PHOSPHOR_CONNECTION_ERROR;
+    case MEET_NET_DISCONNECTED:
+    default:
+        return PHOSPHOR_CONNECTION_OFFLINE;
+    }
+}
+
+/* Caller must hold s_model_lock. */
+static void publish_phosphor_locked(uint64_t completion_hash, bool snapshot)
+{
+    if (!s_phosphor_ready) {
+        return;
+    }
+    phosphor_connection_input_t connection = {
+        .valid = true,
+        .state = s_phosphor_connection,
+    };
+    phosphor_input_state_t input = phosphor_view_model_to_input(
+        &s_model, completion_hash, &connection);
+    if (!phosphor_input_publisher_publish(&input, snapshot)) {
+        ESP_LOGW(TAG, "phosphor input publish failed");
+    }
+}
+
+static void publish_phosphor(uint64_t completion_hash, bool snapshot)
+{
+    if (!s_phosphor_ready || s_model_lock == NULL) {
+        return;
+    }
+    if (xSemaphoreTake(s_model_lock, portMAX_DELAY) != pdTRUE) {
+        return;
+    }
+    publish_phosphor_locked(completion_hash, snapshot);
+    (void)xSemaphoreGive(s_model_lock);
+}
+
 static void set_state(meet_net_client_t *client, meet_net_state_t state)
 {
     if (client == NULL) {
@@ -127,9 +178,11 @@ static void set_state(meet_net_client_t *client, meet_net_state_t state)
         return;
     }
     client->state = state;
+    s_phosphor_connection = map_phosphor_connection(state);
     if (client->callbacks.on_state != NULL) {
         client->callbacks.on_state(state, client->user_ctx);
     }
+    publish_phosphor(0, false);
 }
 
 /* ------------------------------------------------------------------------- */
@@ -665,6 +718,11 @@ static void process_event(cJSON *root)
         sessions = espui_view_model_session_count(&s_model);
         active = espui_view_model_active_session_count(&s_model);
         alerts = espui_view_model_attention_count(&s_model);
+        uint64_t completion_hash = 0;
+        if (strcmp(type, MEET_PROTOCOL_EVENT_MESSAGE_COMPLETED) == 0) {
+            completion_hash = phosphor_completion_hash(event_id, sequence);
+        }
+        publish_phosphor_locked(completion_hash, false);
     }
     (void)xSemaphoreGive(s_model_lock);
 
@@ -1014,6 +1072,8 @@ static void process_welcome(cJSON *root, uint32_t parse_ms)
         s_model_dirty = false;
         s_last_post_ms = now_ms;
     }
+    s_phosphor_connection = PHOSPHOR_CONNECTION_ONLINE;
+    publish_phosphor_locked(0, true);
     (void)xSemaphoreGive(s_model_lock);
 
     if (post_err != ESP_OK) {
@@ -1364,6 +1424,8 @@ static void handle_auth_failure(void)
 
 static void net_task_cleanup(void)
 {
+    s_phosphor_ready = false;
+    phosphor_input_publisher_clear();
     cleanup_ws();
     if (s_rx_buf != NULL) {
         heap_caps_free(s_rx_buf);
@@ -1416,6 +1478,10 @@ static void net_task(void *arg)
 
     meet_state_adapter_init(&s_adapter);
     espui_view_model_init(&s_model);
+    phosphor_input_publisher_init();
+    s_phosphor_connection = PHOSPHOR_CONNECTION_OFFLINE;
+    s_phosphor_ready = true;
+    publish_phosphor(0, false);
     load_auth();
     int backoff = 1;
 
@@ -1562,6 +1628,7 @@ esp_err_t meet_net_client_start(meet_net_client_t *client)
     if (s_running) {
         return ESP_ERR_INVALID_STATE;
     }
+    phosphor_input_publisher_init();
     if (s_lifecycle_lock == NULL) {
         s_lifecycle_lock = xSemaphoreCreateMutex();
         if (s_lifecycle_lock == NULL) {

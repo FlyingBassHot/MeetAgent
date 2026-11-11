@@ -50,7 +50,7 @@ PURE_SRCS := \
 	$(wildcard $(COMPONENTS)/networking/welcome_elision.c) \
 	$(wildcard $(COMPONENTS)/state/state_adapter.c)
 
-TEST_SRCS := $(wildcard test_*.c) stubs/espui_runtime_stub.c
+TEST_SRCS := $(wildcard test_*.c) stubs/espui_runtime_stub.c stubs/freertos_semphr_stub.c
 BUILD_DIR := build
 TEST_BIN := $(BUILD_DIR)/espui_tests
 

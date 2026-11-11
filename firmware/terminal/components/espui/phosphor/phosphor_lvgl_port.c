@@ -16,6 +16,7 @@
 #include "esp_log.h"
 #include "lvgl.h"
 #include "phosphor_demo.h"
+#include "phosphor_input_publisher.h"
 #include "phosphor_motion.h"
 #include "phosphor_state.h"
 #include "phosphor_scene.h"
@@ -62,15 +63,20 @@ static void phosphor_anim_task(void *arg)
         last_frame_start_us = loop_start_us;
         uint32_t now_ms = (uint32_t)((esp_timer_get_time() - start_us) / 1000);
         phosphor_demo_phase_t phase = phosphor_demo_phase_at(now_ms);
-        if (phase != last_phase) {
-            ESP_LOGI(TAG, "P4 demo phase=%s",
-                     phosphor_demo_phase_name(phase));
-            last_phase = phase;
-        }
         uint32_t cycle = now_ms / PHOSPHOR_DEMO_CYCLE_MS + 1u;
         phosphor_input_state_t input;
+        bool real_snapshot = false;
         phosphor_visual_state_t visual;
-        phosphor_demo_build_input(phase, cycle, &input);
+        bool using_demo = !phosphor_input_publisher_read(&input, &real_snapshot) ||
+                          !real_snapshot;
+        if (using_demo) {
+            phosphor_demo_build_input(phase, cycle, &input);
+            if (phase != last_phase) {
+                ESP_LOGI(TAG, "P4 demo phase=%s",
+                         phosphor_demo_phase_name(phase));
+                last_phase = phase;
+            }
+        }
         phosphor_state_resolver_update(&s_resolver, &input, now_ms, &visual);
         if (visual.activity == PHOSPHOR_ACTIVITY_OFFLINE) {
             if (!was_offline) {
@@ -121,8 +127,9 @@ static void phosphor_anim_task(void *arg)
                      "frames=%u fps=%u render_avg_us=%u loop_avg_us=%u "
                      "period_avg_us=%u delay=%u tick=%u internal_free=%u "
                      "psram_free=%u",
-                     phosphor_demo_phase_name(phase), (int)visual.activity,
-                     (unsigned)visual.attention, (unsigned)frames,
+                     using_demo ? phosphor_demo_phase_name(phase) : "node",
+                     (int)visual.activity, (unsigned)visual.attention,
+                     (unsigned)frames,
                      (unsigned)fps, avg_us, loop_avg_us, period_avg_us,
                      (unsigned)last_delay_ms, (unsigned)configTICK_RATE_HZ,
                      (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
@@ -161,6 +168,7 @@ esp_err_t phosphor_lvgl_port_init(const espui_display_hal_t *display)
         ESP_LOGE(TAG, "no LVGL display registered");
         return ESP_ERR_INVALID_STATE;
     }
+    phosphor_input_publisher_init();
 
     const size_t bytes =
         (size_t)PHOSPHOR_CANVAS_W * PHOSPHOR_CANVAS_H * sizeof(uint16_t);
