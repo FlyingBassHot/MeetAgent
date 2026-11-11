@@ -7,6 +7,7 @@
 #include "glyph_rasterizer.h"
 #include "orbit_geometry.h"
 #include "phosphor_lut.h"
+#include "phosphor_core.h"
 #include "phosphor_demo.h"
 #include "phosphor_motion.h"
 #include "phosphor_state.h"
@@ -502,6 +503,46 @@ static void test_state_resolver(void)
     TEST_ASSERT_EQ_INT(slot_a, slot_a2);
 }
 
+static void test_core_six_states(void)
+{
+    phosphor_demo_phase_t phases[6] = {
+        PHOSPHOR_DEMO_IDLE, PHOSPHOR_DEMO_WORKING,
+        PHOSPHOR_DEMO_APPROVAL, PHOSPHOR_DEMO_ERROR,
+        PHOSPHOR_DEMO_COMPLETED, PHOSPHOR_DEMO_OFFLINE,
+    };
+    phosphor_core_metrics_t m[6];
+    glyph_frame_t frames[6];
+    for (int p = 0; p < 6; ++p) {
+        phosphor_state_resolver_t resolver;
+        phosphor_input_state_t input;
+        phosphor_visual_state_t visual;
+        phosphor_state_resolver_init(&resolver);
+        phosphor_demo_build_input(phases[p], 1, &input);
+        phosphor_state_resolver_update(&resolver, &input, 0, &visual);
+        uint32_t t = phases[p] == PHOSPHOR_DEMO_COMPLETED ? 300u : 1000u;
+        phosphor_state_resolver_update(&resolver, &input, t, &visual);
+        phosphor_core_build_frame(&frames[p], &visual, &m[p]);
+    }
+    TEST_ASSERT_TRUE(m[2].approval_gap_cells > 0);
+    TEST_ASSERT_EQ_INT(7, m[3].error_break_cells);
+    TEST_ASSERT_EQ_INT(3, m[4].completion_wave_layers);
+    TEST_ASSERT_TRUE(m[5].offline_removed_cells > 0);
+    int idle_cells = 0;
+    int working_cells = 0;
+    for (int r = 0; r < PHOSPHOR_GRID_H; ++r) {
+        for (int c = 0; c < PHOSPHOR_GRID_W; ++c) {
+            idle_cells += frames[0].cells[r][c].glyph != 0;
+            working_cells += frames[1].cells[r][c].glyph != 0;
+        }
+    }
+    TEST_ASSERT_TRUE(working_cells > idle_cells);
+    TEST_ASSERT_TRUE(memcmp(&frames[0], &frames[1], sizeof(frames[0])) != 0);
+    TEST_ASSERT_TRUE(memcmp(&frames[1], &frames[2], sizeof(frames[1])) != 0);
+    TEST_ASSERT_TRUE(memcmp(&frames[1], &frames[3], sizeof(frames[1])) != 0);
+    TEST_ASSERT_TRUE(memcmp(&frames[1], &frames[4], sizeof(frames[1])) != 0);
+    TEST_ASSERT_TRUE(memcmp(&frames[1], &frames[5], sizeof(frames[1])) != 0);
+}
+
 static void test_scene_nucleus_and_rasterizer(void)
 {
     glyph_frame_t frame;
@@ -547,6 +588,7 @@ void test_phosphor_run(void)
     test_glyph_frame_priority();
     test_motion_and_scene();
     test_state_resolver();
+    test_core_six_states();
     test_band_neighbors();
     test_scene_nucleus_and_rasterizer();
 }

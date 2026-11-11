@@ -241,3 +241,10 @@ P0 的 288×288 / 8×12 估算作为 P1.0 基线保留；P1.1 根据实机反馈
 - 无静态 satellite；Approval 0.65rad 缺口+2 `?`；Error 5 字符断裂；
   Completed 3 层波；Offline 解体+NO LINK+label；
 - six goldens + contact sheet；真机 FPS ~7；P5/P6 未开始。
+
+
+## 22. R1 静态六态重构（2026-11-11）
+
+- 新 `phosphor_core` direct state geometry，替代 P4b base+overlay；
+- Approval gap 0.65rad、Error 5 字符 break、Completed3 层波、Offline 解体；
+- R1 只 PC 静态、不烧录；host 3693/syntax48。

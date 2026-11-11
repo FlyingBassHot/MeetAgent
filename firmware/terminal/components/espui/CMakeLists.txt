@@ -28,6 +28,7 @@ idf_component_register(
         "themes/terminal_aesthetic/renderers/ascii_renderer.c"
 
         "phosphor/glyph_atlas.c"
+        "phosphor/phosphor_core.c"
         "phosphor/glyph_frame.c"
         "phosphor/glyph_ramp.c"
         "phosphor/glyph_rasterizer.c"

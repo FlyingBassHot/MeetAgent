@@ -723,6 +723,20 @@ I (26244) touch_test: TOUCH release
 - Host：**3683 checks, 0 failures**；syntax **47 files OK**。
 - P5/P6 未开始。
 
+### 11.25 PHOSPHOR R1 静态六态重构（2026-11-11）
+
+- 新增 `phosphor_core` direct state geometry；`phosphor_scene` visual 路径委托 core，
+  不再是 P3.6 base + overlay。
+- 六态几何：Idle/Working 水密度与 4 sat；Approval 0.65rad 缺口+2 `?`；
+  Error 5 字符断裂；Completed 3 层波+8 外轨粒子；Offline 解体+NO LINK。
+- R1.1 contact：Approval gap42 / Error break7；pixel diff vs Working：
+  Idle4,104/Approval8,171/Error8,558/Offline19,901/Completed20,138。
+- **只编译，不烧录**；设备保留 P4b。
+- build-only app：1,284,080 B，SHA-256
+  `0f65a53f...7b129d78`，app free 16%，DIRAM 59.87%。
+- Host：**3693 checks, 0 failures**；syntax **48 files OK**。
+- R2/motion/烧录未开始。
+
 ## 12. 仓库约束
 
 - 只修改 `firmware/terminal/`
