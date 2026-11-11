@@ -7,7 +7,7 @@
 | Core / Node | 主会话 | M0 + M1 + M4 Core | 完成；审计/限流/重连边界加固 | M6 可选增强 |
 | Protocol v2 | 主会话 | M0 | 完成 | 随实现补兼容测试 |
 | Mobile | omp | M5b + UX P0/P1/P2 | 视觉与原生交互改造完成（信息层级/聊天流/触感/键盘/返回键/下拉刷新/视觉打磨） | iOS/Release |
-| Terminal / ESPUI | pi | E0–E3a + LCD-4 Bring-up + E4a + E4b-1/2/3 + PHOSPHOR P1/P2 | 真机启动成功；Wi-Fi/WS/事件/命令链路已验证；PHOSPHOR P2 静态渲染（密度 ramp / palette / 前后合成）已上屏 | P3 Idle/Working、interrupt/permission 实机、AP portal `/save` |
+| Terminal / ESPUI | pi | E0–E3a + LCD-4 Bring-up + E4a + E4b-1/2/3 + PHOSPHOR P1/P2 + net QA fixes | 真机启动成功；Wi-Fi/WS/事件/命令链路已验证；PHOSPHOR P2 静态渲染已上屏；F1/F3/F5/F7/F8/F10 已合并并通过组合固件启动 | P3 Idle/Working、interrupt/permission 实机、AP portal `/save` |
 | Cloud relay | 主会话 | 可选 | 保留 V1 实现 | M6 再验证混合模式 |
 
 ## 已完成
@@ -33,6 +33,7 @@
 - Terminal E4b-3（2026-11-11）：command gateway 安全链路已验证（`REFRESH_STATE → session.list` completed，42 sessions，footer ACK）；interrupt/permission.respond 代码完成、pending 表/15s 超时/断线 failed 已接入；host tests 1024/1024；interrupt/permission 尚未安全实机测试
 - Terminal PHOSPHOR P1（2026-11-11）：P0 审计 + P1 静态 Core 已上屏；24×16 网格 / 18×27 Bold+dilate / 432×432 canvas / 三条不同轨道 / 2× `>_` / `*` + `?` satellites；PC SDL golden screenshot 与 ESP32 实机同源；host tests 2013/2013；P2 密度/颜色待做
 - Terminal PHOSPHOR P2（2026-11-11）：Glyph 密度 ramp、核心密度场、8 色 palette RGB565 精确校验、前后层级合成（NUCLEUS>SATELLITE>FRONT>BACK>FIELD）、2× Nucleus 裁剪；host tests 3541/3541；P2 静态截图 `docs/phosphor/p2_static.png`；P3 动画待做
+- Terminal network QA fixes（2026-11-11）：F1 welcome 空/缺失 events、F3 stale pairing code、F5 mock stop、F7 字符串 NUL、F8 heartbeat 时序、F10 node_url 变化清 token 已合并；组合固件 0x135f00 / 17% free；启动日志 token=set、pairing_code=empty、welcome 49KB、snapshot applied、heartbeat RTT 298ms；host tests 3589/3589；F9/F4/F6/F2 仍待后续
 - Terminal 硬件目标确定为 **Waveshare ESP32-S3-Touch-LCD-4 V4**（480×480 RGB LCD + GT911 + CH32V003 helper）；真实 BSP 已接入，显示/触摸方向/PSRAM 待实物验证
 
 ## 真实联调（主会话）
