@@ -15,15 +15,15 @@
 
 已验证：
 
-- **真机 bring-up 成功（2026-11-11）**：ESP-IDF v5.5.5 构建、烧录、启动通过
+- **真机 bring-up 成功（2026-11-11）**：ESP-IDF v5.5.5 构建、烧录、启动通过；180° 显示旋转已修正并重新烧录
 - 启动证据：16MB QIO Flash、8MB Octal PSRAM 80MHz、240MHz、ST7701 480×480、GT911 0x14、ESPUI 初始化
-- 固件：`meetagent_terminal.bin` 506,240 bytes（SHA-256 `cc09416c...5882655`）；app 分区剩余 67%
+- 固件：`meetagent_terminal.bin` 506,928 bytes（SHA-256 `bd13bf91...c7c09ed`）；app 分区剩余 67%
 - 原厂 16MB Flash 已备份：`/home/perch/esp/backups/lcd4-factory-2026-11-11-1132.bin`
 - 主机测试：`807 checks, 0 failure(s)`（ASan/UBSan + `-Werror`）
 - 主机语法检查：33 个固件 C 文件通过（board_lcd4.c 由真实 IDF 构建验证）
 - E3a 帧预览：`make preview STATE=working FRAMES=3 DELAY=300`
 - 启动日志：`/tmp/opencode/esp-lcd4-boot.log`
-- **待人工确认**：屏幕实际颜色/方向、GT911 触摸方向/命中、背光亮度
+- **待人工确认**：旋转后屏幕实际方向/颜色、GT911 触摸命中、背光亮度
 
 当前环境：
 
@@ -77,7 +77,7 @@ idf.py size
 因 sudo 的 `HOME=/root` 找不到 Python 环境而失败（未接触设备），修正 `HOME` /
 `IDF_TOOLS_PATH` / `IDF_PYTHON_ENV_PATH` 后一次成功。
 
-> 已烧录并启动；屏幕颜色/方向/触摸命中仍需人工确认。详细证据、固件 hash、
+> 已烧录并启动；180° 旋转修正后屏幕方向/颜色/触摸命中仍需人工确认。详细证据、固件 hash、
 > 启动日志与风险见 `docs/BUILD_STATUS.md` / `docs/HARDWARE.md`。
 
 ## 主机测试

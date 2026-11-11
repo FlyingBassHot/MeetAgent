@@ -29,7 +29,7 @@
 | `bsp_display_get_input_dev()` | touch HAL `init` | 返回 BSP 注册的 LVGL touch indev |
 | `bsp_display_new()` 内部 | 不直接调用 | 由 `bsp_display_start()` 完成 CH32 复位与面板初始化 |
 | `bsp_touch_new()` | 不直接调用 | BSP 已创建一个 GT911 实例，避免重复 I2C 实例 |
-| `bsp_display_rotate()` | 未调用 | 480×480 方形；颜色/触摸方向待真机确认 |
+| `bsp_display_rotate()` | `display.init` 内调用 | `bsp_display_start()` 后持锁执行 `LV_DISP_ROT_180`；触摸随 LVGL indev 变换 |
 
 补充：
 
@@ -122,6 +122,7 @@ I cpu_start: cpu freq: 240000000 Hz
 I ESP32-S3-Touch-LCD-4: Touch 0x14 found
 I GT911: TouchPad_ID:0x39,0x31,0x31
 I GT911: TouchPad_Config_Version:79
+I board_lcd4: display rotated 180 degrees (touch transform follows LVGL indev)
 I board_lcd4: LCD-4 BSP started: 480x480 RGB565
 I espui: ESPUI initialized: theme=terminal_aesthetic
            display=waveshare-esp32-s3-touch-lcd-4-v4 480x480
@@ -133,9 +134,25 @@ I main_task: Returned from app_main()
 - 非致命 warning：
   - `i2c.master` 提示检查上拉电阻；GT911 仍成功识别。
   - ST7701 `36h` / `3Ah` 命令被 BSP 外部初始化序列覆盖。
-- 启动日志：`/tmp/opencode/esp-lcd4-boot.log`
+- 启动日志：`/tmp/opencode/esp-lcd4-boot.log`（初次）
+  / `/tmp/opencode/esp-lcd4-rotate-boot.log`（180° 修正后）
 - 原厂备份：`/home/perch/esp/backups/lcd4-factory-2026-11-11-1132.bin`
   （16,777,216 bytes，SHA-256 `c996b103...f963e2c7`）
+
+### 180° 旋转修正
+
+`main/board_lcd4.c` 在 `bsp_display_start()` 成功后、持 `bsp_display_lock()`
+调用：
+
+```c
+bsp_display_rotate(s_display, LV_DISP_ROT_180);
+```
+
+LVGL 8.4 的 `indev_pointer_proc()` 对 `LV_DISP_ROT_180` 自动做
+`x = hor_res - x - 1`、`y = ver_res - y - 1`，所以 `espui_touch_hal_t.read()`
+通过 `lv_indev_get_point()` 得到的已是旋转后的坐标。启动日志已确认
+`display rotated 180 degrees`，无 panic/assert；实际屏幕方向与触摸命中仍需
+人工确认。
 
 ### 期望画面
 
@@ -155,11 +172,11 @@ E2 MOCK // ASCII RENDERER E3
 ```
 
 Mock 状态每 3 秒循环：ACTIVE → APPROVAL → COMPLETED → OFFLINE。
-期望颜色为近黑背景、磷光绿、琥珀、红色；**实际颜色/方向/触摸命中需人工确认**。
+期望颜色为近黑背景、磷光绿、琥珀、红色；180° 修正后画面应正立。**实际颜色/方向/触摸命中需人工确认**。
 
 ## 8. 待确认清单
 
-1. 480×480 实际颜色顺序、ST7701 方向、背光亮度曲线（初始化已通过）。
+1. 480×480 实际颜色顺序、旋转修正后的 ST7701 方向、背光亮度曲线（初始化已通过）。
 2. GT911 坐标方向、镜像、单点触摸命中（检测已通过：0x14 / ID 39:31:31）。
 3. CH32V003 电池 ADC 与电量百分比映射（BSP v3.0.0 未提供，当前返回未知 255）。
 4. ~~16MB Flash / Octal PSRAM 与实物丝印一致~~（启动日志已确认 16MB / 8MB 80MHz）。

@@ -95,6 +95,20 @@ static esp_err_t display_init(void)
         return ESP_FAIL;
     }
 
+    /*
+     * The panel is physically mounted 180° from the BSP default. Rotate both
+     * display and LVGL indev: LVGL 8.4's indev_pointer_proc() applies the
+     * matching x/y transform for LV_DISP_ROT_180. The lock prevents racing the
+     * LVGL port task that BSP already started.
+     */
+    if (!bsp_display_lock(1000)) {
+        ESP_LOGE(TAG, "display lock failed while applying 180 rotation");
+        return ESP_ERR_TIMEOUT;
+    }
+    bsp_display_rotate(s_display, LV_DISP_ROT_180);
+    bsp_display_unlock();
+    ESP_LOGI(TAG, "display rotated 180 degrees (touch transform follows LVGL indev)");
+
     s_indev = bsp_display_get_input_dev();
     if (s_indev == NULL) {
         ESP_LOGW(TAG, "BSP display started without a touch input device");

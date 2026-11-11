@@ -3,7 +3,7 @@
 日期：2026-11-11  
 范围：`firmware/terminal/` only  
 目标：Waveshare ESP32-S3-Touch-LCD-4 V4.0（ESP32-S3N16R8）  
-状态：**已烧录并成功启动**；颜色/触摸方向仍需人工确认
+状态：**180° 旋转修正后已重新烧录并成功启动**；颜色/触摸命中仍需人工确认
 
 ## 1. 真机信息
 
@@ -79,8 +79,8 @@ idf.py size
 
 ```text
 build/meetagent_terminal.bin
-  size   : 506,240 bytes (0x7B980)
-  sha256 : cc09416cee692e906d649f8fdc60e638d729df8f55c4a9a18ef504adf5882655
+  size   : 506,928 bytes (0x7BC30)
+  sha256 : bd13bf91d6ae286b6c70199c0abeefc0abd004d50922b2c87970fdbe7c7c09ed
 
 build/bootloader/bootloader.bin
   size   : 22,272 bytes (0x5700)
@@ -94,9 +94,9 @@ build/partition_table/partition-table.bin
 `idf.py size`：
 
 ```text
-Total image size : 506,127 bytes
-Flash Code       : 322,916 bytes
-Flash Data       :  86,016 bytes
+Total image size : 506,819 bytes
+Flash Code       : 323,464 bytes
+Flash Data       :  86,160 bytes
 DIRAM            : 141,179 / 341,760 bytes (41.31%)
 IRAM (size 工具) :  16,384 / 16,384 bytes (100.0%)
 ```
@@ -105,7 +105,7 @@ App 分区：
 
 ```text
 Smallest app partition : 0x177000 bytes
-Free                   : 0xFB680 bytes (67%)
+Free                   : 0xFB3D0 bytes (67%)
 ```
 
 IRAM 说明：size 工具表里的 16,384 与链接脚本 `iram0_0_seg = 0x57700` 口径不同；
@@ -140,9 +140,16 @@ table     0x8000     3,072 bytes  Hash verified
 Hard resetting via RTS pin...
 ```
 
+180° 旋转修正后再次烧录成功：
+
+```text
+app      0x10000   506,928 bytes  Hash verified
+日志     : /tmp/opencode/esp-lcd4-rotate-boot.log
+```
+
 ## 6. 启动日志
 
-日志：`/tmp/opencode/esp-lcd4-boot.log`  
+日志：`/tmp/opencode/esp-lcd4-rotate-boot.log`（旋转修正后）  
 抓取命令：`timeout --signal=INT --kill-after=3 15 idf.py -p /dev/ttyACM0 monitor`
 
 关键证据：
@@ -158,6 +165,7 @@ I cpu_start: cpu freq: 240000000 Hz
 I ESP32-S3-Touch-LCD-4: Touch 0x14 found
 I GT911: TouchPad_ID:0x39,0x31,0x31
 I GT911: TouchPad_Config_Version:79
+I board_lcd4: display rotated 180 degrees (touch transform follows LVGL indev)
 I board_lcd4: LCD-4 BSP started: 480x480 RGB565
 I espui: ESPUI initialized: theme=terminal_aesthetic
            display=waveshare-esp32-s3-touch-lcd-4-v4 480x480
@@ -172,6 +180,15 @@ I main_task: Returned from app_main()
   - `i2c.master` 提示检查上拉电阻（BSP/硬件层面）
   - ST7701 `36h` / `3Ah` 命令被外部初始化序列覆盖
 - monitor 超时退出（137）后，应用继续运行；未再发生复位。
+
+### 180° 旋转修正
+
+- 位置：`main/board_lcd4.c`，`bsp_display_start()` 成功后调用
+  `bsp_display_rotate(s_display, LV_DISP_ROT_180)`（持 `bsp_display_lock`）。
+- 触摸：LVGL 8.4 `indev_pointer_proc()` 对 `LV_DISP_ROT_180` 自动执行
+  `x = hor_res - x - 1`、`y = ver_res - y - 1`；HAL 读取的是 indev 变换后的点。
+- 启动日志已出现 `display rotated 180 degrees`，无 panic/assert。
+- 实际屏幕方向与触摸命中仍需人工确认。
 
 ## 7. 期望画面（需人工确认）
 
@@ -226,12 +243,13 @@ idf.py flash: SUCCESS (exit 0)
 - [x] GT911 @0x14 检测与 ID/配置读取
 - [x] ESPUI Terminal Aesthetic 480×480 初始化
 - [x] app_main / UI task 启动，无 panic/assert/reset loop
+- [x] 180° 显示旋转调用已生效（日志确认），触摸变换走 LVGL indev
 - [x] 烧录后三段镜像 Hash verified
 
 未验证：
 
-- [ ] 屏幕实际颜色、方向、刷新效果（需人工看）
-- [ ] GT911 坐标方向/镜像/单点命中（需人工触摸）
+- [ ] 屏幕实际颜色、旋转后方向、刷新效果（需人工看）
+- [ ] GT911 旋转后坐标方向/镜像/单点命中（需人工触摸）
 - [ ] CH32V003 电池 ADC → 电量映射
 - [ ] 多点触控（BSP port 只注册 1 点）
 - [ ] 长时间运行、内存泄漏、FPS
