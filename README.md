@@ -49,7 +49,7 @@ Mobile (Vue + Capacitor)        ESP32 Terminal (ESP-IDF + LVGL)
 | Core / Node | `cmd/node`, `internal/`, `pkg/`, `configs/` | M0/M1/M4 完成；审计、限流、重连边界加固 |
 | Node 模拟器 | `cmd/simulator` | 可用 |
 | Mobile | `mobile/` | M5b + UX P0/P1/P2 完成；Android 真机 Prompt/Interrupt/审批/断网恢复/原生交互已验证 |
-| ESP32 Terminal / ESPUI | `firmware/terminal/` | E0–E3a + LCD-4 V4 真机 bring-up 成功（v5.5.5，LCD/GT911/PSRAM OK） | 颜色/触摸人工确认；E3b/E4 |
+| ESP32 Terminal / ESPUI | `firmware/terminal/` | E0–E3a + LCD-4 V4 真机 bring-up 成功；方向已修正为正立 | 触摸确认、Wi-Fi 配网验收、E4b |
 | V1 Cloud / Web Console | `cmd/cloud`, `web/test-client` | 归档参考 |
 
 ---
