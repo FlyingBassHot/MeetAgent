@@ -40,6 +40,8 @@ typedef enum {
 #define GLYPH_FLAG_FIELD (1u << 2)
 #define GLYPH_FLAG_SATELLITE (1u << 3)
 #define GLYPH_FLAG_NUCLEUS (1u << 4)
+#define GLYPH_FLAG_INNER_BAND (1u << 5)
+#define GLYPH_FLAG_OUTER_BAND (1u << 6)
 
 typedef struct {
     uint8_t glyph;

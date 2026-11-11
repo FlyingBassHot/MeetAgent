@@ -1,7 +1,7 @@
-# PHOSPHOR CORE — P3.2 Idle / Working 密度与二进制流
+# PHOSPHOR CORE — P3.3 Idle / Working 相邻 cell 密度
 
 日期：2026-11-11
-状态：P3.2 去掉零散外围点，改为连续 Outer 内侧副带，并提高 Inner 密度；未进入 P4。实屏由用户确认。
+状态：P3.3 用相邻 cell 增加可见字符，修正 Outer/Inner/缺口空白；未进入 P4。实屏由用户确认。
 
 ## 1. 保持 P1.3/P2 基线
 
@@ -35,16 +35,16 @@
 - orbit phase 叠加 motion 相位；
 - Idle 慢速、低密度；Working 中轨快速、核心密度提高；
 - Working 添加 2–7 个固定相位 `+`/`%` 活动粒子（不使用 `*`，保持 Satellite 唯一）；
-- **P3.2**：删除所有零散外围 0/1 点；
-- **P3.2**：Outer 保留半径 192 / 96 采样 / `+#%@01` / warning 缺口；
-  新增连续内侧副带：同 tilt/rotation/phase，半径约 176（约 1 cell 内侧），
-  96 采样、同 warning 缺口；
-- 副带字符 `0/1/+/%`，index+time hash 确定性选择；FIELD 优先级，
-  不覆盖主 Outer/Middle；强度 Idle 135、Working 195（低于主带）；
-- **P3.2**：Inner 保持半径 80，采样 64→96；字符以 `: ;` 为主，少量 `+`，
-  强度 200（180–210），Secondary/Muted；不增加第二圈；
-- 0/1 主 Outer / 副带均使用 time bucket；Working 300ms（≈3.3Hz），
-  Idle 800ms；主 Outer Working 比例约 45%，Idle 约 12%；
+- **P3.3**：删除所有零散外围 0/1 点；不再使用 radius 176 独立副带；
+- **P3.3**：对每个主 Outer cell 写朝中心方向的相邻 cell（主轴规则，失败时
+  尝试垂直候选）；字符 `0/1/+/%`，FIELD/BAND，Idle 150–170 /
+  Working 190–215；不覆盖主 Outer/Middle；
+- **P3.3**：Inner 对每个主 cell 写朝外相邻 cell；主 Inner 在 Middle/Outer
+  之后绘制；字符 `.,:;` + 少量 `+`，强度 130–170；
+- Outer warning gap 缩到 half-width **0.11 rad**；Middle gap 缩到 **0.04 rad**；
+  缺口内用低亮度 `0/1/./+` 连续填充，不留大块黑；
+- Inner 半径 80、96 采样；Middle 不变；
+- 主 Outer 仍 96 采样、`+#%@01`，Working 300ms bucket；副带/缺口填充连续；
 - Satellite 位置固定，不随机换位；
 - Nucleus 2× 固定中心，亮度随呼吸 235–255；
 - 静态 API `phosphor_scene_build_frame()` 保留为 P2 回归/基准路径。
@@ -63,8 +63,8 @@
 ### 实测（真机）
 
 ```text
-Idle    fps=6–7  render_avg=52–85ms  period=141–152ms
-Working fps=7    render_avg=72–115ms period=134–137ms
+Idle    fps=6    render_avg=60–82ms  period=142–149ms
+Working fps=7    render_avg=75–116ms period=135–138ms
 ```
 
 - **Idle 达到 6–8 FPS 目标。**
@@ -79,51 +79,51 @@ Working fps=7    render_avg=72–115ms period=134–137ms
 cd firmware/terminal/tools/phosphor_sim
 make
 ./build/phosphor_sim                         # 动画窗口；1=Idle 2=Working ESC=退出
-SDL_VIDEODRIVER=dummy ./build/phosphor_sim --screenshot build/p3_idle_v3.bmp --state idle --time-ms 3000
-SDL_VIDEODRIVER=dummy ./build/phosphor_sim --screenshot build/p3_working_v3.bmp --state working --time-ms 3000
-convert build/p3_idle_v3.bmp ../../docs/phosphor/p3_idle_v3.png
-convert build/p3_working_v3.bmp ../../docs/phosphor/p3_working_v3.png
+SDL_VIDEODRIVER=dummy ./build/phosphor_sim --screenshot build/p3_idle_v4.bmp --state idle --time-ms 3000
+SDL_VIDEODRIVER=dummy ./build/phosphor_sim --screenshot build/p3_working_v4.bmp --state working --time-ms 3000
+convert build/p3_idle_v4.bmp ../../docs/phosphor/p3_idle_v4.png
+convert build/p3_working_v4.bmp ../../docs/phosphor/p3_working_v4.png
 ```
 
 Golden：
 
 ```text
-docs/phosphor/p3_idle_v3.png
-480x480 PNG, 3,163 B
-sha256 8b4c85acc3672e60bed3e65e86cea9bc1df9a0433501ac6cd7b04e5e77a1d2b6
+docs/phosphor/p3_idle_v4.png
+480x480 PNG, 3,740 B
+sha256 3cb9de827cf0cd46f61f084da3426ce88fd475029dc63c108e705b373c533f43
 
-docs/phosphor/p3_working_v3.png
-480x480 PNG, 3,062 B
-sha256 fd0632bf84a79ce5fcac78bea37ccfbd2b6519d252e7b0e82611fa81b9cc5c0e
+docs/phosphor/p3_working_v4.png
+480x480 PNG, 3,622 B
+sha256 bfa1fd5db030e0d267cf086aa6d4204a5780a8da4c02191cd5a59ec1588b3cce
 
-历史 P3.0/P3.1 截图保留。
+历史 P3.0–P3.2 截图保留。
 ```
 
 ## 6. 构建 / 内存
 
 ```text
-app size : 1,273,152 B (0x136d40)
-sha256   : fec4255465d456b6d2823912b605919cf4b00822d658388f0189d6020bfe6573
-app free : 0x402c0 (17%)
+app size : 1,273,072 B (0x136cf0)
+sha256   : 311428dca127233645196156e32425678c56abc667001ea16a77f74fbeec6260
+app free : 0x40310 (17%)
 DIRAM    : 204,423 / 341,760 B (59.81%)
 IRAM     : 16,384/16,384（size 固定窗口；链接断言通过）
 PSRAM canvas: 373,248 B（一次分配）
 ```
 
-真机启动日志 `/tmp/phosphor-p3c-boot.log`：
+真机启动日志 `/tmp/phosphor-p3d-boot.log`：
 
 ```text
 P3 animation started: demo 6s Idle / 6s Working
-welcome memory: internal_free=45,207 psram_free=6,133,496
+welcome memory: internal_free=43,475 psram_free=6,133,480
 network state: online
 ```
 
-后续统计 internal_free 55.9–65.1KB，PSRAM ~6,133,324 B；无持续下降。
+后续统计 internal_free 55.9–65.1KB，PSRAM ~6,133,308 B；无持续下降。
 
 ## 7. Host 验证
 
 ```text
-make test          -> 3620 checks, 0 failures
+make test          -> 3624 checks, 0 failures
 syntax_check.sh    -> 45 files OK
 ```
 
@@ -133,7 +133,14 @@ syntax_check.sh    -> 45 files OK
 - 同 time/state 可复现（含 `memcmp`）；
 - Idle/Working frame 不同、非空、P2/P1.3 回归；
 - LUT sin/cos 边界；
-- P3.1/P3.2 atlas 0/1、outer 96、Inner 96、Working 0.85 density/速度回归；
+- P3.3 band cell 计数：Idle/Working Inner band=6、Outer band=23；
+- changed pixels（Idle/Working）：
+  - v2→v3: 1,956 / 2,915
+  - v3→v4: **5,740 / 5,510**（明显更大）
+- annulus 黑像素比例（v3→v4）：
+  Idle Inner 83.7→76.5%，Outer 95.71→94.97%；
+  Working Inner 83.93→76.7%，Outer 96.0→95.31%；
+- P3.1/P3.2 atlas 0/1、outer/inner 96、Working 0.85 density/速度回归；
 - 既有 ramp/palette/compositor/Nucleus/Satellite 测试。
 
 ## 8. P4 待办（不开始）

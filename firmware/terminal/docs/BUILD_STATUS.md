@@ -634,6 +634,24 @@ I (26244) touch_test: TOUCH release
 - Host：**3620 checks, 0 failures**；syntax **45 files OK**。
 - P4 未开始。
 
+### 11.20 PHOSPHOR P3.3 相邻 cell 加厚（2026-11-11）
+
+- 删除外围零散点与 radius-176 副带；Outer 对每个主 cell 写朝中心相邻 cell
+  （失败尝试垂直候选），Inner 写朝外相邻 cell；Inner 最后绘制。
+- Outer warning gap 0.22→0.11 rad，Middle gap 0.23→0.04 rad；缺口用低亮度
+  `0/1/./+` 连续填充；副带连续覆盖。
+- Host 统计：Idle/Working Inner band=6、Outer band=23；
+  changed pixels v3→v4 = 5,740/5,510（v2→v3=1,956/2,915）；
+  annulus 黑像素比例下降（Inner 约 83.7→76.5%，Outer 95.7→95.0%）。
+- 新截图 `p3_idle_v4.png` / `p3_working_v4.png`。
+- 最终固件：1,273,072 B，SHA-256 `311428dc...6260`，app 剩余 17%，
+  DIRAM 204,423/341,760 (59.81%)。
+- 真机：internal_free 43,475→65,091 B，PSRAM ~6,133,308 B；
+  Idle 6 FPS / Working 7 FPS（仍低于 Working 目标，P5 优化）；
+  Wi-Fi/Node 在线；无 panic/OOM。
+- Host：**3624 checks, 0 failures**；syntax **45 files OK**。
+- P4 未开始。
+
 ## 12. 仓库约束
 
 - 只修改 `firmware/terminal/`

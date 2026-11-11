@@ -361,6 +361,43 @@ static void test_motion_and_scene(void)
     TEST_ASSERT_TRUE(working_nonempty > 0);
 }
 
+static void test_band_neighbors(void)
+{
+    glyph_frame_t frame;
+    phosphor_motion_state_t idle;
+    phosphor_motion_state_t working;
+    phosphor_motion_init(&idle, PHOSPHOR_MODE_IDLE);
+    phosphor_motion_init(&working, PHOSPHOR_MODE_WORKING);
+
+    phosphor_scene_build_frame_motion(&frame, &idle);
+    int idle_inner = 0;
+    int idle_outer = 0;
+    for (int r = 0; r < PHOSPHOR_GRID_H; ++r) {
+        for (int c = 0; c < PHOSPHOR_GRID_W; ++c) {
+            idle_inner += (frame.cells[r][c].flags &
+                           GLYPH_FLAG_INNER_BAND) != 0;
+            idle_outer += (frame.cells[r][c].flags &
+                           GLYPH_FLAG_OUTER_BAND) != 0;
+        }
+    }
+    TEST_ASSERT_TRUE(idle_inner > 0);
+    TEST_ASSERT_TRUE(idle_outer > 0);
+
+    phosphor_scene_build_frame_motion(&frame, &working);
+    int working_inner = 0;
+    int working_outer = 0;
+    for (int r = 0; r < PHOSPHOR_GRID_H; ++r) {
+        for (int c = 0; c < PHOSPHOR_GRID_W; ++c) {
+            working_inner += (frame.cells[r][c].flags &
+                              GLYPH_FLAG_INNER_BAND) != 0;
+            working_outer += (frame.cells[r][c].flags &
+                              GLYPH_FLAG_OUTER_BAND) != 0;
+        }
+    }
+    TEST_ASSERT_TRUE(working_inner >= idle_inner);
+    TEST_ASSERT_TRUE(working_outer >= idle_outer);
+}
+
 static void test_scene_nucleus_and_rasterizer(void)
 {
     glyph_frame_t frame;
@@ -405,5 +442,6 @@ void test_phosphor_run(void)
     test_satellite_layout();
     test_glyph_frame_priority();
     test_motion_and_scene();
+    test_band_neighbors();
     test_scene_nucleus_and_rasterizer();
 }

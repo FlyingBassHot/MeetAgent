@@ -201,3 +201,11 @@ P0 的 288×288 / 8×12 估算作为 P1.0 基线保留；P1.1 根据实机反馈
 - 删除外围稀疏 0/1 点；Outer 连续内侧副带 radius 176、FIELD、warning 缺口；
 - Inner 80 半径不变，采样 96，提高 `: ;` 密度；
 - 不进入 P4；Working FPS 仍待 P5 优化。
+
+
+## 17. P3.3 相邻 cell 加厚（2026-11-11）
+
+- Outer/Inner 使用相邻 cell band 替代 radius-176 副带；
+- warning gap 0.11 / middle gap 0.04，低亮度填充；
+- v3→v4 changed pixels 5,740/5,510；Inner/Outer band cells 6/23；
+- P3 仍静态，P4 未开始。
