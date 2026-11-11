@@ -1,7 +1,7 @@
 # PHOSPHOR CORE — P3.6 Outer 水层 / 漂浮物
 
 日期：2026-11-11
-状态：P3.6 Outer 分 Secondary 水层 + Highlight 漂浮物 packet；未进入 P4。实屏由用户确认。
+状态：P3.6 Outer 水层/漂浮物；P4 六态已在其上完成。实屏由用户确认。
 
 ## 1. 保持 P1.3/P2 基线
 
@@ -161,3 +161,6 @@ syntax_check.sh    -> 45 files OK
 - 六态合成、事件去重、真实 ViewModel 映射（P6）；
 - P5 性能优化（Working FPS 目标）；
 - 实屏动画与 FPS 人工确认。
+
+
+P4 已完成：见 `docs/PHOSPHOR_P4.md`（六态 resolver、Demo、goldens）。

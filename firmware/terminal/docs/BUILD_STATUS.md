@@ -703,6 +703,24 @@ I (26244) touch_test: TOUCH release
 - Host：**3624 checks, 0 failures**；syntax **45 files OK**。
 - P4 未开始。
 
+### 11.24 PHOSPHOR P4 六态（2026-11-11）
+
+- 新增 `phosphor_state` resolver：offline 优先，approval/error 可叠加在
+  working；completed 900ms 去重 pulse；error 300ms glitch；4 satellites
+  稳定 slot + overflow。
+- 新增 `phosphor_demo`：Idle4→Working4→Approval4→Error4→Completed2→Offline4
+  循环；ESP32 phase 日志；PC keys 1–6。
+- Scene 增加 visual 叠层：`?` warning、红色 `!` + glitch、Completed 径向波、
+  Offline dim；保持 P3.6/P3.4 基线。
+- Golden：`p4_idle/working/approval/error/offline/completed.png`。
+- 最终固件：1,276,752 B，SHA-256 `cf2ac813...da7e78`，app 剩余 17%，
+  DIRAM 204,623/341,760 (59.87%)。
+- 真机：demo 六态 phase 日志完整；FPS ~7（Working 目标未达，P5）；
+  internal_free 49.4→64.9KB，PSRAM ~6,132,908 B；
+  无 panic/OOM；Wi-Fi/Node 在线。
+- Host：**3648 checks, 0 failures**；syntax **47 files OK**。
+- P5/P6 未开始。
+
 ## 12. 仓库约束
 
 - 只修改 `firmware/terminal/`

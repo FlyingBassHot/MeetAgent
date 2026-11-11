@@ -2,6 +2,7 @@
 
 #include <math.h>
 #include <stddef.h>
+#include <string.h>
 
 #include "glyph_atlas.h"
 #include "glyph_ramp.h"
@@ -428,12 +429,231 @@ void phosphor_scene_build_frame(glyph_frame_t *frame)
     phosphor_scene_build_frame_motion(frame, &idle);
 }
 
+static void clear_satellite_cells(glyph_frame_t *frame)
+{
+    for (uint8_t row = 0; row < PHOSPHOR_GRID_H; ++row) {
+        for (uint8_t col = 0; col < PHOSPHOR_GRID_W; ++col) {
+            if (frame->cells[row][col].flags & GLYPH_FLAG_SATELLITE) {
+                memset(&frame->cells[row][col], 0, sizeof(glyph_cell_t));
+            }
+        }
+    }
+}
+
+static void clear_outer_arc(glyph_frame_t *frame,
+                            const phosphor_motion_state_t *motion,
+                            float angle, float span)
+{
+    const phosphor_orbit_t *outer = &phosphor_orbit_defaults()[2];
+    float phase = motion != NULL ? motion->orbit_phase[2] : 0.0f;
+    for (float t = -span; t <= span; t += 0.01f) {
+        phosphor_point_t p;
+        phosphor_orbit_point(outer, angle + phase + t, PHOSPHOR_CX,
+                             PHOSPHOR_CY, &p);
+        uint8_t col = 0;
+        uint8_t row = 0;
+        if (phosphor_point_to_cell(p.x, p.y, &col, &row) &&
+            (frame->cells[row][col].flags & GLYPH_FLAG_NUCLEUS) == 0) {
+            memset(&frame->cells[row][col], 0, sizeof(glyph_cell_t));
+        }
+    }
+}
+
+static phosphor_satellite_status_t visual_status_to_satellite(
+    phosphor_session_status_t status)
+{
+    switch (status) {
+    case PHOSPHOR_SESSION_WAITING:
+        return PHOSPHOR_SATELLITE_WARNING;
+    default:
+        return PHOSPHOR_SATELLITE_RUNNING;
+    }
+}
+
+static void draw_visual_satellites(
+    glyph_frame_t *frame, const phosphor_motion_state_t *motion,
+    const phosphor_visual_state_t *visual)
+{
+    static const float slot_angle[PHOSPHOR_MAX_SATELLITES] = {
+        0.65f, 3.75f, 1.85f, 5.30f,
+    };
+    (void)visual_status_to_satellite;
+    const phosphor_orbit_t *outer = &phosphor_orbit_defaults()[2];
+    for (uint8_t i = 0; i < visual->satellite_count &&
+                    i < PHOSPHOR_MAX_SATELLITES;
+         ++i) {
+        const phosphor_satellite_state_t *sat = &visual->satellites[i];
+        float angle = slot_angle[sat->slot % PHOSPHOR_MAX_SATELLITES];
+        float phase = motion != NULL ? motion->orbit_phase[2] : 0.0f;
+        phosphor_point_t p;
+        phosphor_orbit_point(outer, angle + phase, PHOSPHOR_CX,
+                             PHOSPHOR_CY, &p);
+        uint8_t col = 0;
+        uint8_t row = 0;
+        if (!phosphor_point_to_cell(p.x, p.y, &col, &row)) {
+            continue;
+        }
+        char glyph = 'o';
+        glyph_color_id_t color = GLYPH_COLOR_MUTED;
+        uint8_t intensity = 210;
+        switch (sat->status) {
+        case PHOSPHOR_SESSION_RUNNING:
+            glyph = '*';
+            color = GLYPH_COLOR_HIGHLIGHT;
+            intensity = 255;
+            break;
+        case PHOSPHOR_SESSION_WAITING:
+            glyph = '?';
+            color = GLYPH_COLOR_WARNING;
+            intensity = (uint8_t)(180.0f + 75.0f * visual->approval_breath);
+            break;
+        case PHOSPHOR_SESSION_ERROR:
+            glyph = '!';
+            color = GLYPH_COLOR_ERROR;
+            intensity = 255;
+            break;
+        case PHOSPHOR_SESSION_COMPLETED:
+            glyph = '.';
+            color = GLYPH_COLOR_HIGHLIGHT;
+            intensity = 220;
+            break;
+        case PHOSPHOR_SESSION_IDLE:
+        default:
+            glyph = 'o';
+            color = GLYPH_COLOR_MUTED;
+            intensity = 170;
+            break;
+        }
+        glyph_frame_set(frame, col, row, glyph_atlas_index(glyph), color,
+                        intensity, GLYPH_FLAG_SATELLITE);
+        if (visual->error_glitch_active &&
+            sat->status == PHOSPHOR_SESSION_ERROR) {
+            /* Short, local glitch: two adjacent error marks, then gone. */
+            uint8_t gc = (uint8_t)((int)col + 1);
+            if (gc < PHOSPHOR_GRID_W) {
+                glyph_frame_set(frame, gc, row, glyph_atlas_index('!'),
+                                GLYPH_COLOR_ERROR, 210,
+                                GLYPH_FLAG_FRONT);
+            }
+            uint8_t gr = (uint8_t)((int)row + 1);
+            if (gr < PHOSPHOR_GRID_H) {
+                glyph_frame_set(frame, col, gr, glyph_atlas_index('!'),
+                                GLYPH_COLOR_ERROR, 190,
+                                GLYPH_FLAG_FRONT);
+            }
+        }
+    }
+    if (visual->overflow_count > 0) {
+        float angle = 5.90f;
+        float phase = motion != NULL ? motion->orbit_phase[2] : 0.0f;
+        phosphor_point_t p;
+        phosphor_orbit_point(outer, angle + phase, PHOSPHOR_CX,
+                             PHOSPHOR_CY, &p);
+        uint8_t col = 0;
+        uint8_t row = 0;
+        if (phosphor_point_to_cell(p.x, p.y, &col, &row)) {
+            glyph_frame_set(frame, col, row, glyph_atlas_index('+'),
+                            GLYPH_COLOR_HIGHLIGHT, 220,
+                            GLYPH_FLAG_SATELLITE);
+        }
+    }
+}
+
+static void draw_completion_overlay(glyph_frame_t *frame,
+                                    const phosphor_visual_state_t *visual)
+{
+    if (!visual->completion_active) {
+        return;
+    }
+    float p = (float)visual->completion_elapsed_ms / PHOSPHOR_COMPLETION_MS;
+    if (p > 1.0f) {
+        p = 1.0f;
+    }
+    uint8_t intensity = (uint8_t)(220.0f * (1.0f - p) + 15.0f);
+    for (int i = 0; i < 12; ++i) {
+        float angle = PHOSPHOR_TWO_PI * (float)i / 12.0f;
+        float radius = 40.0f + 120.0f * p;
+        phosphor_point_t point;
+        point.x = PHOSPHOR_CX + cosf(angle) * radius;
+        point.y = PHOSPHOR_CY + sinf(angle) * radius;
+        uint8_t col = 0;
+        uint8_t row = 0;
+        if (!phosphor_point_to_cell(point.x, point.y, &col, &row)) {
+            continue;
+        }
+        char glyph = (i & 1) ? '*' : '+';
+        glyph_frame_set(frame, col, row, glyph_atlas_index(glyph),
+                        GLYPH_COLOR_HIGHLIGHT, intensity, GLYPH_FLAG_FRONT);
+    }
+}
+
+static void dim_for_offline(glyph_frame_t *frame)
+{
+    for (uint8_t row = 0; row < PHOSPHOR_GRID_H; ++row) {
+        for (uint8_t col = 0; col < PHOSPHOR_GRID_W; ++col) {
+            glyph_cell_t *cell = &frame->cells[row][col];
+            if (cell->glyph != 0) {
+                uint16_t dim = (uint16_t)cell->intensity * 35u / 100u;
+                cell->intensity = (uint8_t)(dim < 25 ? 25 : dim);
+            }
+        }
+    }
+}
+
+void phosphor_scene_build_frame_visual(
+    glyph_frame_t *frame, const phosphor_motion_state_t *motion,
+    const phosphor_visual_state_t *visual)
+{
+    phosphor_scene_build_frame_motion(frame, motion);
+    if (frame == NULL || visual == NULL) {
+        return;
+    }
+    clear_satellite_cells(frame);
+    if (visual->attention & PHOSPHOR_ATTENTION_APPROVAL) {
+        /* Wider, visible approval gap; the warning satellite is redrawn. */
+        clear_outer_arc(frame, motion, 3.75f, 0.20f);
+    }
+    draw_visual_satellites(frame, motion, visual);
+    draw_completion_overlay(frame, visual);
+    if (visual->completion_active) {
+        for (uint8_t row = 0; row < PHOSPHOR_GRID_H; ++row) {
+            for (uint8_t col = 0; col < PHOSPHOR_GRID_W; ++col) {
+                glyph_cell_t *cell = &frame->cells[row][col];
+                if (cell->flags & GLYPH_FLAG_NUCLEUS) {
+                    cell->intensity = 255;
+                }
+            }
+        }
+    }
+    if (visual->activity == PHOSPHOR_ACTIVITY_OFFLINE) {
+        dim_for_offline(frame);
+        for (uint8_t row = 0; row < PHOSPHOR_GRID_H; ++row) {
+            for (uint8_t col = 0; col < PHOSPHOR_GRID_W; ++col) {
+                if (frame->cells[row][col].flags & GLYPH_FLAG_SATELLITE) {
+                    memset(&frame->cells[row][col], 0, sizeof(glyph_cell_t));
+                }
+            }
+        }
+    }
+}
+
 void phosphor_scene_render_motion_rgb565(
     uint16_t *pixels, int width, int height,
     const phosphor_motion_state_t *motion)
 {
     glyph_frame_t frame;
     phosphor_scene_build_frame_motion(&frame, motion);
+    glyph_rasterizer_render(&frame, pixels, width, height,
+                            phosphor_palette_default());
+}
+
+void phosphor_scene_render_visual_rgb565(
+    uint16_t *pixels, int width, int height,
+    const phosphor_motion_state_t *motion,
+    const phosphor_visual_state_t *visual)
+{
+    glyph_frame_t frame;
+    phosphor_scene_build_frame_visual(&frame, motion, visual);
     glyph_rasterizer_render(&frame, pixels, width, height,
                             phosphor_palette_default());
 }

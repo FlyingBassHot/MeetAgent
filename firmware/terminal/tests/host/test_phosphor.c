@@ -7,7 +7,9 @@
 #include "glyph_rasterizer.h"
 #include "orbit_geometry.h"
 #include "phosphor_lut.h"
+#include "phosphor_demo.h"
 #include "phosphor_motion.h"
+#include "phosphor_state.h"
 #include "phosphor_palette.h"
 #include "phosphor_scene.h"
 #include "radial_field.h"
@@ -398,6 +400,108 @@ static void test_band_neighbors(void)
     TEST_ASSERT_TRUE(working_outer >= idle_outer);
 }
 
+static void add_state_session(phosphor_input_state_t *in, const char *id,
+                              phosphor_session_status_t status)
+{
+    if (in->session_count >= PHOSPHOR_MAX_SESSIONS) {
+        return;
+    }
+    phosphor_session_input_t *s = &in->sessions[in->session_count++];
+    memset(s, 0, sizeof(*s));
+    strncpy(s->session_id, id, sizeof(s->session_id) - 1);
+    s->status = status;
+}
+
+static void test_state_resolver(void)
+{
+    phosphor_state_resolver_t resolver;
+    phosphor_visual_state_t visual;
+    phosphor_input_state_t input;
+    phosphor_state_resolver_init(&resolver);
+
+    memset(&input, 0, sizeof(input));
+    input.node_online = true;
+    add_state_session(&input, "run", PHOSPHOR_SESSION_RUNNING);
+    add_state_session(&input, "wait", PHOSPHOR_SESSION_WAITING);
+    input.approval_count = 1;
+    phosphor_state_resolver_update(&resolver, &input, 1000, &visual);
+    TEST_ASSERT_EQ_INT(PHOSPHOR_ACTIVITY_WORKING, visual.activity);
+    TEST_ASSERT_TRUE((visual.attention & PHOSPHOR_ATTENTION_APPROVAL) != 0);
+    TEST_ASSERT_EQ_INT(2, visual.satellite_count);
+
+    input.error_count = 1;
+    add_state_session(&input, "err", PHOSPHOR_SESSION_ERROR);
+    phosphor_state_resolver_update(&resolver, &input, 1200, &visual);
+    TEST_ASSERT_TRUE((visual.attention & PHOSPHOR_ATTENTION_APPROVAL) != 0);
+    TEST_ASSERT_TRUE((visual.attention & PHOSPHOR_ATTENTION_ERROR) != 0);
+    TEST_ASSERT_EQ_INT(3, visual.satellite_count);
+
+    input.completed_event_id = 10;
+    phosphor_state_resolver_update(&resolver, &input, 1300, &visual);
+    TEST_ASSERT_TRUE(visual.completion_active);
+    TEST_ASSERT_EQ_INT(0, visual.completion_elapsed_ms);
+    input.completed_event_id = 10;
+    phosphor_state_resolver_update(&resolver, &input, 1400, &visual);
+    TEST_ASSERT_TRUE(visual.completion_active);
+    TEST_ASSERT_EQ_INT(100, visual.completion_elapsed_ms);
+    phosphor_state_resolver_update(&resolver, &input, 2200, &visual);
+    TEST_ASSERT_FALSE(visual.completion_active);
+    input.completed_event_id = 11;
+    phosphor_state_resolver_update(&resolver, &input, 2300, &visual);
+    TEST_ASSERT_TRUE(visual.completion_active);
+
+    input.error_event_id = 20;
+    phosphor_state_resolver_update(&resolver, &input, 2400, &visual);
+    TEST_ASSERT_TRUE(visual.error_glitch_active);
+    input.error_event_id = 20;
+    phosphor_state_resolver_update(&resolver, &input, 2600, &visual);
+    TEST_ASSERT_TRUE(visual.error_glitch_active);
+    phosphor_state_resolver_update(&resolver, &input, 2700, &visual);
+    TEST_ASSERT_FALSE(visual.error_glitch_active);
+
+    phosphor_state_resolver_update(&resolver, &input, 2800, &visual);
+    TEST_ASSERT_EQ_INT(PHOSPHOR_ACTIVITY_WORKING, visual.activity);
+    input.node_online = false;
+    input.completed_event_id = 12;
+    phosphor_state_resolver_update(&resolver, &input, 2900, &visual);
+    TEST_ASSERT_EQ_INT(PHOSPHOR_ACTIVITY_OFFLINE, visual.activity);
+    TEST_ASSERT_EQ_INT(0, visual.attention);
+    TEST_ASSERT_FALSE(visual.completion_active);
+    TEST_ASSERT_EQ_INT(0, visual.satellite_count);
+
+    /* Stable slots + overflow. */
+    phosphor_state_resolver_init(&resolver);
+    memset(&input, 0, sizeof(input));
+    input.node_online = true;
+    add_state_session(&input, "a", PHOSPHOR_SESSION_RUNNING);
+    add_state_session(&input, "b", PHOSPHOR_SESSION_WAITING);
+    add_state_session(&input, "c", PHOSPHOR_SESSION_ERROR);
+    add_state_session(&input, "d", PHOSPHOR_SESSION_COMPLETED);
+    add_state_session(&input, "e", PHOSPHOR_SESSION_IDLE);
+    add_state_session(&input, "f", PHOSPHOR_SESSION_RUNNING);
+    phosphor_state_resolver_update(&resolver, &input, 0, &visual);
+    TEST_ASSERT_EQ_INT(4, visual.satellite_count);
+    TEST_ASSERT_EQ_INT(2, visual.overflow_count);
+    uint8_t slot_a = 255;
+    for (int i = 0; i < 4; ++i) {
+        if (strcmp(visual.satellites[i].session_id, "a") == 0) {
+            slot_a = visual.satellites[i].slot;
+        }
+    }
+    TEST_ASSERT_TRUE(slot_a != 255);
+    phosphor_session_input_t tmp_session = input.sessions[0];
+    input.sessions[0] = input.sessions[3];
+    input.sessions[3] = tmp_session;
+    phosphor_state_resolver_update(&resolver, &input, 100, &visual);
+    uint8_t slot_a2 = 255;
+    for (int i = 0; i < 4; ++i) {
+        if (strcmp(visual.satellites[i].session_id, "a") == 0) {
+            slot_a2 = visual.satellites[i].slot;
+        }
+    }
+    TEST_ASSERT_EQ_INT(slot_a, slot_a2);
+}
+
 static void test_scene_nucleus_and_rasterizer(void)
 {
     glyph_frame_t frame;
@@ -442,6 +546,7 @@ void test_phosphor_run(void)
     test_satellite_layout();
     test_glyph_frame_priority();
     test_motion_and_scene();
+    test_state_resolver();
     test_band_neighbors();
     test_scene_nucleus_and_rasterizer();
 }

@@ -15,7 +15,9 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "lvgl.h"
+#include "phosphor_demo.h"
 #include "phosphor_motion.h"
+#include "phosphor_state.h"
 #include "phosphor_scene.h"
 #include "phosphor_types.h"
 
@@ -29,6 +31,7 @@ static uint16_t *s_canvas_buf;
 static lv_obj_t *s_overlay;
 static lv_obj_t *s_canvas;
 static phosphor_motion_state_t s_motion;
+static phosphor_state_resolver_t s_resolver;
 
 #define P3_DEMO_SWITCH_MS 6000u
 #define P3_IDLE_FPS 7u
@@ -37,8 +40,8 @@ static phosphor_motion_state_t s_motion;
 static void phosphor_anim_task(void *arg)
 {
     const espui_display_hal_t *display = (const espui_display_hal_t *)arg;
-    phosphor_motion_mode_t mode = PHOSPHOR_MODE_IDLE;
-    phosphor_motion_init(&s_motion, mode);
+    phosphor_motion_init(&s_motion, PHOSPHOR_MODE_IDLE);
+    phosphor_state_resolver_init(&s_resolver);
     const int64_t start_us = esp_timer_get_time();
     uint32_t last_stats_ms = 0;
     uint32_t frames = 0;
@@ -47,6 +50,7 @@ static void phosphor_anim_task(void *arg)
     uint64_t period_us_total = 0;
     uint64_t last_frame_start_us = 0;
     uint32_t last_delay_ms = 0;
+    phosphor_demo_phase_t last_phase = (phosphor_demo_phase_t)-1;
 
     while (true) {
         uint64_t loop_start_us = esp_timer_get_time();
@@ -55,15 +59,30 @@ static void phosphor_anim_task(void *arg)
         }
         last_frame_start_us = loop_start_us;
         uint32_t now_ms = (uint32_t)((esp_timer_get_time() - start_us) / 1000);
-        mode = ((now_ms / P3_DEMO_SWITCH_MS) & 1u) ? PHOSPHOR_MODE_WORKING
-                                                    : PHOSPHOR_MODE_IDLE;
-        phosphor_motion_update(&s_motion, now_ms, mode);
+        phosphor_demo_phase_t phase = phosphor_demo_phase_at(now_ms);
+        if (phase != last_phase) {
+            ESP_LOGI(TAG, "P4 demo phase=%s",
+                     phosphor_demo_phase_name(phase));
+            last_phase = phase;
+        }
+        uint32_t cycle = now_ms / PHOSPHOR_DEMO_CYCLE_MS + 1u;
+        phosphor_input_state_t input;
+        phosphor_visual_state_t visual;
+        phosphor_demo_build_input(phase, cycle, &input);
+        phosphor_state_resolver_update(&s_resolver, &input, now_ms, &visual);
+        if (visual.activity != PHOSPHOR_ACTIVITY_OFFLINE) {
+            phosphor_motion_mode_t motion_mode =
+                visual.activity == PHOSPHOR_ACTIVITY_WORKING
+                    ? PHOSPHOR_MODE_WORKING
+                    : PHOSPHOR_MODE_IDLE;
+            phosphor_motion_update(&s_motion, now_ms, motion_mode);
+        }
 
         uint64_t render_start = esp_timer_get_time();
         if (display->lock(1000) == ESP_OK) {
-            phosphor_scene_render_motion_rgb565(
+            phosphor_scene_render_visual_rgb565(
                 s_canvas_buf, PHOSPHOR_CANVAS_W, PHOSPHOR_CANVAS_H,
-                &s_motion);
+                &s_motion, &visual);
             lv_obj_invalidate(s_canvas);
             display->unlock();
         }
@@ -86,13 +105,14 @@ static void phosphor_anim_task(void *arg)
                                                       (frames - 1))
                                          : 0;
             ESP_LOGI(TAG,
-                     "P3 anim stats mode=%s frames=%u fps=%u "
-                     "render_avg_us=%u loop_avg_us=%u period_avg_us=%u "
-                     "delay=%u tick=%u internal_free=%u psram_free=%u",
-                     mode == PHOSPHOR_MODE_WORKING ? "working" : "idle",
-                     (unsigned)frames, (unsigned)fps, avg_us, loop_avg_us,
-                     period_avg_us, (unsigned)last_delay_ms,
-                     (unsigned)configTICK_RATE_HZ,
+                     "P4 anim stats state=%s activity=%d attention=%u "
+                     "frames=%u fps=%u render_avg_us=%u loop_avg_us=%u "
+                     "period_avg_us=%u delay=%u tick=%u internal_free=%u "
+                     "psram_free=%u",
+                     phosphor_demo_phase_name(phase), (int)visual.activity,
+                     (unsigned)visual.attention, (unsigned)frames,
+                     (unsigned)fps, avg_us, loop_avg_us, period_avg_us,
+                     (unsigned)last_delay_ms, (unsigned)configTICK_RATE_HZ,
                      (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
                      (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
             last_stats_ms = now_ms;
@@ -104,8 +124,9 @@ static void phosphor_anim_task(void *arg)
         }
 
         loop_us_total += (uint64_t)(esp_timer_get_time() - loop_start_us);
-        uint32_t fps_target = mode == PHOSPHOR_MODE_WORKING ? P3_WORKING_FPS
-                                                            : P3_IDLE_FPS;
+        uint32_t fps_target = visual.activity == PHOSPHOR_ACTIVITY_WORKING
+                                  ? P3_WORKING_FPS
+                                  : P3_IDLE_FPS;
         uint32_t frame_ms = 1000u / fps_target;
         uint32_t render_ms = (uint32_t)(render_elapsed_us / 1000u);
         uint32_t delay_ms = frame_ms > render_ms
@@ -182,7 +203,7 @@ esp_err_t phosphor_lvgl_port_init(const espui_display_hal_t *display)
     display->unlock();
 
     ESP_LOGI(TAG,
-             "P1 static canvas ready: %ux%u at (%d,%d), PSRAM=%u bytes",
+             "P4 canvas ready: %ux%u at (%d,%d), PSRAM=%u bytes",
              PHOSPHOR_CANVAS_W, PHOSPHOR_CANVAS_H, PHOSPHOR_CANVAS_X,
              PHOSPHOR_CANVAS_Y, (unsigned)bytes);
 
