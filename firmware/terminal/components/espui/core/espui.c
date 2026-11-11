@@ -8,6 +8,7 @@
 #include "esp_timer.h"
 #include "espui_event.h"
 #include "espui_renderer.h"
+#include "input_gesture.h"
 #include "input_router.h"
 #include "navigation.h"
 #include "espui_scene.h"
@@ -25,6 +26,10 @@
 #define ESPUI_DEFAULT_PRIORITY 5
 #define ESPUI_DEFAULT_TICK_MS 50
 #define ESPUI_DEFAULT_QUEUE_LENGTH 4
+#define ESPUI_DEFAULT_INPUT_QUEUE_LENGTH 16
+#define ESPUI_DEFAULT_INPUT_POLL_MS 20
+#define ESPUI_DEFAULT_INPUT_STACK 4096
+#define ESPUI_DEFAULT_INPUT_PRIORITY 4
 #define ESPUI_DEFAULT_MEMORY_BUDGET (64u * 1024u)
 
 struct espui_context {
@@ -42,8 +47,11 @@ struct espui_context {
     espui_memory_budget_t memory;
 
     QueueHandle_t events;
+    QueueHandle_t inputs;
     SemaphoreHandle_t stopped_sem;
+    SemaphoreHandle_t input_stopped_sem;
     TaskHandle_t ui_task;
+    TaskHandle_t input_task;
 
     int64_t started_us;
     bool initialized;
@@ -116,6 +124,18 @@ static void normalize_config(espui_config_t *config)
     if (config->event_queue_length == 0) {
         config->event_queue_length = ESPUI_DEFAULT_QUEUE_LENGTH;
     }
+    if (config->input_queue_length == 0) {
+        config->input_queue_length = ESPUI_DEFAULT_INPUT_QUEUE_LENGTH;
+    }
+    if (config->input_poll_ms == 0) {
+        config->input_poll_ms = ESPUI_DEFAULT_INPUT_POLL_MS;
+    }
+    if (config->input_task_stack == 0) {
+        config->input_task_stack = ESPUI_DEFAULT_INPUT_STACK;
+    }
+    if (config->input_task_priority == 0) {
+        config->input_task_priority = ESPUI_DEFAULT_INPUT_PRIORITY;
+    }
     if (config->memory_budget_bytes == 0) {
         config->memory_budget_bytes = ESPUI_DEFAULT_MEMORY_BUDGET;
     }
@@ -126,6 +146,14 @@ static void cleanup_runtime(espui_context_t *ctx)
     if (ctx->events != NULL) {
         vQueueDelete(ctx->events);
         ctx->events = NULL;
+    }
+    if (ctx->inputs != NULL) {
+        vQueueDelete(ctx->inputs);
+        ctx->inputs = NULL;
+    }
+    if (ctx->input_stopped_sem != NULL) {
+        vSemaphoreDelete(ctx->input_stopped_sem);
+        ctx->input_stopped_sem = NULL;
     }
     if (ctx->stopped_sem != NULL) {
         vSemaphoreDelete(ctx->stopped_sem);
@@ -138,6 +166,85 @@ static void cleanup_runtime(espui_context_t *ctx)
         }
         ctx->renderer_ready = false;
     }
+}
+
+static esp_err_t post_input_event(const espui_input_event_t *event)
+{
+    if (!s_ctx.initialized || s_ctx.inputs == NULL || event == NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (xQueueSend(s_ctx.inputs, event, 0) == pdTRUE) {
+        return ESP_OK;
+    }
+    /* Raw TOUCH press/release is lower priority than discrete gestures. */
+    if (event->type == ESPUI_INPUT_TOUCH) {
+        return ESP_ERR_TIMEOUT;
+    }
+    if (xQueueSend(s_ctx.inputs, event, pdMS_TO_TICKS(20)) != pdTRUE) {
+        return ESP_ERR_TIMEOUT;
+    }
+    return ESP_OK;
+}
+
+static void input_task(void *arg)
+{
+    espui_context_t *ctx = (espui_context_t *)arg;
+    espui_gesture_state_t gesture;
+    espui_gesture_init(&gesture);
+    uint32_t poll_ms = ctx->config.input_poll_ms;
+
+    while (ctx->running) {
+        bool touched = false;
+        uint16_t x = gesture.last_x;
+        uint16_t y = gesture.last_y;
+
+        const espui_touch_hal_t *touch = ctx->board.touch;
+        const espui_display_hal_t *display = ctx->board.display;
+        if (touch != NULL && touch->read != NULL) {
+            espui_touch_point_t point;
+            size_t count = 0;
+            bool lock_ok = true;
+            if (display != NULL && display->lock != NULL) {
+                lock_ok = display->lock(1000) == ESP_OK;
+            }
+            if (lock_ok) {
+                esp_err_t err = touch->read(&point, 1, &count);
+                if (display != NULL && display->unlock != NULL) {
+                    display->unlock();
+                }
+                if (err == ESP_OK && count > 0 && point.pressed) {
+                    touched = true;
+                    x = point.x;
+                    y = point.y;
+                }
+            }
+        }
+
+        uint32_t timestamp_ms = espui_uptime_ms(ctx);
+        espui_input_event_t events[ESPUI_GESTURE_MAX_EVENTS];
+        size_t event_count = espui_gesture_feed(
+            &gesture, touched, x, y, timestamp_ms, events,
+            ESPUI_GESTURE_MAX_EVENTS);
+        for (size_t i = 0; i < event_count; ++i) {
+            (void)espui_post_input(&events[i]);
+        }
+
+        const espui_input_hal_t *input = ctx->board.input;
+        if (input != NULL && input->read_event != NULL) {
+            for (int i = 0; i < 4; ++i) {
+                espui_input_event_t boot;
+                if (input->read_event(&boot, 0) != ESP_OK) break;
+                (void)espui_post_input(&boot);
+            }
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(poll_ms));
+    }
+    if (ctx->input_stopped_sem != NULL) {
+        xSemaphoreGive(ctx->input_stopped_sem);
+    }
+    ctx->input_task = NULL;
+    vTaskDelete(NULL);
 }
 
 static void handle_view_model(espui_context_t *ctx,
@@ -166,12 +273,20 @@ static void handle_input(espui_context_t *ctx, const espui_input_event_t *event)
         ESP_LOGW(TAG, "navigation %s failed: %s", espui_nav_intent_name(intent),
                  esp_err_to_name(err));
     }
+    /* Navigation may be rejected by sticky Attention; keep router scene in
+     * sync with the authoritative scene manager. */
+    espui_input_router_set_scene(&ctx->input_router,
+                                 espui_scene_manager_current(&ctx->scenes));
 
     const espui_theme_descriptor_t *active =
         espui_theme_manager_active(&ctx->theme_manager);
     if (active != NULL && active->ops->on_input != NULL) {
         active->ops->on_input(event);
     }
+    ESP_LOGI(TAG, "input type=%s x=%u y=%u scene=%s",
+             espui_input_type_name(event->type), (unsigned)event->x,
+             (unsigned)event->y,
+             espui_scene_name(espui_scene_manager_current(&ctx->scenes)));
 }
 
 static void handle_event(espui_context_t *ctx, const espui_event_t *event)
@@ -234,6 +349,12 @@ static void ui_task(void *arg)
     TickType_t last_ticks = xTaskGetTickCount();
 
     while (ctx->running) {
+        espui_input_event_t input;
+        while (xQueueReceive(ctx->inputs, &input, 0) == pdTRUE) {
+            display_lock(ctx);
+            handle_input(ctx, &input);
+            display_unlock(ctx);
+        }
         espui_event_t event;
         if (xQueueReceive(ctx->events, &event,
                           pdMS_TO_TICKS(ctx->config.tick_ms)) == pdTRUE) {
@@ -323,8 +444,12 @@ esp_err_t espui_init(const espui_config_t *config)
 
     s_ctx.events = xQueueCreate(s_ctx.config.event_queue_length,
                                 sizeof(espui_event_t));
+    s_ctx.inputs = xQueueCreate(s_ctx.config.input_queue_length,
+                                sizeof(espui_input_event_t));
     s_ctx.stopped_sem = xSemaphoreCreateBinary();
-    if (s_ctx.events == NULL || s_ctx.stopped_sem == NULL) {
+    s_ctx.input_stopped_sem = xSemaphoreCreateBinary();
+    if (s_ctx.events == NULL || s_ctx.inputs == NULL ||
+        s_ctx.stopped_sem == NULL || s_ctx.input_stopped_sem == NULL) {
         cleanup_runtime(&s_ctx);
         return ESP_ERR_NO_MEM;
     }
@@ -389,6 +514,19 @@ esp_err_t espui_start(void)
         return ESP_ERR_NO_MEM;
     }
 
+    if (xTaskCreatePinnedToCore(input_task, "espui_input",
+                                s_ctx.config.input_task_stack, &s_ctx,
+                                s_ctx.config.input_task_priority,
+                                &s_ctx.input_task, core) != pdPASS) {
+        s_ctx.running = false;
+        espui_event_t event = {.type = ESPUI_EVENT_STOP};
+        (void)xQueueSend(s_ctx.events, &event, 0);
+        (void)xSemaphoreTake(s_ctx.stopped_sem, pdMS_TO_TICKS(1000));
+        s_ctx.ui_task = NULL;
+        s_ctx.started = false;
+        return ESP_ERR_NO_MEM;
+    }
+
     s_ctx.started = true;
     return ESP_OK;
 }
@@ -414,6 +552,13 @@ esp_err_t espui_stop(void)
         }
         s_ctx.started = false;
         s_ctx.ui_task = NULL;
+    }
+    if (s_ctx.input_task != NULL &&
+        xTaskGetCurrentTaskHandle() != s_ctx.input_task) {
+        if (s_ctx.input_stopped_sem != NULL) {
+            (void)xSemaphoreTake(s_ctx.input_stopped_sem, pdMS_TO_TICKS(1000));
+        }
+        s_ctx.input_task = NULL;
     }
 
     display_lock(&s_ctx);
@@ -472,9 +617,7 @@ esp_err_t espui_post_input(const espui_input_event_t *event)
     if (event == NULL) {
         return ESP_ERR_INVALID_ARG;
     }
-    espui_event_t queued = {.type = ESPUI_EVENT_INPUT};
-    queued.data.input = *event;
-    return post_event(&queued);
+    return post_input_event(event);
 }
 
 esp_err_t espui_post_action_result(const espui_action_result_t *result)

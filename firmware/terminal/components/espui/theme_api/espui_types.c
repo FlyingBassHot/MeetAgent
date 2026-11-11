@@ -89,6 +89,16 @@ const char *espui_input_type_name(espui_input_type_t type)
         return "long_press";
     case ESPUI_INPUT_TOUCH:
         return "touch";
+    case ESPUI_INPUT_TAP:
+        return "tap";
+    case ESPUI_INPUT_SWIPE_LEFT:
+        return "swipe_left";
+    case ESPUI_INPUT_SWIPE_RIGHT:
+        return "swipe_right";
+    case ESPUI_INPUT_SWIPE_UP:
+        return "swipe_up";
+    case ESPUI_INPUT_SWIPE_DOWN:
+        return "swipe_down";
     default:
         return "unknown";
     }

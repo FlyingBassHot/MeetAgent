@@ -17,6 +17,7 @@
 #include "bsp/esp32_s3_touch_lcd_4.h"
 #include "driver/gpio.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "esp_rom_sys.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -236,21 +237,98 @@ static const espui_touch_hal_t s_touch_hal = {
     .read = touch_read,
 };
 
+/*
+ * Waveshare LCD-4 V4 exposes the ESP32-S3 BOOT button on GPIO0 (active low).
+ * GPIO0 is also a strapping pin: this code only configures it after boot; do
+ * not hold BOOT during reset unless download mode is intended. The schematic
+ * is external to this repo, so this mapping remains a board assumption.
+ */
+#define BOARD_BOOT_GPIO GPIO_NUM_0
+#define BOARD_BOOT_DEBOUNCE_MS 30u
+#define BOARD_BOOT_LONG_MS 600u
+
+static bool s_boot_initialized;
+static bool s_boot_raw_pressed;
+static bool s_boot_stable_pressed;
+static bool s_boot_pressed;
+static bool s_boot_long_sent;
+static uint32_t s_boot_raw_change_ms;
+static uint32_t s_boot_press_ms;
+
 static esp_err_t input_init(void)
 {
+    if (s_boot_initialized) return ESP_OK;
+    gpio_config_t io_conf = {0};
+    io_conf.pin_bit_mask = 1ULL << BOARD_BOOT_GPIO;
+    io_conf.mode = GPIO_MODE_INPUT;
+    io_conf.pull_up_en = GPIO_PULLUP_ENABLE;
+    io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    io_conf.intr_type = GPIO_INTR_DISABLE;
+    esp_err_t err = gpio_config(&io_conf);
+    if (err != ESP_OK) return err;
+    s_boot_raw_pressed = gpio_get_level(BOARD_BOOT_GPIO) == 0;
+    s_boot_stable_pressed = s_boot_raw_pressed;
+    s_boot_pressed = false;
+    s_boot_long_sent = false;
+    s_boot_raw_change_ms = (uint32_t)(esp_timer_get_time() / 1000);
+    s_boot_initialized = true;
+    ESP_LOGI(TAG, "BOOT input on GPIO0 (active low; strapping pin)");
     return ESP_OK;
 }
 
 static esp_err_t input_deinit(void)
 {
+    s_boot_initialized = false;
     return ESP_OK;
 }
 
 static esp_err_t input_read_event(espui_input_event_t *event, uint32_t timeout_ms)
 {
-    (void)event;
     (void)timeout_ms;
-    /* LCD-4 V4 has no confirmed encoder/button GPIO mapping in this project. */
+    if (event == NULL || !s_boot_initialized) return ESP_ERR_INVALID_STATE;
+    uint32_t now = (uint32_t)(esp_timer_get_time() / 1000);
+    bool raw_pressed = gpio_get_level(BOARD_BOOT_GPIO) == 0;
+    if (raw_pressed != s_boot_raw_pressed) {
+        s_boot_raw_pressed = raw_pressed;
+        s_boot_raw_change_ms = now;
+        return ESP_ERR_TIMEOUT;
+    }
+    if (raw_pressed != s_boot_stable_pressed &&
+        now - s_boot_raw_change_ms >= BOARD_BOOT_DEBOUNCE_MS) {
+        s_boot_stable_pressed = raw_pressed;
+        if (raw_pressed) {
+            s_boot_pressed = true;
+            s_boot_long_sent = false;
+            s_boot_press_ms = now;
+            return ESP_ERR_TIMEOUT;
+        }
+        bool was_pressed = s_boot_pressed;
+        s_boot_pressed = false;
+        if (was_pressed && !s_boot_long_sent) {
+            bool long_enough = now - s_boot_press_ms >= BOARD_BOOT_LONG_MS;
+            s_boot_long_sent = long_enough;
+            event->type = long_enough ? ESPUI_INPUT_LONG_PRESS
+                                      : ESPUI_INPUT_BACK;
+            event->value = 0;
+            event->x = 0;
+            event->y = 0;
+            event->pressed = long_enough;
+            event->timestamp_ms = now;
+            return ESP_OK;
+        }
+        return ESP_ERR_TIMEOUT;
+    }
+    if (s_boot_stable_pressed && s_boot_pressed && !s_boot_long_sent &&
+        now - s_boot_press_ms >= BOARD_BOOT_LONG_MS) {
+        s_boot_long_sent = true;
+        event->type = ESPUI_INPUT_LONG_PRESS;
+        event->value = 0;
+        event->x = 0;
+        event->y = 0;
+        event->pressed = true;
+        event->timestamp_ms = now;
+        return ESP_OK;
+    }
     return ESP_ERR_TIMEOUT;
 }
 

@@ -41,7 +41,11 @@ typedef struct {
     uint32_t ui_task_priority; /* 0 => 5 */
     int ui_task_core;          /* -1 => no affinity */
     uint32_t tick_ms;          /* 0 => 50 */
-    uint32_t event_queue_length; /* 0 => 4 */
+    uint32_t event_queue_length; /* 0 => 4 (ViewModel/action/theme) */
+    uint32_t input_queue_length; /* 0 => 16 (raw/gesture input) */
+    uint32_t input_poll_ms;      /* 0 => 20 */
+    uint32_t input_task_stack;   /* 0 => 4096 */
+    uint32_t input_task_priority; /* 0 => 4 */
     uint32_t memory_budget_bytes; /* 0 => 64 KiB */
 } espui_config_t;
 

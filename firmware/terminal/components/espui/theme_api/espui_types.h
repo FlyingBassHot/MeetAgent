@@ -49,6 +49,11 @@ typedef enum {
     ESPUI_INPUT_BACK,
     ESPUI_INPUT_LONG_PRESS,
     ESPUI_INPUT_TOUCH,
+    ESPUI_INPUT_TAP,
+    ESPUI_INPUT_SWIPE_LEFT,
+    ESPUI_INPUT_SWIPE_RIGHT,
+    ESPUI_INPUT_SWIPE_UP,
+    ESPUI_INPUT_SWIPE_DOWN,
 } espui_input_type_t;
 
 typedef struct {

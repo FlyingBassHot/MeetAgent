@@ -10,6 +10,7 @@ idf_component_register(
         "core/action_dispatcher.c"
         "core/espui.c"
         "core/espui_view_model.c"
+        "core/input_gesture.c"
         "core/input_router.c"
         "core/navigation.c"
 

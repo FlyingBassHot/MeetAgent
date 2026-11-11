@@ -38,10 +38,32 @@ static void test_input_router(void)
 
     event.type = ESPUI_INPUT_TOUCH;
     event.pressed = true;
+    TEST_ASSERT_EQ_INT(ESPUI_NAV_NONE,
+                       espui_input_router_feed(&router, &event));
+    event.type = ESPUI_INPUT_TAP;
     TEST_ASSERT_EQ_INT(ESPUI_NAV_ACTIVATE,
                        espui_input_router_feed(&router, &event));
-    event.pressed = false;
-    TEST_ASSERT_EQ_INT(ESPUI_NAV_NONE, espui_input_router_feed(&router, &event));
+
+    event.type = ESPUI_INPUT_SWIPE_LEFT;
+    TEST_ASSERT_EQ_INT(ESPUI_NAV_SCENE_FOCUS,
+                       espui_input_router_feed(&router, &event));
+    TEST_ASSERT_EQ_INT(ESPUI_SCENE_FOCUS, router.scene);
+    TEST_ASSERT_EQ_INT(ESPUI_NAV_SCENE_ACTIVITY,
+                       espui_input_router_feed(&router, &event));
+    TEST_ASSERT_EQ_INT(ESPUI_SCENE_ACTIVITY, router.scene);
+    TEST_ASSERT_EQ_INT(ESPUI_NAV_NONE,
+                       espui_input_router_feed(&router, &event));
+    event.type = ESPUI_INPUT_SWIPE_RIGHT;
+    TEST_ASSERT_EQ_INT(ESPUI_NAV_SCENE_FOCUS,
+                       espui_input_router_feed(&router, &event));
+    TEST_ASSERT_EQ_INT(ESPUI_NAV_SCENE_AMBIENT,
+                       espui_input_router_feed(&router, &event));
+    event.type = ESPUI_INPUT_SWIPE_DOWN;
+    TEST_ASSERT_EQ_INT(ESPUI_NAV_BACK,
+                       espui_input_router_feed(&router, &event));
+    event.type = ESPUI_INPUT_SWIPE_UP;
+    TEST_ASSERT_EQ_INT(ESPUI_NAV_NONE,
+                       espui_input_router_feed(&router, &event));
 
     event.type = ESPUI_INPUT_LONG_PRESS;
     TEST_ASSERT_EQ_INT(ESPUI_NAV_NONE,

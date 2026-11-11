@@ -141,6 +141,8 @@ void app_main(void)
         .ui_task_core = -1,
         .tick_ms = 50,
         .event_queue_length = 4,
+        .input_queue_length = 16,
+        .input_poll_ms = 20,
         .memory_budget_bytes = 64 * 1024,
     };
 

@@ -5,7 +5,6 @@
 espui_nav_intent_t espui_navigation_from_input(const espui_input_event_t *event,
                                                espui_scene_id_t scene)
 {
-    (void)scene;
     if (event == NULL) {
         return ESPUI_NAV_NONE;
     }
@@ -23,7 +22,30 @@ espui_nav_intent_t espui_navigation_from_input(const espui_input_event_t *event,
     case ESPUI_INPUT_LONG_PRESS:
         return ESPUI_NAV_TOGGLE_ATTENTION;
     case ESPUI_INPUT_TOUCH:
-        return event->pressed ? ESPUI_NAV_ACTIVATE : ESPUI_NAV_NONE;
+        /* Raw touch is preserved for themes; TAP is the activation event. */
+        return ESPUI_NAV_NONE;
+    case ESPUI_INPUT_TAP:
+        return ESPUI_NAV_ACTIVATE;
+    case ESPUI_INPUT_SWIPE_LEFT:
+        if (scene == ESPUI_SCENE_AMBIENT) {
+            return ESPUI_NAV_SCENE_FOCUS;
+        }
+        if (scene == ESPUI_SCENE_FOCUS) {
+            return ESPUI_NAV_SCENE_ACTIVITY;
+        }
+        return ESPUI_NAV_NONE;
+    case ESPUI_INPUT_SWIPE_RIGHT:
+        if (scene == ESPUI_SCENE_ACTIVITY) {
+            return ESPUI_NAV_SCENE_FOCUS;
+        }
+        if (scene == ESPUI_SCENE_FOCUS) {
+            return ESPUI_NAV_SCENE_AMBIENT;
+        }
+        return ESPUI_NAV_NONE;
+    case ESPUI_INPUT_SWIPE_DOWN:
+        return ESPUI_NAV_BACK;
+    case ESPUI_INPUT_SWIPE_UP:
+        return ESPUI_NAV_NONE;
     case ESPUI_INPUT_NONE:
     default:
         return ESPUI_NAV_NONE;

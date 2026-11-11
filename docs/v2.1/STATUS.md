@@ -7,7 +7,7 @@
 | Core / Node | 主会话 | M0 + M1 + M4 Core | 完成；审计/限流/重连边界加固 | M6 可选增强 |
 | Protocol v2 | 主会话 | M0 | 完成 | 随实现补兼容测试 |
 | Mobile | omp | M5b + UX P0/P1/P2 | 视觉与原生交互改造完成（信息层级/聊天流/触感/键盘/返回键/下拉刷新/视觉打磨） | iOS/Release |
-| Terminal / ESPUI | pi | E0–E3a + LCD-4 Bring-up + E4a + E4b-1/2/3 + PHOSPHOR R2.1 + P6 + P5 + net QA fixes | R2.1/P6 真实 ViewModel 已烧录；P5 dirty-cell + partial invalidate：Idle 7 FPS / real Working 11 FPS，render 19–26ms；2h soak 运行中 | 交互阶段 Stage 1/2（并行中）、2h soak、real Approval/Error/Offline、interrupt/permission、AP portal `/save` |
+| Terminal / ESPUI | pi | E0–E3a + LCD-4 Bring-up + E4a + E4b-1/2/3 + PHOSPHOR R2.1/P6/P5 + Stage 1 input + net QA fixes | P5 real Working 11 FPS；Stage 1 输入管线/tap/long/swipe/BOOT/Back 代码+host 5386+build 完成，**未 flash**（P5 soak 18:46/2h）；Stage 2 场景/canvas 并行中 | P5 soak 完成、Stage 2 合并/flash、real touch、Stage 3 审批/Interrupt、Stage 4 Settings、AP portal `/save` |
 | Cloud relay | 主会话 | 可选 | 保留 V1 实现 | M6 再验证混合模式 |
 
 ## 已完成
@@ -48,6 +48,7 @@
 - Terminal PHOSPHOR P6（2026-11-11）：真实 ViewModel/事件 → phosphor input adapter + 线程安全 publisher；映射 online/connecting/offline、8 sessions、approval/error attention、completion hash；net_client 发布、port real/demo 自动切换；host tests 3780/3780；app 0x13a130 / 16% free；**app-flash 成功**；启动后 `state=node activity=1 attention=0`，真实 snapshot 驱动 core；已知：completion 仅 message.completed、error_event_id 未映射、connecting 视为 offline；P5/真实 Approval/Error/Offline 场景待验证
 - Terminal PHOSPHOR P5（2026-11-11）：dirty-cell rasterizer + changed bbox + partial `lv_obj_invalidate_area` + 32-bit 背景填充；Idle 7 FPS / render 15.9–21.1ms；real Working soak 11 FPS / render 19–26ms，dirty 39–90 cells，bbox 306–324，full 回退阈值 70%；host tests 3966/3966；syntax 51；app 1,289,984 B / 16% free；**app-flash 成功**；2h soak 运行中（启动 03:45，internal/PSRAM 稳定，heartbeat 57ms，无 panic），2h 完整结果待收
 - Terminal 交互规划（2026-11-11）：已按 TerminalUi.md E3/E4/E5 完成 gap/阶段计划；Stage 1 输入管线（touch poll/gesture/BOOT/Back）、Stage 2 场景+PHOSPHOR canvas 集成、Stage 3 安全审批/Interrupt/action queue、Stage 4 Settings/NVS、Stage 5 idle/低功耗；当前 PHOSPHOR 是 top-layer overlay、无输入轮询、theme `on_input` 为空、commands 无 UI 入口；Stage 1/2 并行开发中，不烧录直到 P5 soak 完成
+- Terminal 交互 Stage 1（2026-11-11）：新增 input task（20ms、display lock）、gesture recognizer（tap/long/swipe/debounce）、BOOT GPIO0 短按 Back/长按 Attention、独立 input queue 16、TAP/SWIPE 事件与场景导航；host tests 5386/5386；syntax 52；IDF build 1,292,352 B/16%；**未 flash**（P5 soak 占用设备）；真机 tap/swipe/long/BOOT 待 soak 后验证；PHOSPHOR overlay 仍遮挡场景，Stage 2 处理
 - Terminal network QA fixes（2026-11-11）：F1 welcome 空/缺失 events、F3 stale pairing code、F5 mock stop、F7 字符串 NUL、F8 heartbeat 时序、F10 node_url 变化清 token 已合并；组合固件 0x135f00 / 17% free；启动日志 token=set、pairing_code=empty、welcome 49KB、snapshot applied、heartbeat RTT 298ms；host tests 3589/3589；F9/F4/F6/F2 仍待后续
 - Terminal 硬件目标确定为 **Waveshare ESP32-S3-Touch-LCD-4 V4**（480×480 RGB LCD + GT911 + CH32V003 helper）；真实 BSP 已接入，显示/触摸方向/PSRAM 待实物验证
 
