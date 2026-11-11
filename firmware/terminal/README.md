@@ -18,14 +18,16 @@
 
 - **真机 bring-up 成功（2026-11-11）**：ESP-IDF v5.5.5 构建、烧录、启动通过；180° 显示旋转已修正并重新烧录
 - 启动证据：16MB QIO Flash、8MB Octal PSRAM 80MHz、240MHz、ST7701 480×480、GT911 0x14、ESPUI 初始化
-- 固件：`meetagent_terminal.bin` 1,212,272 bytes（SHA-256 `0183dedd...30d157d`）；app 分区剩余 21%
+- 固件：`meetagent_terminal.bin` 1,212,272 bytes（SHA-256 `8d416686...fcca60c`）；app 分区剩余 21%
 - 原厂 16MB Flash 已备份：`/home/perch/esp/backups/lcd4-factory-2026-11-11-1132.bin`
 - 主机测试：`807 checks, 0 failure(s)`（ASan/UBSan + `-Werror`）
 - 主机语法检查：33 个固件 C 文件通过（board_lcd4.c 与 wifi_prov.c 由真实 IDF 构建验证）
 - E3a 帧预览：`make preview STATE=working FRAMES=3 DELAY=300`
 - 启动日志：`/tmp/opencode/esp-lcd4-boot.log`
 - E4a 实测：STA 172.20.10.2，Node developer-machine/2.1.0，`/status` node_reachable=true
-- **待人工确认**：旋转后屏幕实际方向/颜色、GT911 触摸命中、背光亮度；AP portal `/save` 需第二台设备
+- GT911 触摸已实机确认：TL/TR/BL/BR/C 五点 + 180° 映射；临时 Touch Test overlay 已移除
+- **待人工确认**：屏幕颜色/背光亮度；AP portal `/save` 需第二台设备
+- 注意：正式固件仍不轮询 touch HAL，Mock UI 暂无可点击控件
 
 当前环境：
 
@@ -80,7 +82,7 @@ idf.py size
 因 sudo 的 `HOME=/root` 找不到 Python 环境而失败（未接触设备），修正 `HOME` /
 `IDF_TOOLS_PATH` / `IDF_PYTHON_ENV_PATH` 后一次成功。
 
-> 已烧录并启动；180° 旋转修正后屏幕方向/颜色/触摸命中仍需人工确认。详细证据、固件 hash、
+> 已烧录并启动；触摸/180° 已确认，屏幕颜色/背光仍需人工确认。详细证据、固件 hash、
 > 启动日志与风险见 `docs/BUILD_STATUS.md` / `docs/HARDWARE.md`。
 
 ## 主机测试
@@ -156,7 +158,7 @@ firmware/terminal/
 - E4b 真实 Node：WebSocket/pairing/snapshot/event/command、心跳与重连（E4a 仅 Wi-Fi + `/api/v2/info`）
 - E5：主题设置持久化、亮度/夜间模式、低功耗、OTA
 - 语音 / STT、本地 AI、完整聊天、文件浏览、长历史
-- 真机 LCD / 触摸 / 旋钮驱动与引脚定义
+- 生产 UI 触摸交互 / 旋钮驱动 / 显示颜色校准
 
 ## 设计约束
 

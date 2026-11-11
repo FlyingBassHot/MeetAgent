@@ -3,7 +3,7 @@
 日期：2026-11-11  
 范围：`firmware/terminal/` only  
 目标：Waveshare ESP32-S3-Touch-LCD-4 V4.0（ESP32-S3N16R8）  
-状态：**E4a Wi-Fi/STA/Node 已验证**；180° 旋转已修正；屏幕颜色/触摸命中仍需人工确认
+状态：**E4a Wi-Fi/STA/Node 已验证；GT911 触摸已实机确认**；180° 已修正；屏幕颜色/背光仍需人工确认
 
 ## 1. 真机信息
 
@@ -80,7 +80,7 @@ idf.py size
 ```text
 build/meetagent_terminal.bin
   size   : 1,212,272 bytes (0x127F70)
-  sha256 : 0183deddbe2cf84d7bed35f8221fcc74358e7b1f657b9cc17aeff4bfa30d157d
+  sha256 : 8d416686f14fe37367759687078d236f54827ecda871df210113e7e03fcca60c
 
 build/bootloader/bootloader.bin
   size   : 22,272 bytes (0x5700)
@@ -188,7 +188,7 @@ I main_task: Returned from app_main()
 - 触摸：LVGL 8.4 `indev_pointer_proc()` 对 `LV_DISP_ROT_180` 自动执行
   `x = hor_res - x - 1`、`y = ver_res - y - 1`；HAL 读取的是 indev 变换后的点。
 - 启动日志已出现 `display rotated 180 degrees`，无 panic/assert。
-- 实际屏幕方向与触摸命中仍需人工确认。
+- 屏幕方向/触摸已由用户实机确认；颜色/背光仍需人工确认。
 
 ## 7. 期望画面（需人工确认）
 
@@ -214,7 +214,7 @@ I main_task: Returned from app_main()
 期望颜色：近黑背景、磷光绿主色、琥珀审批、红色错误。
 Mock 状态每 3 秒循环：ACTIVE → APPROVAL → COMPLETED → OFFLINE。
 
-**未验证**：实际颜色顺序、ST7701 方向、GT911 坐标方向、触摸命中、背光亮度曲线。
+**待确认**：实际颜色顺序、背光亮度曲线；触摸/180° 已实机确认。
 
 ## 8. 主机验证
 
@@ -241,6 +241,7 @@ idf.py flash: SUCCESS (exit 0)
 - [x] 240MHz CPU
 - [x] ST7701 480×480 面板初始化
 - [x] GT911 @0x14 检测与 ID/配置读取
+- [x] GT911 触摸事件/坐标实机确认（TL/TR/BL/BR/C + 180°）；临时 overlay 已移除
 - [x] ESPUI Terminal Aesthetic 480×480 初始化
 - [x] app_main / UI task 启动，无 panic/assert/reset loop
 - [x] 180° 显示旋转调用已生效（日志确认），触摸变换走 LVGL indev
@@ -248,8 +249,8 @@ idf.py flash: SUCCESS (exit 0)
 
 未验证：
 
-- [ ] 屏幕实际颜色、旋转后方向、刷新效果（需人工看）
-- [ ] GT911 旋转后坐标方向/镜像/单点命中（需人工触摸）
+- [ ] 屏幕实际颜色、刷新效果（方向/触摸已确认，颜色需人工看）
+- [ ] 生产 UI 触摸交互（当前正式固件不轮询 touch HAL，Mock UI 无可点击控件）
 - [ ] CH32V003 电池 ADC → 电量映射
 - [ ] 多点触控（BSP port 只注册 1 点）
 - [ ] 长时间运行、内存泄漏、FPS
@@ -257,8 +258,8 @@ idf.py flash: SUCCESS (exit 0)
 
 ## 10. 风险
 
-- I2C 上拉 warning 来自 ESP-IDF master 驱动；GT911 已识别，但实际触摸稳定性需确认。
-- ST7701 初始化序列覆盖 warning 来自 BSP；显示已初始化，颜色/方向未确认。
+- I2C 上拉 warning 来自 ESP-IDF master 驱动；GT911 触摸已实机确认，长期稳定性仍需观察。
+- ST7701 初始化序列覆盖 warning 来自 BSP；显示已初始化，方向已确认，颜色未校准。
 - BSP 无完整 deinit；恢复/OTA 需另行设计。
 - `idf.py size` IRAM 行口径待核对；实际链接断言通过。
 - `sdkconfig.defaults` 的 16MB/Octal 已由启动日志验证为 16MB/8MB，但具体模组批次仍需记录。
@@ -281,7 +282,7 @@ idf.py flash: SUCCESS (exit 0)
 ```text
 ESP-IDF : v5.5.5
 app bin : 1,212,272 bytes (0x127F70)
-sha256  : 0183deddbe2cf84d7bed35f8221fcc74358e7b1f657b9cc17aeff4bfa30d157d
+sha256  : 8d416686f14fe37367759687078d236f54827ecda871df210113e7e03fcca60c
 Total image size : 1,212,151 bytes
 Flash Code       : 900,468 bytes
 Flash Data       : 175,236 bytes
@@ -338,6 +339,32 @@ wifi_prov: Node reachable: name=developer-machine version=2.1.0 protocol=1 schem
 - [ ] NVS/Flash 加密；当前密码以 NVS 明文保存
 - [ ] 开放 AP 仅用于配网；若 STA 连续失败会保持 AP
 - [ ] E4b WebSocket/pairing/snapshot
+
+### 11.6 Touch 验收（2026-11-11）
+
+临时 Touch Test overlay（已移除）：
+
+```text
+测试固件 hash: 76de71fdfd5d6371e6498486eee4861a4bb825262ea0ba5f00fecbe757495752
+正式固件 hash: 8d416686f14fe37367759687078d236f54827ecda871df210113e7e03fcca60c
+测试日志     : /tmp/opencode/touch-test-boot.log
+恢复日志     : /tmp/opencode/touch-revert-boot.log
+```
+
+实机证据：
+
+```text
+I (26117) touch_test: TOUCH x=46 y=125
+I (26244) touch_test: TOUCH release
+```
+
+- `x=46 y=125` 落在 TL 标记范围（x=12..76, y=104..140）。
+- 用户人工确认 TL/TR/BL/BR/C 五个标记均跟随手指，180° 映射正确。
+- 测试 overlay 已删除：`main/touch_test.c/.h`、app_main 调用、CMake 条目。
+- 正式 E4a 固件已 app-flash 恢复；启动日志无 `touch_test`、无 panic。
+- Wi-Fi 仍连接手机热点（STA 172.20.10.2），Node `developer-machine/2.1.0` 可达。
+- 注意：正式固件目前仍只在启动时 `touch->init()`，生产 Mock UI 不轮询 touch HAL，
+  也没有可点击控件；触摸交互待 UI 功能接入。
 
 ## 12. 仓库约束
 

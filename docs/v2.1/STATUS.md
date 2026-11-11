@@ -7,7 +7,7 @@
 | Core / Node | 主会话 | M0 + M1 + M4 Core | 完成；审计/限流/重连边界加固 | M6 可选增强 |
 | Protocol v2 | 主会话 | M0 | 完成 | 随实现补兼容测试 |
 | Mobile | omp | M5b + UX P0/P1/P2 | 视觉与原生交互改造完成（信息层级/聊天流/触感/键盘/返回键/下拉刷新/视觉打磨） | iOS/Release |
-| Terminal / ESPUI | pi | E0–E3a + LCD-4 Bring-up + E4a | 真机启动成功；方向已修正；Wi-Fi STA 172.20.10.2 / Node 可达已验证 | AP portal `/save` 实测、触摸确认、E4b |
+| Terminal / ESPUI | pi | E0–E3a + LCD-4 Bring-up + E4a | 真机启动成功；方向已修正；Wi-Fi STA 172.20.10.2 / Node 可达已验证；GT911 触摸已确认 | AP portal `/save` 实测、E4b |
 | Cloud relay | 主会话 | 可选 | 保留 V1 实现 | M6 再验证混合模式 |
 
 ## 已完成
@@ -25,7 +25,8 @@
 - Mobile：`npm run typecheck` / `npm run build` 通过；390/1440 截图
 - Terminal：host tests 807/807；syntax 33/33；ESP-IDF v5.5.5 + LVGL 8.4.0 + 官方 BSP 3.0.0 构建/烧录成功，app 506,240 bytes，480×480 布局已适配
 - Terminal 真机 bring-up（2026-11-11）：16MB QIO Flash、8MB Octal PSRAM 80MHz、240MHz、ST7701 480×480、GT911 0x14、ESPUI 初始化成功；无 panic/assert/reset loop；原厂 16MB Flash 已备份（SHA-256 `c996b103...e2c7`）
-- Terminal 屏幕方向：BSP 默认方向反 180°，已通过 `LV_DISP_ROT_180` 修正并烧录；用户人工确认画面已正立，GT911 触摸待确认
+- Terminal 屏幕方向：BSP 默认方向反 180°，已通过 `LV_DISP_ROT_180` 修正并烧录；用户人工确认画面已正立
+- Terminal GT911 触摸：临时 Touch Test overlay 实机捕获 `TOUCH x=46 y=125`，用户确认 TL/TR/BL/BR/C 五点均跟随手指，180° 映射正确；测试 overlay 已移除
 - Terminal E4a（2026-11-11）：Wi-Fi NVS 配网、STA 自动连接手机热点、断线重连、Node `/api/v2/info` 可达已验证；ESP32 `172.20.10.2`，Node `developer-machine/2.1.0`；AP portal `/save` 待第二设备实测
 - Terminal 硬件目标确定为 **Waveshare ESP32-S3-Touch-LCD-4 V4**（480×480 RGB LCD + GT911 + CH32V003 helper）；真实 BSP 已接入，显示/触摸方向/PSRAM 待实物验证
 

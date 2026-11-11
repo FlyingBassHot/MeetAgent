@@ -6,7 +6,7 @@
 |---|---|---|
 | 开发板 | Waveshare ESP32-S3-Touch-LCD-4 **V4.0** | 用户确认 |
 | 屏幕 | 4.0" 480×480 RGB565（ST7701） | 按 BSP/官方示例 |
-| 触摸 | GT911，电容，硬件支持 5 点 | 按 BSP/官方示例 |
+| 触摸 | GT911，电容，硬件支持 5 点 | 已实机验证（单点） |
 | 模组 | ESP32-S3N16R8：16MB Flash + 8MB Octal PSRAM | 按用户确认 |
 | helper | CH32V003F4U6，I2C（背光/复位/电源/电池） | 按 BSP/官方示例 |
 | 按键 | BOOT / RESET / BAT_PWR（无板载旋钮） | 按 BSP/官方示例 |
@@ -70,6 +70,16 @@ uint16_t touchpad_x[1];  // esp_lvgl_port_touch.c
 单点。多点手势（缩放/多指）需要后续替换 BSP touch port 或使用原始 GT911 handle，
 本次未实现。
 
+实机触摸验证（2026-11-11）：
+
+- 临时 Touch Test overlay 捕获 `TOUCH x=46 y=125`（TL 标记区域 x=12..76 /
+  y=104..140）并正常 `TOUCH release`。
+- 用户人工确认 TL/TR/BL/BR/C 五个标记均能跟随手指，180° 映射正确。
+- 临时 overlay 已移除；正式 E4a 固件不再包含 touch test。
+- **当前 ESPUI 仍只在启动时调用 `board->touch->init()`，没有在生产 UI 中轮询
+  `board->touch->read()`；Mock UI 仍是不可点击的静态 Label。触摸交互要等后续 UI
+  功能接入。**
+
 ## 5. 480×480 布局
 
 - Safe fallback：全宽标题/场景行 + 中部 448×320 面板 + 底部 footer。
@@ -77,7 +87,7 @@ uint16_t touchpad_x[1];  // esp_lvgl_port_touch.c
   info 面板、footer；不是把 320×480 简单横向拉伸。
 - Manifest：`orientation=any`、`min_width=min_height=480`。
 - ASCII Renderer 默认网格改为 **60×30**，对应 480×480 / 约 8×16 字体。
-- 显示颜色/触摸方向未在真机验证；不能仅凭构建结果认定。
+- 触摸方向/180° 映射已实机验证；显示颜色/背光曲线仍未校准。
 
 ## 6. 性能配置
 
@@ -151,8 +161,7 @@ bsp_display_rotate(s_display, LV_DISP_ROT_180);
 LVGL 8.4 的 `indev_pointer_proc()` 对 `LV_DISP_ROT_180` 自动做
 `x = hor_res - x - 1`、`y = ver_res - y - 1`，所以 `espui_touch_hal_t.read()`
 通过 `lv_indev_get_point()` 得到的已是旋转后的坐标。启动日志已确认
-`display rotated 180 degrees`，无 panic/assert；实际屏幕方向与触摸命中仍需
-人工确认。
+`display rotated 180 degrees`，无 panic/assert；触摸/180° 映射已由用户实机确认。
 
 ### 期望画面
 
@@ -172,14 +181,14 @@ E2 MOCK // ASCII RENDERER E3
 ```
 
 Mock 状态每 3 秒循环：ACTIVE → APPROVAL → COMPLETED → OFFLINE。
-期望颜色为近黑背景、磷光绿、琥珀、红色；180° 修正后画面应正立。**实际颜色/方向/触摸命中需人工确认**。
+期望颜色为近黑背景、磷光绿、琥珀、红色；180° 修正后画面应正立。**实际颜色/背光仍需人工确认；触摸/180° 已确认**。
 
 ## 8. 待确认清单
 
-1. 480×480 实际颜色顺序、旋转修正后的 ST7701 方向、背光亮度曲线（初始化已通过）。
-2. GT911 坐标方向、镜像、单点触摸命中（检测已通过：0x14 / ID 39:31:31）。
+1. 480×480 实际颜色顺序、背光亮度曲线（ST7701 初始化与旋转已通过）。
+2. ~~GT911 坐标方向、镜像、单点触摸命中~~（已实机验证：TL/TR/BL/BR/C + 180°；多点仍未接入）。
 3. CH32V003 电池 ADC 与电量百分比映射（BSP v3.0.0 未提供，当前返回未知 255）。
 4. ~~16MB Flash / Octal PSRAM 与实物丝印一致~~（启动日志已确认 16MB / 8MB 80MHz）。
 5. LVGL draw buffer 的分配位置（内部 RAM vs PSRAM）与真实余量（启动成功，未测余量）。
 6. ~~BSP 在 ESP-IDF 5.5.5 上的运行时稳定性~~（已启动，长时间运行未测）。
-7. ~~烧录后的启动日志、背光、触摸和 480×480 布局~~（启动已通过；画面/触摸仍人工确认）。
+7. ~~烧录后的启动日志、触摸和 480×480 布局~~（启动/触摸已通过；背光/颜色仍待确认）。
