@@ -4,6 +4,7 @@
 
 void test_ascii_renderer_run(void);
 void test_builtin_themes_run(void);
+void test_command_table_run(void);
 void test_manifest_run(void);
 void test_motion_profiles_run(void);
 void test_runtime_helpers_run(void);
@@ -21,6 +22,7 @@ int main(void)
     printf("MeetAgent Terminal host tests\n");
     RUN(test_ascii_renderer_run);
     RUN(test_builtin_themes_run);
+    RUN(test_command_table_run);
     RUN(test_manifest_run);
     RUN(test_motion_profiles_run);
     RUN(test_runtime_helpers_run);

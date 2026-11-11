@@ -3,7 +3,7 @@
 日期：2026-11-11  
 范围：`firmware/terminal/` only  
 目标：Waveshare ESP32-S3-Touch-LCD-4 V4.0（ESP32-S3N16R8）  
-状态：**E4a Wi-Fi + E4b-1 WebSocket + E4b-2 事件 apply/replay 已验证；GT911 触摸已确认**；屏幕颜色/背光仍需人工确认
+状态：**E4a Wi-Fi + E4b-1 WebSocket + E4b-2 事件 apply/replay + E4b-3 安全命令链路已验证；GT911 触摸已确认**；屏幕颜色/背光仍需人工确认
 
 ## 1. 真机信息
 
@@ -256,7 +256,8 @@ idf.py flash: SUCCESS (exit 0)
 - [ ] 多点触控（BSP port 只注册 1 点）
 - [ ] 长时间运行、内存泄漏、FPS
 - [x] E4b-2 event apply / replay / sequence 去重
-- [ ] E3b LVGL 字符网格 / E4b-3 command/审批发送
+- [x] E4b-3 安全命令链路（session.list completed + action result）
+- [ ] E3b LVGL 字符网格 / interrupt/permission 真机链路
 
 ## 10. 风险
 
@@ -395,7 +396,7 @@ I (26244) touch_test: TOUCH release
 - `/status` 仍为 connected / node_reachable=true；STA 172.20.10.2
 - 无 panic/assert/OOM
 - E4b-1 只观察 event；`send_action` 未实现，只日志一次
-- E4b-2 已补齐 event apply/replay；command/审批与无效 token 重试留待 E4b-3
+- E4b-2 已补齐 event apply/replay；command gateway 在 E4b-3 实现，interrupt/permission 真机与无效 token 重试留待 E4b-4
 
 ### 11.8 E4b-1 review fixes（2026-11-11）
 
@@ -446,7 +447,7 @@ I (26244) touch_test: TOUCH release
   无 panic/assert/OOM。
 - 未做：真机 permission 审批、4Hz 高频压力、主动 sequence gap、心跳 3 次
   失联、无效 token + pairing retry、多 Agent 全局 active-first、UI 人工视觉确认。
-- 命令/审批发送仍属 E4b-3；`send_action` 未实现。
+- E4b-3 已实现安全命令发送；`send_action` 不支持 session.prompt，interrupt/permission 真机未验证。
 
 ### 11.10 E4b-2 并发修正（2026-11-11 review）
 
@@ -465,6 +466,27 @@ I (26244) touch_test: TOUCH release
   heartbeat 62/13 ms，无 panic/OOM。
 - Host：`make test` 974 checks；`syntax_check.sh` 32 files OK。
 - stop 竞态为代码审查修正，尚无真机 stop 入口压测。
+
+### 11.11 E4b-3 命令/审批发送（2026-11-11）
+
+- 新增纯逻辑 `command_table.c`：固定 4 条 pending command，支持 add/take、
+  15s 超时（wrap-safe）和断线 drain。
+- `net_client` 新增 `s_cmd_lock`，在 start 创建、cleanup 删除；命令 result 匹配
+  command_id，映射 completed/rejected/timeout/failed 到 ESPUI action result。
+- `send_action` 支持 interrupt / permission.respond / refresh(session.list)；
+  session/agent 只在 `s_model_lock` 内复制，释放后 build/send。不支持 prompt。
+- heartbeat 250ms tick 检查超时；WS 断开把未完成命令标记 FAILED connection
+  lost，不跨重连重试；app_main 回调 `espui_post_action_result()`。
+- 主机测试：**1024 checks, 0 failures**；syntax **33 files OK**。
+- 最终固件：1,255,696 B，SHA-256
+  `84374daa...b7891aac`，app 剩余 18%，DIRAM 200,247 B (58.59%)。
+- 临时诊断构建（hash `6448647b...`）发送一次 REFRESH_STATE：
+  `command result ... type=session.list status=completed sessions=42`，
+  app action result status=OK；诊断已移除，最终固件无触发逻辑。
+- 最终回归：welcome 49,958 B/10ms，snapshot 8/42 seq=218，
+  event #219–225 apply，heartbeat 61/12ms，无 panic/OOM。
+- 未验证：interrupt 真机、permission.respond 真机、超时/断线真实网络故障、
+  footer 视觉截图；均未强行构造或删除用户 session。
 
 ## 12. 仓库约束
 

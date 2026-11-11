@@ -131,5 +131,16 @@ meet_protocol_snapshot_t
 
 - 多 Node：ViewModel 需要节点集合，当前按“一个主 Node”实现；协议结构保留 `node_id`。
 - 更多 Agent/Session：优先提升固定上限或分页，不引入无界历史。
-- Event 增量：已按 sequence 去重；缺号当前仅告警，补偿/重连策略留待 E4b-3；
+- Event 增量：已按 sequence 去重；缺号当前仅告警，补偿/重连策略留待 E4b-4；
   Snapshot 重建时 ViewModel 容量不变。
+
+
+## 11. Action Result（E4b-3）
+
+- 命令发送从 ViewModel 复制 session/attention 的 id，然后释放 `s_model_lock`；
+  ViewModel 本身不记录 pending command。
+- 待处理命令表在 `components/networking/command_table.c`，由 `s_cmd_lock` 保护。
+- `command.result` / 超时 / 断线结果通过 `espui_action_result_t` 投递到 UI Task，
+  只更新 theme footer（ACK/ERR），不修改 Node/Agent/Session/Attention 业务态。
+- `session.list` 的返回只记录 sessions 数量用于诊断，不替换 ViewModel；全量状态仍以
+  welcome snapshot + event apply 为准。

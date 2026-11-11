@@ -1,5 +1,5 @@
 idf_component_register(
-    SRCS "net_client.c" "wifi_prov.c"
+    SRCS "net_client.c" "command_table.c" "wifi_prov.c"
     INCLUDE_DIRS "include"
     REQUIRES
         espui

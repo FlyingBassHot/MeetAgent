@@ -29,9 +29,24 @@ static esp_err_t send_action(const espui_action_t *action, void *user_ctx)
 
 static void on_net_state(meet_net_state_t state, void *user_ctx)
 {
-    (void)state; /* used by ESP_LOGI in the firmware build */
+    (void)state; /* host syntax stubs drop ESP_LOG arguments */
     (void)user_ctx;
     ESP_LOGI(TAG, "network state: %s", meet_net_state_name(state));
+}
+
+static void on_action_result(const espui_action_result_t *result,
+                             void *user_ctx)
+{
+    (void)user_ctx;
+    if (result == NULL) {
+        return;
+    }
+    ESP_LOGI(TAG, "action result: type=%s status=%d",
+             espui_action_type_name(result->action.type), (int)result->status);
+    esp_err_t err = espui_post_action_result(result);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "action result post failed: %s", esp_err_to_name(err));
+    }
 }
 
 static esp_err_t init_nvs(void)
@@ -104,6 +119,7 @@ void app_main(void)
     };
     meet_net_callbacks_t net_callbacks = {
         .on_state = on_net_state,
+        .on_action_result = on_action_result,
     };
     err = meet_net_client_init(&s_net, &net_config, &net_callbacks, NULL);
     if (err != ESP_OK) {
@@ -157,6 +173,6 @@ void app_main(void)
     }
 
     ESP_LOGI(TAG, "terminal scaffold running (LCD-4 BSP, mock state)");
-    ESP_LOGI(TAG, "Wi-Fi provisioning + Node WebSocket started (E4b-2)");
+    ESP_LOGI(TAG, "Wi-Fi provisioning + Node WebSocket started (E4b-3)");
     vTaskDelay(pdMS_TO_TICKS(10000));
 }

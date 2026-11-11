@@ -44,6 +44,7 @@ NON_PURE_SRCS := $(ESPUI)/core/espui.c $(ESPUI)/runtime/lvgl_renderer.c
 PURE_SRCS := \
 	$(filter-out $(NON_PURE_SRCS), $(ALL_ESPUI_SRCS)) \
 	$(wildcard $(COMPONENTS)/protocol/*.c) \
+	$(wildcard $(COMPONENTS)/networking/command_table.c) \
 	$(wildcard $(COMPONENTS)/state/state_adapter.c)
 
 TEST_SRCS := $(wildcard test_*.c) stubs/espui_runtime_stub.c

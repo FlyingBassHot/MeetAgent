@@ -197,7 +197,7 @@ capabilities: ui.compact, display.touch, input.button, input.encoder,
 - `net_client_stub.c` 已替换为真实 `net_client.c`。
 - `net_client` 等待 `meet_wifi_prov_get_status()` 为 connected 且 node_url 非空。
 - `http://host:port` → `ws://host:port/ws`；E4b-1 不支持 https。
-- `send_action` 仍未实现，只打印一次警告。
+- E4b-1 阶段 `send_action` 未实现；E4b-3 已实现 interrupt / permission.respond / session.list。
 
 ## 2. NVS 鉴权
 
@@ -258,7 +258,8 @@ memory        : internal_free=65,895 B, psram_free=6,516,920 B
 - [x] replay 重建后的后续事件 apply（seq 46–52 实测）
 - [ ] 连续 3 次 heartbeat 无回包触发重连（未主动断 WS）
 - [x] 事件 apply / sequence 去重（E4b-2 实测）
-- [ ] 命令/审批发送（E4b-3）
+- [x] 命令发送链路 / session.list 安全刷新（E4b-3）
+- [ ] interrupt / permission.respond 真机链路
 - [ ] 多客户端、权限撤销、token 轮换
 
 ## 4.1 2026-11-11 review fixes
@@ -295,7 +296,7 @@ memory        : internal_free=65,895 B, psram_free=6,516,920 B
 
 - event apply / replay / sequence 去重
 - snapshot session active-first 截断
-- command gateway（session.prompt / interrupt / permission.respond）留待 E4b-3
+- command gateway 已在 E4b-3 实现（interrupt / permission.respond / session.list）；session.prompt 不做
 - token 轮换/撤销、无效 token + pairing retry 验证
 - 多客户端一致性、WS 心跳失联强制测试
 
@@ -339,7 +340,7 @@ sequence <= adapter.last_sequence  → ignored_events++，ESP_OK
 - 事件序号：
   - `sequence <= last_sequence` 忽略（adapter 计数）；
   - 非连续但更大的序号打印 `sequence gap previous/current`，不强制重连
-    （E4b-3 再决定补偿/重连策略）；
+    （E4b-4 再决定补偿/重连策略）；
   - `s_last_sequence` 始终与 adapter 同步；WS 断开/退出时写 NVS。
 - `replay_truncated=1`：以 welcome snapshot 全量重建 ViewModel，更新
   `last_sequence`，后续新序号事件继续 apply；旧序号忽略。
@@ -386,7 +387,7 @@ heartbeat RTT=77/131 ms
 - 并发修正前构建（`2fbd2f25...`）启动验证：NVS `last_sequence=59`，
   welcome 37,812 B / 11 ms / 59 events，snapshot seq=59，heartbeat 53 ms。
 
-## 4. 未验证 / 留待 E4b-3
+## 4. 未验证 / 留待 E4b-4
 
 - 真机 permission.requested / permission.resolved（host tests 已覆盖）。
 - 高频事件下 4Hz 节流的压力/丢帧表现。
@@ -394,8 +395,7 @@ heartbeat RTT=77/131 ms
 - 连续 3 次 heartbeat 无回包强制重连。
 - 无效 token + 有效 pairing_code 自动重试。
 - 多 Agent 时的全局 active-first 截断（当前仅单 Agent 实测）。
-- UI 视觉更新需人工确认；命令/审批发送仍未实现，`send_action` 返回
-  `ESP_ERR_NOT_SUPPORTED`。
+- UI 视觉更新需人工确认；E4b-3 已实现安全命令发送，未实现 session.prompt。
 
 
 ## 5. 并发修正（2026-11-11 review）
@@ -443,3 +443,113 @@ heartbeat RTT=62/13 ms
 
 无 panic/assert/OOM；host tests 974 checks、syntax 32 files 均通过。
 stop 竞态修正目前为代码审查验证，尚无运行入口做真机 stop 压测。
+
+
+---
+
+# E4b-3：命令/审批发送（2026-11-11）
+
+## 1. Action → Command
+
+当前 `espui_action_t` 只有以下可发送动作，不扩展 prompt/text：
+
+| Action | Command | 必填字段 | Inner payload |
+|---|---|---|---|
+| `ESPUI_ACTION_INTERRUPT_SESSION` | `session.interrupt` | `session_id` + `agent_id` | `{}` |
+| `ESPUI_ACTION_RESPOND_PERMISSION` | `permission.respond` | `permission_id` + `session_id` + `agent_id` | `{permission_id, decision}` |
+| `ESPUI_ACTION_REFRESH_STATE` | `session.list` | 无（agent 省略） | `{}` |
+
+- `session_id` 来自 action（interrupt）或 Attention（permission）。
+- `agent_id` 从 ViewModel 中该 Session 取。
+- `s_model_lock` 只用于复制 id；释放后才 build/send，不在持锁路径发送。
+- 缺失/未知 session/agent/permission、WS 非 online、表满都返回明确
+  `esp_err_t` 并打印不含业务内容的日志。
+- 不实现 `session.prompt`，也不新增 UI 输入字段。
+
+命令外层：
+
+```json
+{
+  "schema_version": 1,
+  "type": "command",
+  "message_id": "msg-terminal-<uptime>-<counter>",
+  "payload": {
+    "schema_version": 1,
+    "command_id": "cmd-terminal-<uptime>-<counter>",
+    "agent_id": "opencode-main",
+    "session_id": "ses_...",
+    "type": "session.interrupt",
+    "payload": {}
+  }
+}
+```
+
+`command_id` / `message_id` 由 uptime + 单调 counter 生成，长度 < 64；发送前先登记
+待处理表，避免极快 result 先于登记。
+
+## 2. Pending table / result
+
+- `components/networking/command_table.c`：纯逻辑、无分配、固定 4 条。
+- `s_cmd_lock` 保护 `s_pending_commands`；start 创建、cleanup 删除。
+- 每条：`command_id` + `espui_action_t` + `sent_ms`。
+- `command.result` 按 `payload.command_id` 匹配并移除；重复/未知只告警。
+- 状态映射：
+  - `completed` → `ESPUI_ACTION_STATUS_OK`
+  - `rejected` → `REJECTED`
+  - `timeout` → `TIMEOUT`
+  - `failed` / other → `FAILED`
+- `message` 使用 result `error`；为空时使用 result status 文本。
+- `session.list` 的 `data.sessions` 数组长度写入日志（本次 42）。
+- heartbeat 250ms tick 检查 15s 超时；超时移除并回调 TIMEOUT。
+- WS 断开/stop 时 drain 未完成命令，回调 FAILED `connection lost`；不跨重连重试。
+- app_main 的 `on_action_result` 调用 `espui_post_action_result()`，theme footer
+  显示 `ACK // ...` / `ERR // ...`。
+
+## 3. 真机验证
+
+最终固件：
+
+```text
+size: 1,255,696 bytes (0x132910)
+sha256: 84374daaa18a1a4f661d72a8e96789a3449ddcab7458eb48cc72c3a7b7891aac
+app partition free: 0x446f0 (18%)
+DIRAM: 200,247 / 341,760 (58.59%)
+```
+
+安全命令使用临时诊断任务只在 WS online 后发送一次 `REFRESH_STATE`
+（诊断构建 hash `6448647b...`；测试后已移除，最终固件默认不触发）：
+
+```text
+command sent cmd=cmd-terminal-00000e0d-00000001 type=session.list agent=- session=-
+command result cmd=cmd-terminal-00000e0d-00000001 type=node.refresh status=completed sessions=42 duration_ms=0
+app_main: action result: type=node.refresh status=1
+heartbeat RTT=102 ms
+```
+
+最终固件回归（无诊断）：
+
+```text
+last_sequence=218
+welcome 49,958 B / 10 ms / 100 events
+snapshot agents=1 sessions=8/42 seq=218
+internal_free=64,823 B psram_free=6,514,984 B
+event #219 agent.status_changed  took_us=146
+event #220 session.status_changed took_us=239 active=1
+event #223 message.completed      took_us=86  alerts=1
+event #224 session.status_changed took_us=268 active=0
+event #225 agent.status_changed   took_us=281 active=0
+heartbeat RTT=61/12 ms
+```
+
+Host tests：`1024 checks, 0 failures`；`syntax_check.sh` 33 files OK。
+无 panic/assert/OOM。
+
+## 4. 未验证 / 风险
+
+- Interrupt 真机链路未构造运行中的 test session；未强行中断其他用户 session。
+- permission.respond 真机未触发（当前无 pending permission）；代码审查通过。
+- 15s 超时、断线 FAILED 的真实网络故障未构造；command table host tests 已覆盖
+  超时/回绕/drain 逻辑。
+- Footer 视觉未截图；已确认 action result 回调 status=OK 并进入 ESPUI 队列。
+- 未实现 session.prompt / 文本输入；`send_action` 仅支持上述三个 action。
+- WS 发送路径仍沿用现有 `send_text()` 保护；未新增独立 WS send 锁。
