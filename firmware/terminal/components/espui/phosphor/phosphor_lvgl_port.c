@@ -15,6 +15,7 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "lvgl.h"
+#include "glyph_dirty.h"
 #include "phosphor_demo.h"
 #include "phosphor_input_publisher.h"
 #include "phosphor_motion.h"
@@ -33,6 +34,7 @@ static lv_obj_t *s_overlay;
 static lv_obj_t *s_canvas;
 static phosphor_motion_state_t s_motion;
 static phosphor_state_resolver_t s_resolver;
+static glyph_dirty_state_t s_dirty;
 
 #define P3_DEMO_SWITCH_MS 6000u
 #define P3_IDLE_FPS 7u
@@ -43,14 +45,21 @@ static void phosphor_anim_task(void *arg)
     const espui_display_hal_t *display = (const espui_display_hal_t *)arg;
     phosphor_motion_init(&s_motion, PHOSPHOR_MODE_IDLE);
     phosphor_state_resolver_init(&s_resolver);
+    glyph_dirty_reset(&s_dirty);
     const int64_t start_us = esp_timer_get_time();
     uint32_t last_stats_ms = 0;
     uint32_t frames = 0;
     uint64_t render_us_total = 0;
+    uint64_t build_us_total = 0;
+    uint64_t raster_us_total = 0;
+    uint64_t invalidate_us_total = 0;
     uint64_t loop_us_total = 0;
     uint64_t period_us_total = 0;
     uint64_t last_frame_start_us = 0;
     uint32_t last_delay_ms = 0;
+    uint32_t last_bbox_w = 0;
+    uint32_t last_bbox_h = 0;
+    bool last_bbox_full = false;
     phosphor_demo_phase_t last_phase = (phosphor_demo_phase_t)-1;
     bool was_offline = false;
     uint32_t offline_start_ms = 0;
@@ -97,13 +106,47 @@ static void phosphor_anim_task(void *arg)
         }
 
         uint64_t render_start = esp_timer_get_time();
+        glyph_frame_t frame;
+        phosphor_scene_build_frame_visual(&frame, &s_motion, &visual);
+        uint64_t build_done_us = esp_timer_get_time();
+        glyph_dirty_bbox_t dirty;
+        bool changed = false;
         if (display->lock(1000) == ESP_OK) {
-            phosphor_scene_render_visual_rgb565(
-                s_canvas_buf, PHOSPHOR_CANVAS_W, PHOSPHOR_CANVAS_H,
-                &s_motion, &visual);
-            lv_obj_invalidate(s_canvas);
+            changed = glyph_dirty_render(
+                &s_dirty, &frame, s_canvas_buf, PHOSPHOR_CANVAS_W,
+                PHOSPHOR_CANVAS_H, phosphor_palette_default(), &dirty);
+            uint64_t raster_done_us = esp_timer_get_time();
+            last_bbox_w = (uint32_t)dirty.w;
+            last_bbox_h = (uint32_t)dirty.h;
+            last_bbox_full = dirty.full;
+            if (changed) {
+                uint32_t dirty_area =
+                    (uint32_t)dirty.w * (uint32_t)dirty.h;
+                if (dirty.full ||
+                    dirty_area * 100u >=
+                        (uint32_t)PHOSPHOR_CANVAS_W *
+                            PHOSPHOR_CANVAS_H * 70u) {
+                    lv_obj_invalidate(s_canvas);
+                } else if (dirty.w > 0 && dirty.h > 0) {
+                    lv_area_t area = {
+                        .x1 = dirty.x,
+                        .y1 = dirty.y,
+                        .x2 = dirty.x + dirty.w - 1,
+                        .y2 = dirty.y + dirty.h - 1,
+                    };
+                    lv_obj_invalidate_area(s_canvas, &area);
+                }
+            }
+            invalidate_us_total +=
+                (uint64_t)(esp_timer_get_time() - raster_done_us);
             display->unlock();
+            raster_us_total +=
+                (uint64_t)(raster_done_us - build_done_us);
+        } else {
+            raster_us_total +=
+                (uint64_t)(esp_timer_get_time() - build_done_us);
         }
+        build_us_total += (uint64_t)(build_done_us - render_start);
         uint64_t render_elapsed_us =
             (uint64_t)(esp_timer_get_time() - render_start);
         render_us_total += render_elapsed_us;
@@ -124,19 +167,34 @@ static void phosphor_anim_task(void *arg)
                                          : 0;
             ESP_LOGI(TAG,
                      "P4 anim stats state=%s activity=%d attention=%u "
-                     "frames=%u fps=%u render_avg_us=%u loop_avg_us=%u "
+                     "frames=%u fps=%u render_avg_us=%u "
+                     "build_avg_us=%u raster_avg_us=%u "
+                     "invalidate_avg_us=%u dirty_changed=%d dirty_cells=%d "
+                     "redraw_cells=%d bbox=%ux%u full=%d stack_hwm=%u "
+                     "loop_avg_us=%u "
                      "period_avg_us=%u delay=%u tick=%u internal_free=%u "
                      "psram_free=%u",
                      using_demo ? phosphor_demo_phase_name(phase) : "node",
                      (int)visual.activity, (unsigned)visual.attention,
                      (unsigned)frames,
-                     (unsigned)fps, avg_us, loop_avg_us, period_avg_us,
-                     (unsigned)last_delay_ms, (unsigned)configTICK_RATE_HZ,
+                     (unsigned)fps, avg_us,
+                     frames > 0 ? (unsigned)(build_us_total / frames) : 0,
+                     frames > 0 ? (unsigned)(raster_us_total / frames) : 0,
+                     frames > 0 ? (unsigned)(invalidate_us_total / frames) : 0,
+                     s_dirty.last_changed_cells, s_dirty.last_dirty_cells,
+                     s_dirty.last_redraw_cells, (unsigned)last_bbox_w,
+                     (unsigned)last_bbox_h, (int)last_bbox_full,
+                     (unsigned)uxTaskGetStackHighWaterMark(NULL), loop_avg_us,
+                     period_avg_us, (unsigned)last_delay_ms,
+                     (unsigned)configTICK_RATE_HZ,
                      (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
                      (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
             last_stats_ms = now_ms;
             frames = 0;
             render_us_total = 0;
+            build_us_total = 0;
+            raster_us_total = 0;
+            invalidate_us_total = 0;
             loop_us_total = 0;
             period_us_total = 0;
             last_frame_start_us = 0;

@@ -1,7 +1,9 @@
 #include <math.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "glyph_atlas.h"
+#include "glyph_dirty.h"
 #include "glyph_frame.h"
 #include "glyph_ramp.h"
 #include "glyph_rasterizer.h"
@@ -703,6 +705,169 @@ static void test_scene_nucleus_and_rasterizer(void)
     TEST_ASSERT_EQ_INT(phosphor_palette_default()->background, small[0]);
 }
 
+static void set_test_cell(glyph_frame_t *frame, int row, int col, char glyph)
+{
+    glyph_cell_t *cell = &frame->cells[row][col];
+    cell->glyph = glyph_atlas_index(glyph);
+    cell->color = (uint8_t)(GLYPH_COLOR_PRIMARY + (row + col) % 3);
+    cell->intensity = (uint8_t)(120 + (row * 7 + col * 11) % 136);
+    cell->flags = GLYPH_FLAG_FRONT;
+    cell->scale = 1;
+}
+
+static void test_dirty_rasterizer(void)
+{
+    const size_t bytes = (size_t)PHOSPHOR_CANVAS_W * PHOSPHOR_CANVAS_H *
+                         sizeof(uint16_t);
+    uint16_t *full = malloc(bytes);
+    uint16_t *dirty_pixels = malloc(bytes);
+    TEST_ASSERT_NOT_NULL(full);
+    TEST_ASSERT_NOT_NULL(dirty_pixels);
+
+    glyph_dirty_state_t state;
+    glyph_dirty_bbox_t bbox;
+    glyph_frame_t frame;
+    glyph_frame_clear(&frame);
+    glyph_dirty_reset(&state);
+
+    /* First frame is full, and produces an empty background exactly. */
+    bool changed = glyph_dirty_render(&state, &frame, dirty_pixels,
+                                      PHOSPHOR_CANVAS_W, PHOSPHOR_CANVAS_H,
+                                      phosphor_palette_default(), &bbox);
+    TEST_ASSERT_TRUE(changed);
+    TEST_ASSERT_TRUE(bbox.full);
+    glyph_rasterizer_render(&frame, full, PHOSPHOR_CANVAS_W,
+                            PHOSPHOR_CANVAS_H, phosphor_palette_default());
+    TEST_ASSERT_TRUE(memcmp(full, dirty_pixels, bytes) == 0);
+
+    /* Random multi-frame mutations, including empty cells and 2x Nucleus. */
+    uint32_t rng = 0x12345678u;
+    char glyphs[] = "ABC>_?!*#";
+    for (int step = 0; step < 80; ++step) {
+        for (int n = 0; n < 6; ++n) {
+            rng = rng * 1664525u + 1013904223u;
+            int row = (int)((rng >> 16) % PHOSPHOR_GRID_H);
+            int col = (int)((rng >> 8) % PHOSPHOR_GRID_W);
+            glyph_cell_t *cell = &frame.cells[row][col];
+            if ((rng & 1u) != 0) {
+                memset(cell, 0, sizeof(*cell));
+            } else {
+                cell->glyph = glyph_atlas_index(
+                    glyphs[(rng >> 4) % (sizeof(glyphs) - 1)]);
+                cell->color = (uint8_t)((rng >> 20) % GLYPH_COLOR_COUNT);
+                cell->intensity = (uint8_t)(1 + ((rng >> 12) % 255));
+                cell->flags = GLYPH_FLAG_FRONT;
+                cell->scale = 1;
+            }
+        }
+        if ((step % 3) == 0) {
+            glyph_cell_t *cell = &frame.cells[7][10];
+            cell->glyph = glyph_atlas_index('>');
+            cell->color = GLYPH_COLOR_HIGHLIGHT;
+            cell->intensity = 245;
+            cell->flags = GLYPH_FLAG_NUCLEUS;
+            cell->scale = 2;
+        }
+        if ((step % 3) == 1) {
+            glyph_cell_t *cell = &frame.cells[7][12];
+            cell->glyph = glyph_atlas_index('_');
+            cell->color = GLYPH_COLOR_HIGHLIGHT;
+            cell->intensity = 245;
+            cell->flags = GLYPH_FLAG_NUCLEUS;
+            cell->scale = 2;
+        }
+        changed = glyph_dirty_render(&state, &frame, dirty_pixels,
+                                     PHOSPHOR_CANVAS_W, PHOSPHOR_CANVAS_H,
+                                     phosphor_palette_default(), &bbox);
+        TEST_ASSERT_TRUE(changed);
+        glyph_rasterizer_render(&frame, full, PHOSPHOR_CANVAS_W,
+                                PHOSPHOR_CANVAS_H,
+                                phosphor_palette_default());
+        TEST_ASSERT_TRUE(memcmp(full, dirty_pixels, bytes) == 0);
+    }
+
+    /* Single-cell bbox + ghost removal. */
+    glyph_frame_clear(&frame);
+    glyph_dirty_reset(&state);
+    glyph_dirty_render(&state, &frame, dirty_pixels, PHOSPHOR_CANVAS_W,
+                       PHOSPHOR_CANVAS_H, phosphor_palette_default(), &bbox);
+    set_test_cell(&frame, 4, 5, 'A');
+    changed = glyph_dirty_render(&state, &frame, dirty_pixels,
+                                 PHOSPHOR_CANVAS_W, PHOSPHOR_CANVAS_H,
+                                 phosphor_palette_default(), &bbox);
+    TEST_ASSERT_TRUE(changed);
+    TEST_ASSERT_EQ_INT(5 * PHOSPHOR_CELL_W, bbox.x);
+    TEST_ASSERT_EQ_INT(4 * PHOSPHOR_CELL_H, bbox.y);
+    TEST_ASSERT_EQ_INT(PHOSPHOR_CELL_W, bbox.w);
+    TEST_ASSERT_EQ_INT(PHOSPHOR_CELL_H, bbox.h);
+    memset(&frame.cells[4][5], 0, sizeof(frame.cells[4][5]));
+    changed = glyph_dirty_render(&state, &frame, dirty_pixels,
+                                 PHOSPHOR_CANVAS_W, PHOSPHOR_CANVAS_H,
+                                 phosphor_palette_default(), &bbox);
+    TEST_ASSERT_TRUE(changed);
+    glyph_rasterizer_render(&frame, full, PHOSPHOR_CANVAS_W,
+                            PHOSPHOR_CANVAS_H, phosphor_palette_default());
+    TEST_ASSERT_TRUE(memcmp(full, dirty_pixels, bytes) == 0);
+    TEST_ASSERT_EQ_INT(phosphor_palette_default()->background,
+                       dirty_pixels[4 * PHOSPHOR_CELL_H * PHOSPHOR_CANVAS_W +
+                                    5 * PHOSPHOR_CELL_W]);
+
+    /* 2x Nucleus bbox and right/bottom clipping. */
+    glyph_frame_clear(&frame);
+    glyph_dirty_reset(&state);
+    glyph_dirty_render(&state, &frame, dirty_pixels, PHOSPHOR_CANVAS_W,
+                       PHOSPHOR_CANVAS_H, phosphor_palette_default(), &bbox);
+    glyph_cell_t *nucleus = &frame.cells[7][10];
+    nucleus->glyph = glyph_atlas_index('>');
+    nucleus->color = GLYPH_COLOR_HIGHLIGHT;
+    nucleus->intensity = 245;
+    nucleus->flags = GLYPH_FLAG_NUCLEUS;
+    nucleus->scale = 2;
+    changed = glyph_dirty_render(&state, &frame, dirty_pixels,
+                                 PHOSPHOR_CANVAS_W, PHOSPHOR_CANVAS_H,
+                                 phosphor_palette_default(), &bbox);
+    TEST_ASSERT_TRUE(changed);
+    TEST_ASSERT_EQ_INT(10 * PHOSPHOR_CELL_W, bbox.x);
+    TEST_ASSERT_EQ_INT(7 * PHOSPHOR_CELL_H, bbox.y);
+    TEST_ASSERT_EQ_INT(2 * PHOSPHOR_CELL_W, bbox.w);
+    TEST_ASSERT_EQ_INT(2 * PHOSPHOR_CELL_H, bbox.h);
+    glyph_rasterizer_render(&frame, full, PHOSPHOR_CANVAS_W,
+                            PHOSPHOR_CANVAS_H, phosphor_palette_default());
+    TEST_ASSERT_TRUE(memcmp(full, dirty_pixels, bytes) == 0);
+
+    glyph_frame_clear(&frame);
+    glyph_dirty_reset(&state);
+    glyph_dirty_render(&state, &frame, dirty_pixels, PHOSPHOR_CANVAS_W,
+                       PHOSPHOR_CANVAS_H, phosphor_palette_default(), &bbox);
+    glyph_cell_t *edge = &frame.cells[PHOSPHOR_GRID_H - 1][
+        PHOSPHOR_GRID_W - 1];
+    edge->glyph = glyph_atlas_index('#');
+    edge->color = GLYPH_COLOR_PRIMARY;
+    edge->intensity = 200;
+    edge->flags = GLYPH_FLAG_NUCLEUS;
+    edge->scale = 2;
+    changed = glyph_dirty_render(&state, &frame, dirty_pixels,
+                                 PHOSPHOR_CANVAS_W, PHOSPHOR_CANVAS_H,
+                                 phosphor_palette_default(), &bbox);
+    TEST_ASSERT_TRUE(changed);
+    TEST_ASSERT_TRUE(bbox.x + bbox.w <= PHOSPHOR_CANVAS_W);
+    TEST_ASSERT_TRUE(bbox.y + bbox.h <= PHOSPHOR_CANVAS_H);
+    glyph_rasterizer_render(&frame, full, PHOSPHOR_CANVAS_W,
+                            PHOSPHOR_CANVAS_H, phosphor_palette_default());
+    TEST_ASSERT_TRUE(memcmp(full, dirty_pixels, bytes) == 0);
+
+    /* No-op frame does not invalidate. */
+    changed = glyph_dirty_render(&state, &frame, dirty_pixels,
+                                 PHOSPHOR_CANVAS_W, PHOSPHOR_CANVAS_H,
+                                 phosphor_palette_default(), &bbox);
+    TEST_ASSERT_FALSE(changed);
+    TEST_ASSERT_EQ_INT(0, bbox.w);
+    TEST_ASSERT_EQ_INT(0, bbox.h);
+
+    free(full);
+    free(dirty_pixels);
+}
+
 void test_phosphor_run(void)
 {
     test_palette_rgb565();
@@ -719,4 +884,5 @@ void test_phosphor_run(void)
     test_core_motion();
     test_band_neighbors();
     test_scene_nucleus_and_rasterizer();
+    test_dirty_rasterizer();
 }

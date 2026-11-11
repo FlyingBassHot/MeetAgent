@@ -769,6 +769,23 @@ I (26244) touch_test: TOUCH release
 - Host：**3723 checks, 0 failures**；syntax **48 files OK**。
 - P5/P6 未开始；未 commit/push。
 
+### 11.28 PHOSPHOR P5 性能优化（2026-11-11）
+
+- 新增 `glyph_dirty.c/.h`：上一帧比较、cell footprint dirty（含 2× Nucleus）、
+  空 cell 清除、changed bbox、full/dirty 像素一致测试。
+- 平台改 partial `lv_obj_invalidate_area`；bbox ≥70% fallback full；
+  全量背景 32-bit 双像素填充；不再每帧全 canvas invalidate。
+- Host：**3966 checks, 0 failures**；随机 80 帧 full/dirty 一致；
+  2× Nucleus/边界/ghost/no-op 通过；syntax 51 files。
+- 实机 Idle final：7 FPS，render 15.9–21.1ms（build 3.9–4.1，
+  raster 11.9–16.9，invalidate 0.07），bbox 306–324，stack_hwm 1352。
+- Working real P6（soak 中 activity=1）：**10–11 FPS**，render 19.5–24.8ms
+  （build 4.4–4.9，raster 15.0–19.8），bbox 306–360；目标下限达成。
+- app-flash final：1,289,984 B，SHA-256 `9af8a962...ad3928`，
+  free 16%；final 恢复 P6 real ViewModel。
+- 2h soak 已启动，报告时约 18s；完整结果待继续观察，未宣称通过。
+- P5/P6 未改 Node/mobile/根文档；未 commit/push。
+
 ## 12. 仓库约束
 
 - 只修改 `firmware/terminal/`

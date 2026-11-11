@@ -6,7 +6,11 @@ SDL_CFLAGS := $(shell pkg-config --cflags sdl2)
 SDL_LIBS := $(shell pkg-config --libs sdl2)
 BUILD_DIR ?= build
 
-PURE_SRCS := $(filter-out $(PHOSPHOR)/phosphor_lvgl_port.c, $(wildcard $(PHOSPHOR)/*.c))
+PURE_SRCS := $(filter-out \
+	$(PHOSPHOR)/phosphor_lvgl_port.c \
+	$(PHOSPHOR)/phosphor_input_publisher.c \
+	$(PHOSPHOR)/phosphor_view_model_adapter.c, \
+	$(wildcard $(PHOSPHOR)/*.c))
 
 .PHONY: all run screenshot clean
 
