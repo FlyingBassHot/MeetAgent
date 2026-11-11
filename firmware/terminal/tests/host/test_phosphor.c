@@ -127,7 +127,8 @@ static void test_orbit_geometry(void)
     TEST_ASSERT_TRUE(NEAR(orbits[0].phase, 0.10f));
     TEST_ASSERT_TRUE(NEAR(orbits[1].phase, 1.90f));
     TEST_ASSERT_TRUE(NEAR(orbits[2].phase, 3.80f));
-    TEST_ASSERT_TRUE(orbits[0].samples >= 48);
+    TEST_ASSERT_TRUE(orbits[0].samples >= 80);
+    TEST_ASSERT_TRUE(orbits[0].samples <= 100);
     TEST_ASSERT_TRUE(orbits[2].samples >= 80);
     TEST_ASSERT_TRUE(orbits[2].samples <= 100);
 

@@ -617,6 +617,23 @@ I (26244) touch_test: TOUCH release
 - Host：**3619 checks, 0 failures**；syntax **45 files OK**。
 - P4 未开始。
 
+### 11.19 PHOSPHOR P3.2 外圈副带/Inner 密度（2026-11-11）
+
+- 删除零散外围 0/1 点；改为 Outer 连续内侧副带：半径 176、96 采样、
+  同 tilt/rotation/phase、warning 缺口；字符 `0/1/+/%`，
+  FIELD 优先级，Idle 135 / Working 195 强度，不覆盖主轨。
+- Inner 半径 80，采样 64→96；字符 `: ;` 为主、少量 `+`，强度 200；
+  Middle 不变。
+- 主 Outer 仍 96 采样、`+#%@01`、Working 300ms bucket。
+- 新截图 `p3_idle_v3.png` / `p3_working_v3.png`。
+- 最终固件：1,273,152 B，SHA-256 `fec42554...e6573`，app 剩余 17%，
+  DIRAM 204,423/341,760 (59.81%)。
+- 真机：internal_free 45,207→65,099 B，PSRAM ~6,133,324 B；
+  Idle 6–7 FPS，Working 7 FPS（仍低于 10–15 目标，P5 优化）；
+  无 panic/OOM，Wi-Fi/Node 在线。
+- Host：**3620 checks, 0 failures**；syntax **45 files OK**。
+- P4 未开始。
+
 ## 12. 仓库约束
 
 - 只修改 `firmware/terminal/`

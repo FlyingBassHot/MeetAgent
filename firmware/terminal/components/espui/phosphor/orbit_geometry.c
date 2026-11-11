@@ -9,7 +9,7 @@
 
 static const phosphor_orbit_t s_orbits[3] = {
     /* Inner: nearly horizontal/broad ellipse. */
-    {80.0f, 1.00f, -0.55f, 0.10f, 64},
+    {80.0f, 1.00f, -0.55f, 0.10f, 96},
     /* Middle: tilted to the upper right. */
     {140.0f, 0.25f, 0.85f, 1.90f, 64},
     /* Outer: tilted the other way; carries satellites. */

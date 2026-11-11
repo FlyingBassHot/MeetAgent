@@ -5,7 +5,6 @@
 
 #include "glyph_atlas.h"
 #include "glyph_ramp.h"
-#include "phosphor_lut.h"
 #include "glyph_rasterizer.h"
 #include "orbit_geometry.h"
 #include "phosphor_palette.h"
@@ -18,8 +17,9 @@
 
 static char inner_glyph(uint32_t i)
 {
-    static const char pattern[] = ".,:;";
-    return pattern[i % 4u];
+    /* Denser inner track: mostly :/; with an occasional +, no solid ring. */
+    static const char pattern[] = ";:;:;+;";
+    return pattern[i % 7u];
 }
 
 static char middle_glyph(uint32_t i, float dx, float dy)
@@ -220,45 +220,69 @@ static void draw_orbit(glyph_frame_t *frame,
     }
 }
 
-static void draw_binary_specks(glyph_frame_t *frame,
-                               const phosphor_motion_state_t *motion)
+static char sideband_glyph(uint32_t i,
+                           const phosphor_motion_state_t *motion)
 {
-    if (frame == NULL) {
-        return;
-    }
-    /* A few isolated 0/1 points in the 160..200 annulus. They are not a
-     * ring: fixed irregular angles/radii and field priority, so orbits win. */
-    static const float angles[8] = {
-        0.35f, 1.15f, 2.45f, 3.30f, 4.15f, 5.05f, 5.55f, 0.95f,
-    };
-    static const float radii[8] = {
-        166.0f, 184.0f, 176.0f, 198.0f, 170.0f, 190.0f, 162.0f, 194.0f,
-    };
-    uint8_t count = 4;
-    if (motion != NULL) {
-        count += (uint8_t)(motion->activity_energy * 4.0f);
-    }
-    if (count > 8) {
-        count = 8;
-    }
+    float mix = motion != NULL ? motion->mode_mix : 0.0f;
     uint32_t bucket = binary_bucket(motion);
-    for (uint8_t i = 0; i < count; ++i) {
-        uint32_t hash = binary_hash((i + 11u) * 0x9e3779b9u ^
-                                    (bucket + 7u) * 0x85ebca6bu ^
-                                    0x5a5a5a5au);
-        char glyph = (hash & 1u) ? '0' : '1';
-        float x = PHOSPHOR_CX + phosphor_lut_cos(angles[i]) * radii[i];
-        float y = PHOSPHOR_CY + phosphor_lut_sin(angles[i]) * radii[i];
-        uint8_t col = 0;
-        uint8_t row = 0;
-        if (!phosphor_point_to_cell(x, y, &col, &row)) {
-            continue;
+    uint32_t hash = binary_hash((i + 31u) * 0x9e3779b9u ^
+                                (bucket + 5u) * 0x85ebca6bu ^
+                                0x3c3c3c3cu);
+    uint32_t threshold = 25u + (uint32_t)(mix * 20.0f); /* 25..45% 0/1 */
+    if (hash % 100u < threshold) {
+        return (hash & 0x80000000u) ? '0' : '1';
+    }
+    return (hash & 0x40000000u) ? '+' : '%';
+}
+
+static void draw_outer_sideband(glyph_frame_t *frame,
+                                const phosphor_motion_state_t *motion,
+                                float warning_angle)
+{
+    /* Continuous inner companion of the outer ellipse (~1 cell inward).
+     * FIELD priority means it can never cover the main Outer/Middle cells. */
+    phosphor_orbit_t band = phosphor_orbit_defaults()[2];
+    band.radius = 176.0f;
+    band.samples = 96;
+    float phase_offset = motion != NULL ? motion->orbit_phase[2] : 0.0f;
+    float mix = motion != NULL ? motion->mode_mix : 0.0f;
+    uint8_t intensity = (uint8_t)(135.0f + 60.0f * mix);
+
+    for (uint32_t i = 0; i < band.samples; ++i) {
+        float t0 = band.phase + phase_offset +
+                   PHOSPHOR_TWO_PI * (float)i / (float)band.samples;
+        float t1 = band.phase + phase_offset +
+                   PHOSPHOR_TWO_PI * (float)(i + 1) /
+                       (float)band.samples;
+        if (in_gap(t0, warning_angle, PHOSPHOR_OUTER_GAP_HALF_WIDTH) ||
+            in_gap(t1, warning_angle, PHOSPHOR_OUTER_GAP_HALF_WIDTH)) {
+            continue; /* Same warning gap as the main outer orbit. */
         }
-        glyph_frame_set(frame, col, row, glyph_atlas_index(glyph),
-                        (i & 1u) ? GLYPH_COLOR_MUTED
-                                 : GLYPH_COLOR_SECONDARY,
-                        (uint8_t)(75u + (hash % 35u)),
-                        GLYPH_FLAG_FIELD);
+        phosphor_point_t p0;
+        phosphor_point_t p1;
+        phosphor_orbit_point(&band, t0, PHOSPHOR_CX, PHOSPHOR_CY, &p0);
+        phosphor_orbit_point(&band, t1, PHOSPHOR_CX, PHOSPHOR_CY, &p1);
+        float dx = p1.x - p0.x;
+        float dy = p1.y - p0.y;
+        float cells_x = fabsf(dx) / PHOSPHOR_CELL_W;
+        float cells_y = fabsf(dy) / PHOSPHOR_CELL_H;
+        int steps = (int)(fmaxf(cells_x, cells_y) * 2.0f) + 1;
+        if (steps > 12) {
+            steps = 12;
+        }
+        char glyph = sideband_glyph(i, motion);
+        for (int step = 0; step < steps; ++step) {
+            float t = (float)step / (float)steps;
+            uint8_t col = 0;
+            uint8_t row = 0;
+            if (!phosphor_point_to_cell(p0.x + dx * t, p0.y + dy * t,
+                                        &col, &row)) {
+                continue;
+            }
+            glyph_frame_set(frame, col, row, glyph_atlas_index(glyph),
+                            GLYPH_COLOR_SECONDARY, intensity,
+                            GLYPH_FLAG_FIELD);
+        }
     }
 }
 
@@ -307,11 +331,11 @@ void phosphor_scene_build_frame_motion(glyph_frame_t *frame,
                                                : 3.75f;
 
     draw_core_density(frame, motion);
-    draw_binary_specks(frame, motion);
     const phosphor_orbit_t *orbits = phosphor_orbit_defaults();
     for (int i = 0; i < 3; ++i) {
         draw_orbit(frame, motion, &orbits[i], i, warning_angle);
     }
+    draw_outer_sideband(frame, motion, warning_angle);
     draw_activity_particles(frame, motion);
 
     for (uint8_t i = 0; i < satellites.count; ++i) {
