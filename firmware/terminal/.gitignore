@@ -8,3 +8,5 @@ dependencies.lock
 *.bin
 *.elf
 *.map
+
+tools/phosphor_sim/build/

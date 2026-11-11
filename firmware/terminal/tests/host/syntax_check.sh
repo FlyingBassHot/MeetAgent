@@ -22,6 +22,7 @@ CFLAGS=(
     -I"${ESPUI}/hal"
     -I"${ESPUI}/themes"
     -I"${ESPUI}/themes/terminal_aesthetic/renderers"
+    -I"${ESPUI}/phosphor"
     -I"${COMPONENTS}/protocol/include"
     -I"${COMPONENTS}/state/include"
     -I"${COMPONENTS}/networking/include"
@@ -33,7 +34,8 @@ CFLAGS=(
 mapfile -t files < <(find "${COMPONENTS}" ../../main -name '*.c' \
     ! -path '*/main/board_lcd4.c' \
     ! -path '*/components/networking/wifi_prov.c' \
-    ! -path '*/components/networking/net_client.c' | sort)
+    ! -path '*/components/networking/net_client.c' \
+    ! -path '*/components/espui/phosphor/phosphor_lvgl_port.c' | sort)
 for file in "${files[@]}"; do
     echo "[syntax] ${file}"
     "${CC}" "${CFLAGS[@]}" "${file}"

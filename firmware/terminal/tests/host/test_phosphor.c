@@ -1,0 +1,249 @@
+#include <math.h>
+#include <string.h>
+
+#include "glyph_atlas.h"
+#include "glyph_frame.h"
+#include "glyph_rasterizer.h"
+#include "orbit_geometry.h"
+#include "phosphor_palette.h"
+#include "phosphor_scene.h"
+#include "radial_field.h"
+#include "satellite_layout.h"
+#include "test_assert.h"
+
+#define NEAR(a, b) (fabsf((a) - (b)) < 0.001f)
+
+static void test_palette_rgb565(void)
+{
+    const phosphor_palette_t *palette = phosphor_palette_default();
+    TEST_ASSERT_NOT_NULL(palette);
+    TEST_ASSERT_EQ_INT(0x0861, phosphor_rgb565_from_hex(0x080C0A));
+    TEST_ASSERT_EQ_INT(0x10C2, phosphor_rgb565_from_hex(0x101813));
+    TEST_ASSERT_EQ_INT(0xA78D, phosphor_rgb565_from_hex(0xA7F36B));
+    TEST_ASSERT_EQ_INT(0x6633, phosphor_rgb565_from_hex(0x62C79B));
+    TEST_ASSERT_EQ_INT(0x5B8C, phosphor_rgb565_from_hex(0x587364));
+    TEST_ASSERT_EQ_INT(0xF5AB, phosphor_rgb565_from_hex(0xF2B75E));
+    TEST_ASSERT_EQ_INT(0xF36C, phosphor_rgb565_from_hex(0xF06C67));
+    TEST_ASSERT_EQ_INT(0xDFF8, phosphor_rgb565_from_hex(0xD9FFC3));
+
+    TEST_ASSERT_EQ_INT(0x0861, palette->background);
+    TEST_ASSERT_EQ_INT(0xA78D, palette->primary);
+    TEST_ASSERT_EQ_INT(0xF5AB, palette->warning);
+    TEST_ASSERT_EQ_INT(0xF36C, palette->error);
+    TEST_ASSERT_EQ_INT(0xA78D,
+                       phosphor_color565(palette, GLYPH_COLOR_PRIMARY));
+    TEST_ASSERT_EQ_INT(0xF36C, phosphor_color565(NULL, GLYPH_COLOR_ERROR));
+    TEST_ASSERT_EQ_INT(0x0000, phosphor_scale565(0xA78D, 0));
+    TEST_ASSERT_EQ_INT(0xA78D, phosphor_scale565(0xA78D, 255));
+    TEST_ASSERT_TRUE(phosphor_scale565(0xA78D, 128) < 0xA78D);
+}
+
+static void test_glyph_atlas_coverage(void)
+{
+    TEST_ASSERT_EQ_INT(18, PHOSPHOR_CELL_W);
+    TEST_ASSERT_EQ_INT(27, PHOSPHOR_CELL_H);
+    TEST_ASSERT_EQ_INT(24, PHOSPHOR_GRID_W);
+    TEST_ASSERT_EQ_INT(16, PHOSPHOR_GRID_H);
+    TEST_ASSERT_EQ_INT(432, PHOSPHOR_CANVAS_W);
+    const char *required = " .,:-=+*#%@/\\|<>^v;[]{}?_!o";
+    for (size_t i = 0; required[i] != '\0'; ++i) {
+        TEST_ASSERT_TRUE(glyph_atlas_contains(required[i]));
+    }
+    TEST_ASSERT_FALSE(glyph_atlas_contains('M'));
+    TEST_ASSERT_EQ_INT(' ', glyph_atlas_char_at(0));
+    uint8_t greater_bits = 0;
+    uint8_t underscore_bits = 0;
+    for (int y = 0; y < GLYPH_ATLAS_H; ++y) {
+        for (int x = 0; x < GLYPH_ATLAS_W; ++x) {
+            TEST_ASSERT_FALSE(glyph_atlas_pixel(0, (uint8_t)x, (uint8_t)y));
+            greater_bits |= glyph_atlas_pixel(glyph_atlas_index('>'),
+                                               (uint8_t)x, (uint8_t)y);
+            underscore_bits |= glyph_atlas_pixel(glyph_atlas_index('_'),
+                                                  (uint8_t)x, (uint8_t)y);
+        }
+    }
+    TEST_ASSERT_TRUE(greater_bits != 0);
+    TEST_ASSERT_TRUE(underscore_bits != 0);
+}
+
+static void test_orbit_geometry(void)
+{
+    const phosphor_orbit_t *orbits = phosphor_orbit_defaults();
+    TEST_ASSERT_NOT_NULL(orbits);
+    TEST_ASSERT_TRUE(NEAR(orbits[0].radius, 80.0f));
+    TEST_ASSERT_TRUE(NEAR(orbits[1].radius, 140.0f));
+    TEST_ASSERT_TRUE(NEAR(orbits[2].radius, 192.0f));
+    TEST_ASSERT_TRUE(NEAR(orbits[0].tilt, 1.00f));
+    TEST_ASSERT_TRUE(NEAR(orbits[1].tilt, 0.25f));
+    TEST_ASSERT_TRUE(NEAR(orbits[2].tilt, 1.30f));
+    TEST_ASSERT_TRUE(NEAR(orbits[0].rotation, -0.55f));
+    TEST_ASSERT_TRUE(NEAR(orbits[1].rotation, 0.85f));
+    TEST_ASSERT_TRUE(NEAR(orbits[2].rotation, -0.65f));
+    TEST_ASSERT_TRUE(NEAR(orbits[0].phase, 0.10f));
+    TEST_ASSERT_TRUE(NEAR(orbits[1].phase, 1.90f));
+    TEST_ASSERT_TRUE(NEAR(orbits[2].phase, 3.80f));
+    TEST_ASSERT_TRUE(orbits[0].samples >= 48);
+    TEST_ASSERT_TRUE(orbits[2].samples <= 72);
+
+    for (int o = 0; o < 3; ++o) {
+        for (int i = 0; i < 64; ++i) {
+            float theta = (float)i * 6.2831853f / 64.0f;
+            phosphor_point_t p;
+            phosphor_orbit_point(&orbits[o], theta, 216.0f, 216.0f, &p);
+            TEST_ASSERT_TRUE(p.x >= 8.0f && p.x <= 424.0f);
+            TEST_ASSERT_TRUE(p.y >= 8.0f && p.y <= 424.0f);
+        }
+    }
+
+    float dx = 0.0f;
+    float dy = 0.0f;
+    phosphor_orbit_tangent(&orbits[0], 0.0f, &dx, &dy);
+    TEST_ASSERT_TRUE(fabsf(dx) + fabsf(dy) > 0.0f);
+    TEST_ASSERT_EQ_INT('-', phosphor_orbit_glyph(1.0f, 0.0f));
+    TEST_ASSERT_EQ_INT('|', phosphor_orbit_glyph(0.0f, 1.0f));
+    TEST_ASSERT_TRUE(phosphor_orbit_glyph(1.0f, 1.0f) != '-');
+    TEST_ASSERT_TRUE(phosphor_orbit_glyph(1.0f, 1.0f) != '|');
+
+    uint8_t col = 99;
+    uint8_t row = 99;
+    TEST_ASSERT_TRUE(phosphor_point_to_cell(0.0f, 0.0f, &col, &row));
+    TEST_ASSERT_EQ_INT(0, col);
+    TEST_ASSERT_EQ_INT(0, row);
+    TEST_ASSERT_TRUE(phosphor_point_to_cell(431.0f, 431.0f, &col, &row));
+    TEST_ASSERT_EQ_INT(23, col);
+    TEST_ASSERT_EQ_INT(15, row);
+    TEST_ASSERT_FALSE(phosphor_point_to_cell(-1.0f, 0.0f, &col, &row));
+    TEST_ASSERT_FALSE(phosphor_point_to_cell(0.0f, 432.0f, &col, &row));
+}
+
+static void test_radial_field(void)
+{
+    TEST_ASSERT_TRUE(NEAR(phosphor_smooth_falloff(0.0f, 10.0f), 1.0f));
+    TEST_ASSERT_TRUE(NEAR(phosphor_smooth_falloff(10.0f, 10.0f), 0.0f));
+    TEST_ASSERT_TRUE(NEAR(phosphor_smooth_falloff(20.0f, 10.0f), 0.0f));
+    TEST_ASSERT_EQ_INT(' ', phosphor_intensity_to_char(0.0f));
+    TEST_ASSERT_EQ_INT('@', phosphor_intensity_to_char(1.0f));
+    TEST_ASSERT_EQ_INT(' ', phosphor_intensity_to_char(-1.0f));
+    TEST_ASSERT_EQ_INT('@', phosphor_intensity_to_char(2.0f));
+
+    glyph_frame_t frame;
+    glyph_frame_clear(&frame);
+    phosphor_radial_field_apply(&frame, 216.0f, 216.0f, 0.0f, 45.0f, 120,
+                                GLYPH_COLOR_SECONDARY);
+    bool found = false;
+    for (int r = 0; r < PHOSPHOR_GRID_H; ++r) {
+        for (int c = 0; c < PHOSPHOR_GRID_W; ++c) {
+            if (frame.cells[r][c].glyph != 0) {
+                found = true;
+            }
+        }
+    }
+    TEST_ASSERT_TRUE(found);
+}
+
+static void test_satellite_layout(void)
+{
+    phosphor_satellite_layout_t layout;
+    phosphor_satellite_layout_static(&layout);
+    TEST_ASSERT_EQ_INT(2, layout.count);
+    TEST_ASSERT_EQ_INT(PHOSPHOR_SATELLITE_RUNNING, layout.items[0].status);
+    TEST_ASSERT_EQ_INT(PHOSPHOR_SATELLITE_WARNING, layout.items[1].status);
+    TEST_ASSERT_TRUE(!NEAR(layout.items[0].angle, layout.items[1].angle));
+
+    const phosphor_orbit_t *orbits = phosphor_orbit_defaults();
+    uint8_t c0 = 0;
+    uint8_t r0 = 0;
+    uint8_t c1 = 0;
+    uint8_t r1 = 0;
+    TEST_ASSERT_TRUE(phosphor_satellite_cell(&orbits[2], &layout.items[0],
+                                            216.0f, 216.0f, &c0, &r0));
+    TEST_ASSERT_TRUE(phosphor_satellite_cell(&orbits[2], &layout.items[1],
+                                            216.0f, 216.0f, &c1, &r1));
+    TEST_ASSERT_TRUE(c0 != c1 || r0 != r1);
+    float x = (float)c0 * PHOSPHOR_CELL_W + PHOSPHOR_CELL_W / 2.0f;
+    float y = (float)r0 * PHOSPHOR_CELL_H + PHOSPHOR_CELL_H / 2.0f;
+    float d = sqrtf((x - 216.0f) * (x - 216.0f) +
+                    (y - 216.0f) * (y - 216.0f));
+    TEST_ASSERT_TRUE(d > 80.0f);
+}
+
+static void test_glyph_frame_priority(void)
+{
+    glyph_frame_t frame;
+    glyph_frame_clear(&frame);
+    uint8_t col = 0;
+    uint8_t row = 0;
+    TEST_ASSERT_FALSE(phosphor_point_to_cell(-1.0f, 0.0f, &col, &row));
+
+    TEST_ASSERT_TRUE(glyph_frame_set(&frame, 1, 1, glyph_atlas_index('-'),
+                                     GLYPH_COLOR_MUTED, 80,
+                                     GLYPH_FLAG_BACK));
+    TEST_ASSERT_TRUE(glyph_frame_set(&frame, 1, 1, glyph_atlas_index('='),
+                                     GLYPH_COLOR_SECONDARY, 100,
+                                     GLYPH_FLAG_FRONT));
+    TEST_ASSERT_EQ_INT(glyph_atlas_index('='), frame.cells[1][1].glyph);
+    TEST_ASSERT_FALSE(glyph_frame_set(&frame, 1, 1, glyph_atlas_index('+'),
+                                      GLYPH_COLOR_MUTED, 255,
+                                      GLYPH_FLAG_BACK));
+    TEST_ASSERT_EQ_INT(glyph_atlas_index('='), frame.cells[1][1].glyph);
+
+    TEST_ASSERT_TRUE(glyph_frame_set(&frame, 1, 1, glyph_atlas_index('?'),
+                                     GLYPH_COLOR_WARNING, 255,
+                                     GLYPH_FLAG_SATELLITE));
+    TEST_ASSERT_TRUE(glyph_frame_set(&frame, 1, 1, glyph_atlas_index('>'),
+                                     GLYPH_COLOR_HIGHLIGHT, 255,
+                                     GLYPH_FLAG_NUCLEUS));
+    TEST_ASSERT_FALSE(glyph_frame_set(&frame, 1, 1, glyph_atlas_index('!'),
+                                      GLYPH_COLOR_ERROR, 255,
+                                      GLYPH_FLAG_SATELLITE));
+    TEST_ASSERT_EQ_INT(glyph_atlas_index('>'), frame.cells[1][1].glyph);
+    TEST_ASSERT_EQ_INT(GLYPH_FLAG_NUCLEUS, frame.cells[1][1].flags);
+    TEST_ASSERT_FALSE(glyph_frame_set(&frame, PHOSPHOR_GRID_W, 0,
+                                      glyph_atlas_index('.'), GLYPH_COLOR_MUTED,
+                                      1, GLYPH_FLAG_FIELD));
+}
+
+static void test_scene_nucleus_and_rasterizer(void)
+{
+    glyph_frame_t frame;
+    phosphor_scene_build_frame(&frame);
+    const glyph_cell_t *n1 = &frame.cells[PHOSPHOR_NUCLEUS_ROW]
+                                        [PHOSPHOR_NUCLEUS_COL];
+    const glyph_cell_t *n2 = &frame.cells[PHOSPHOR_NUCLEUS_ROW]
+                                        [PHOSPHOR_NUCLEUS_COL + 2];
+    TEST_ASSERT_TRUE(n1->glyph != 0);
+    TEST_ASSERT_TRUE(n2->glyph != 0);
+    TEST_ASSERT_EQ_INT(GLYPH_FLAG_NUCLEUS, n1->flags);
+    TEST_ASSERT_EQ_INT(GLYPH_FLAG_NUCLEUS, n2->flags);
+    TEST_ASSERT_EQ_INT(2, n1->scale);
+    TEST_ASSERT_EQ_INT(2, n2->scale);
+
+    uint16_t pixels[PHOSPHOR_CANVAS_W * PHOSPHOR_CANVAS_H];
+    phosphor_scene_render_rgb565(pixels, PHOSPHOR_CANVAS_W,
+                                 PHOSPHOR_CANVAS_H);
+    TEST_ASSERT_EQ_INT(phosphor_palette_default()->background, pixels[0]);
+
+    bool non_background = false;
+    for (size_t i = 0; i < sizeof(pixels) / sizeof(pixels[0]); ++i) {
+        if (pixels[i] != phosphor_palette_default()->background) {
+            non_background = true;
+            break;
+        }
+    }
+    TEST_ASSERT_TRUE(non_background);
+
+    uint16_t small[4] = {0};
+    phosphor_scene_render_rgb565(small, 1, 1);
+    TEST_ASSERT_EQ_INT(phosphor_palette_default()->background, small[0]);
+}
+
+void test_phosphor_run(void)
+{
+    test_palette_rgb565();
+    test_glyph_atlas_coverage();
+    test_orbit_geometry();
+    test_radial_field();
+    test_satellite_layout();
+    test_glyph_frame_priority();
+    test_scene_nucleus_and_rasterizer();
+}

@@ -6,6 +6,7 @@ void test_ascii_renderer_run(void);
 void test_builtin_themes_run(void);
 void test_command_table_run(void);
 void test_manifest_run(void);
+void test_phosphor_run(void);
 void test_motion_profiles_run(void);
 void test_runtime_helpers_run(void);
 void test_scene_manager_run(void);
@@ -24,6 +25,7 @@ int main(void)
     RUN(test_builtin_themes_run);
     RUN(test_command_table_run);
     RUN(test_manifest_run);
+    RUN(test_phosphor_run);
     RUN(test_motion_profiles_run);
     RUN(test_runtime_helpers_run);
     RUN(test_scene_manager_run);

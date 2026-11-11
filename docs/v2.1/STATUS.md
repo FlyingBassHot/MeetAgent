@@ -7,7 +7,7 @@
 | Core / Node | 主会话 | M0 + M1 + M4 Core | 完成；审计/限流/重连边界加固 | M6 可选增强 |
 | Protocol v2 | 主会话 | M0 | 完成 | 随实现补兼容测试 |
 | Mobile | omp | M5b + UX P0/P1/P2 | 视觉与原生交互改造完成（信息层级/聊天流/触感/键盘/返回键/下拉刷新/视觉打磨） | iOS/Release |
-| Terminal / ESPUI | pi | E0–E3a + LCD-4 Bring-up + E4a + E4b-1/2/3 | 真机启动成功；Wi-Fi STA 172.20.10.2；Node WS snapshot + 事件 apply/replay + command 链路、token NVS、心跳与重连已验证 | interrupt/permission 实机、AP portal `/save`、PHOSPHOR 待批准 |
+| Terminal / ESPUI | pi | E0–E3a + LCD-4 Bring-up + E4a + E4b-1/2/3 + PHOSPHOR P1 | 真机启动成功；Wi-Fi/WS/事件/命令链路已验证；PHOSPHOR P1 静态 Core 已上屏（24×16/18×27、432 canvas、三轨+2× `>_`） | P2 密度/颜色、interrupt/permission 实机、AP portal `/save` |
 | Cloud relay | 主会话 | 可选 | 保留 V1 实现 | M6 再验证混合模式 |
 
 ## 已完成
@@ -31,6 +31,7 @@
 - Terminal E4b-1（2026-11-11）：Node WebSocket hello/welcome/snapshot 已通；50KB welcome 在 PSRAM 中剥离 events 后解析（10ms）；token 写入 NVS，重启仅用 token 重连；heartbeat RTT 约 50–60ms；Node 重启后自动重连并以 snapshot 重建；events apply/命令留 E4b-2
 - Terminal E4b-2（2026-11-11）：真实事件 apply 到 ViewModel；session/agent/permission 状态、active 计数、completion/error 计数随事件更新；sequence 去重/旧事件忽略；Node 重启 `replay_truncated=1` 用 snapshot 重建；host tests 974/974；命令/审批留 E4b-3
 - Terminal E4b-3（2026-11-11）：command gateway 安全链路已验证（`REFRESH_STATE → session.list` completed，42 sessions，footer ACK）；interrupt/permission.respond 代码完成、pending 表/15s 超时/断线 failed 已接入；host tests 1024/1024；interrupt/permission 尚未安全实机测试
+- Terminal PHOSPHOR P1（2026-11-11）：P0 审计 + P1 静态 Core 已上屏；24×16 网格 / 18×27 Bold+dilate / 432×432 canvas / 三条不同轨道 / 2× `>_` / `*` + `?` satellites；PC SDL golden screenshot 与 ESP32 实机同源；host tests 2013/2013；P2 密度/颜色待做
 - Terminal 硬件目标确定为 **Waveshare ESP32-S3-Touch-LCD-4 V4**（480×480 RGB LCD + GT911 + CH32V003 helper）；真实 BSP 已接入，显示/触摸方向/PSRAM 待实物验证
 
 ## 真实联调（主会话）

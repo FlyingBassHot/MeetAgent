@@ -27,6 +27,16 @@ idf_component_register(
         "themes/terminal_aesthetic/renderers/ascii_canvas.c"
         "themes/terminal_aesthetic/renderers/ascii_renderer.c"
 
+        "phosphor/glyph_atlas.c"
+        "phosphor/glyph_frame.c"
+        "phosphor/glyph_rasterizer.c"
+        "phosphor/orbit_geometry.c"
+        "phosphor/phosphor_palette.c"
+        "phosphor/phosphor_scene.c"
+        "phosphor/radial_field.c"
+        "phosphor/satellite_layout.c"
+        "phosphor/phosphor_lvgl_port.c"
+
         "hal/board_stub.c"
         "hal/display_stub.c"
         "hal/input_stub.c"
@@ -40,6 +50,7 @@ idf_component_register(
         "hal"
         "themes"
         "themes/terminal_aesthetic/renderers"
+        "phosphor"
     PRIV_REQUIRES
         esp_timer
         lvgl

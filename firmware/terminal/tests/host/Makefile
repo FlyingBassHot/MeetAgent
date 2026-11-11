@@ -24,6 +24,7 @@ INC := -Istubs \
        -I$(ESPUI)/hal \
        -I$(ESPUI)/themes \
        -I$(ESPUI)/themes/terminal_aesthetic/renderers \
+       -I$(ESPUI)/phosphor \
        -I$(COMPONENTS)/protocol/include \
        -I$(COMPONENTS)/state/include \
        -I$(COMPONENTS)/networking/include
@@ -43,6 +44,7 @@ NON_PURE_SRCS := $(ESPUI)/core/espui.c $(ESPUI)/runtime/lvgl_renderer.c
 
 PURE_SRCS := \
 	$(filter-out $(NON_PURE_SRCS), $(ALL_ESPUI_SRCS)) \
+	$(filter-out $(ESPUI)/phosphor/phosphor_lvgl_port.c, $(wildcard $(ESPUI)/phosphor/*.c)) \
 	$(wildcard $(COMPONENTS)/protocol/*.c) \
 	$(wildcard $(COMPONENTS)/networking/command_table.c) \
 	$(wildcard $(COMPONENTS)/state/state_adapter.c)
@@ -74,14 +76,14 @@ test: $(TEST_BIN)
 
 $(TEST_BIN): $(PURE_SRCS) $(TEST_SRCS)
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) $(INC) $^ -o $@
+	$(CC) $(CFLAGS) $(INC) $^ -o $@ -lm
 
 preview: $(PREVIEW_BIN)
 	./$(PREVIEW_BIN) $(STATE) $(FRAMES) $(DELAY)
 
 $(PREVIEW_BIN): $(ASCII_PREVIEW_SRCS)
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) $(INC) $^ -o $@
+	$(CC) $(CFLAGS) $(INC) $^ -o $@ -lm
 
 syntax:
 	./syntax_check.sh

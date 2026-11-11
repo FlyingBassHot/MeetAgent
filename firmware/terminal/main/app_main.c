@@ -16,6 +16,7 @@
 #include "board_lcd4.h"
 #include "mock_state.h"
 #include "net_client.h"
+#include "phosphor_lvgl_port.h"
 #include "wifi_prov.h"
 #include "nvs_flash.h"
 
@@ -153,6 +154,12 @@ void app_main(void)
         ESP_LOGE(TAG, "ESPUI start failed: %s", esp_err_to_name(err));
         (void)espui_stop();
         return;
+    }
+
+    err = phosphor_lvgl_port_init(board->display);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "PHOSPHOR P1 overlay not started: %s",
+                 esp_err_to_name(err));
     }
 
     err = meet_mock_state_start(3000);

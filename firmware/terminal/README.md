@@ -16,15 +16,16 @@
 - E4b-1：真实 Node WebSocket、pairing_code→token、welcome/snapshot、heartbeat、自动重连
 - E4b-2：真实事件 apply、sequence 去重、replay 重建、4Hz ViewModel 节流、active-first session 截断
 - E4b-3：command gateway、pending command 表、15s 超时、断线失败、session.list 安全刷新、action result → footer
+- PHOSPHOR P0/P1/P1.1/P1.2/P1.3：审计、24×16 Glyph Frame、三轨 Orbit、2× Nucleus、Satellite、18×27 Bold Atlas、SDL2 静态截图、ESP32 432 canvas overlay
 
 已验证：
 
 - **真机 bring-up 成功（2026-11-11）**：ESP-IDF v5.5.5 构建、烧录、启动通过；180° 显示旋转已修正并重新烧录
 - 启动证据：16MB QIO Flash、8MB Octal PSRAM 80MHz、240MHz、ST7701 480×480、GT911 0x14、ESPUI 初始化
-- 固件：`meetagent_terminal.bin` 1,255,696 bytes（SHA-256 `84374daa...b7891aac`）；app 分区剩余 18%
+- 固件：`meetagent_terminal.bin` 1,267,232 bytes（SHA-256 `b9156df1...d2d0ef5`）；app 分区剩余 17%
 - 原厂 16MB Flash 已备份：`/home/perch/esp/backups/lcd4-factory-2026-11-11-1132.bin`
-- 主机测试：`1024 checks, 0 failure(s)`（ASan/UBSan + `-Werror`）
-- 主机语法检查：33 个固件 C 文件通过（board_lcd4.c / wifi_prov.c / net_client.c 由真实 IDF 构建验证）
+- 主机测试：`2013 checks, 0 failure(s)`（ASan/UBSan + `-Werror`）
+- 主机语法检查：41 个固件 C 文件通过（board_lcd4.c / wifi_prov.c / net_client.c / phosphor_lvgl_port.c 由真实 IDF 构建验证）
 - E3a 帧预览：`make preview STATE=working FRAMES=3 DELAY=300`
 - 启动日志：`/tmp/opencode/esp-lcd4-boot.log`
 - E4a 实测：STA 172.20.10.2，Node developer-machine/2.1.0，`/status` node_reachable=true
@@ -156,7 +157,9 @@ firmware/terminal/
 - `docs/HARDWARE.md`：HAL 契约、stub 板、待确认硬件项
 - `docs/ASCII_RENDERER.md`：E3a 字符网格、几何、六态 Motion、CLI 与集成
 - `docs/NETWORK.md`：E4a Wi-Fi 配网、E4b-1 WebSocket、E4b-2 事件 apply/replay、E4b-3 命令/审批、NVS 清理、portal 验证
-- `docs/BUILD_STATUS.md`：本次构建/测试结果、阻塞与下一步
+- `docs/PHOSPHOR_AUDIT.md`：P0 依赖/屏幕/内存/集成审计
+- `docs/PHOSPHOR_P1.md`：P1/P1.1/P1.2/P1.3 静态 Core、18×27 Bold、三轨可辨性、模拟器、截图、真机结果
+- `docs/BUILD_STATUS.md`：构建/测试结果、阻塞与下一步
 
 ## 未实现（明确不在本次范围）
 

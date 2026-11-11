@@ -488,6 +488,83 @@ I (26244) touch_test: TOUCH release
 - 未验证：interrupt 真机、permission.respond 真机、超时/断线真实网络故障、
   footer 视觉截图；均未强行构造或删除用户 session。
 
+### 11.12 PHOSPHOR P0/P1 静态 Core（2026-11-11）
+
+- P0 审计：IDF 5.5.5 / LVGL 8.4.0 / BSP 3.0.0 / esp_lvgl_port 2.9.0；
+  480×480 RGB565，180° 旋转与 GT911 路径不变；审计见 `docs/PHOSPHOR_AUDIT.md`。
+- P1 纯模块：`components/espui/phosphor/`，36×24 Glyph Frame、三轨
+  Orbit、Nucleus `>_`、2 Satellite、8×12 1bpp atlas、Palette、Rasterizer。
+- PC SDL2：`tools/phosphor_sim/`；截图 `docs/phosphor/p1_static.png`
+  （480×480，SHA-256 `9f998079...f34f59`）。
+- ESP32：`phosphor_lvgl_port.c` 在 `espui_start()` 后创建 full-screen
+  top-layer overlay + 288×288 PSRAM canvas（165,888 B，一次分配），
+  使用 display lock；旧 terminal_aesthetic 保留 fallback。
+- 最终固件：1,264,656 B，SHA-256
+  `0b0dae60...e7199`，app 剩余 18%，DIRAM 58.6%。
+- 真机启动：`P1 static canvas ready`；internal_free=64,835 B，
+  psram_free=6,345,252 B；snapshot 8/42；heartbeat 195ms；
+  无 panic/assert/OOM。
+- Host：`make test` **1526 checks**；syntax **41 files OK**。
+- P1 只静态；动画/状态切换/性能测量未开始，P2 待办见 `docs/PHOSPHOR_P1.md`。
+- 实屏颜色/可读性/中心位置需用户确认。
+
+### 11.13 PHOSPHOR P1.1 可读性迭代（2026-11-11）
+
+- 实机反馈：P1.0 字符太小、三条轨道挤在中央。
+- P1.1 保留 36×24 网格：cell 12×18、canvas 432×432、位置 (24,24)，
+  canvas 中心局部 (216,216)；atlas 重新生成 12×18（JetBrains Mono OFL）。
+- Orbit 半径 78/126/168；去掉 halo，源 64 点 + DDA 连续段；Inner `.,:`
+  Secondary，Middle `-=/\` Primary，Outer `+*#` Secondary/Highlight，
+  Warning 处保留缺口。
+- Core shell 改为稀疏 `:`/`.`；ambient radial field 固定 14 点、Muted 低亮度；
+  `>_` 保留 1× 2-cell，最后绘制，未做 2×。
+- PC 新截图 `docs/phosphor/p1_static_v2.png`（480×480，SHA-256
+  `fb1362ff...adb9`）；旧 `p1_static.png` 保留对比。
+- 最终固件：1,265,600 B，SHA-256
+  `d6659e69...4459a2`，app 剩余 18%，DIRAM 58.6%。
+- 真机：`P1 static canvas ready: 432x432 at (24,24), PSRAM=373248 bytes`；
+  internal_free=64,819 B，psram_free=6,135,800 B；snapshot 8/42；
+  heartbeat 56ms；无 panic/OOM。
+- Host：**1733 checks, 0 failures**；syntax **41 files OK**。
+- 实屏颜色/可读性/轨道分离度仍待用户确认；P2 未开始。
+
+### 11.14 PHOSPHOR P1.2 字体可读性（2026-11-11）
+
+- 实机反馈：字体细、小、不明显；分布不是主要问题。
+- P1.2 保留 432×432 / (24,24)：grid 24×16，cell 18×27；
+  atlas 改为 JetBrains Mono Bold 18×27，threshold 45% + 1px dilation；
+  可复现脚本 `tools/phosphor_atlas/generate_glyph_atlas.py`。
+- Nucleus 2×（4×2 cells，origin col10/12 row7），rasterizer 第二 pass
+  清空 footprint 后绘制；中心 bbox (180..252,189..243)，中心 216,216。
+- Inner `.,:;` Secondary；Middle `-=/\` Primary；Outer `+#%@` Primary；
+  Satellite `*` Highlight / `?` Warning；主轨道 intensity 240–255。
+- 新截图 `docs/phosphor/p1_static_v3.png`（480×480，2,946 B，
+  SHA-256 `94f6b6d9...1d1965`）。
+- 最终固件：1,267,312 B，SHA-256 `5c2bf6af...81f2b5`，app 剩余 17%，
+  DIRAM 58.6%。
+- 真机：432×432 PSRAM=373,248 B；internal_free=64,803 B，
+  psram_free=6,134,568 B；snapshot 8/42；heartbeat 97ms；无 panic/OOM。
+- Host：**2007 checks, 0 failures**；syntax **41 files OK**。
+- 实屏笔画/颜色/轨道分离度待用户确认；P2 未开始。
+
+### 11.15 PHOSPHOR P1.3 轨道可辨性（2026-11-11）
+
+- 保持 24×16 / 18×27 Bold / 432×432 / (24,24)；不缩小字体。
+- Orbit 半径 80/140/192；tilt 1.00/0.25/1.30；rotation -0.55/0.85/-0.65；
+  phase 0.10/1.90/3.80。
+- Inner Secondary/Muted 后侧（≥185），Middle Secondary 235，
+  Outer Primary 250；Satellite `*` Highlight / `?` Warning。
+- Middle 新增约 5.85 rad 缺口（半宽 0.23），Outer warning 缺口保留；Inner 完整。
+- 移除 ambient radial field；无 halo；后侧不再整段切 Muted/125。
+- 新截图 `docs/phosphor/p1_static_v4.png`（480×480，3,002 B，
+  SHA-256 `b581b0ff...76fc`）。
+- 最终固件：1,267,232 B，SHA-256 `b9156df1...0ef5`，app 剩余 17%，
+  DIRAM 58.6%。
+- 真机：432×432 PSRAM=373,248 B；internal_free=64,771 B，
+  psram_free=6,134,568 B；snapshot 8/42；heartbeat 53ms；无 panic/OOM。
+- Host：**2013 checks, 0 failures**；syntax **41 files OK**。
+- 实屏轨道分离度/颜色仍待用户确认；P2 未开始。
+
 ## 12. 仓库约束
 
 - 只修改 `firmware/terminal/`
