@@ -12,7 +12,7 @@
 | 按键 | BOOT / RESET / BAT_PWR（无板载旋钮） | 按 BSP/官方示例 |
 | BSP | `waveshare/esp32_s3_touch_lcd_4 ^3.0.0`（实际 3.0.0） | 已接入 |
 | LVGL | 8.4.0（`8.4.*` 固定） | 已构建 |
-| ESP-IDF | v5.4.4 | 已构建 |
+| ESP-IDF | v5.5.5（5.4.4 保留） | 已构建并启动 |
 
 ## 2. 官方 BSP API 结论
 
@@ -38,7 +38,7 @@
 - BSP 源码未复制到仓库，依赖由 `main/idf_component.yml` 拉取。
 - 官方示例在 `bsp_display_start()` 前做 I2C bus recovery（SDA=15/SCL=7，来自 BSP
   头文件），本适配层已照做，用于快速复位后 CH32 未同步复位的情况。
-- 官方示例推荐 ESP-IDF 5.5.5/6.0.2；本工程在 5.4.4 上编译/链接成功，运行时未验证。
+- 官方示例推荐 ESP-IDF 5.5.5/6.0.2；本工程已用 5.5.5 完成编译、烧录和启动。
 
 ## 3. 板级适配层
 
@@ -100,15 +100,69 @@ LVGL 仅默认 Montserrat 14，无 lv_demo_*、无额外字体
   这是 ESP-IDF 对 QIO bootloader 的烧录策略，运行时会升级到 QIO。
 - BSP 默认 LVGL draw buffer 高度 100 → 480×100×2 ≈ 96 KB。切换全局
   `CONFIG_BSP_DISPLAY_LVGL_BUF_HEIGHT` 前需实测 PSRAM/内部 RAM 和刷新性能。
-- `idf.py size` 的 IRAM 行显示 16,383/16,384（99.99%），与链接脚本
-  `iram0_0_seg = 0x57700` 的口径不一致；实际链接断言通过，仍需真机确认。
+- `idf.py size` 的 IRAM 行显示 16,384/16,384（100%），与链接脚本
+  `iram0_0_seg = 0x57700` 的口径不一致；实际 `.iram0.text` 81,547 bytes，
+  链接断言通过。
 
-## 7. 待确认清单
+## 7. 真机 bring-up 结果（2026-11-11）
 
-1. 480×480 实际颜色顺序、ST7701 初始化、背光极性/亮度曲线。
-2. GT911 坐标方向、镜像、单点/多点行为。
+已连接 `/dev/ttyACM0`，完成 16MB 原厂 Flash 备份、ESP-IDF 5.5.5 安装、
+构建、烧录和 15 秒启动日志抓取。
+
+关键启动证据：
+
+```text
+I boot: ESP-IDF v5.5.5 2nd stage bootloader
+I boot.esp32s3: SPI Mode : QIO
+I boot.esp32s3: SPI Flash Size : 16MB
+I esp_psram: Found 8MB PSRAM device
+I esp_psram: Speed: 80MHz
+I esp_psram: SPI SRAM memory test OK
+I cpu_start: cpu freq: 240000000 Hz
+I ESP32-S3-Touch-LCD-4: Touch 0x14 found
+I GT911: TouchPad_ID:0x39,0x31,0x31
+I GT911: TouchPad_Config_Version:79
+I board_lcd4: LCD-4 BSP started: 480x480 RGB565
+I espui: ESPUI initialized: theme=terminal_aesthetic
+           display=waveshare-esp32-s3-touch-lcd-4-v4 480x480
+I app_main: terminal scaffold running (LCD-4 BSP, mock state)
+I main_task: Returned from app_main()
+```
+
+- 未出现 panic / assert / reset loop。
+- 非致命 warning：
+  - `i2c.master` 提示检查上拉电阻；GT911 仍成功识别。
+  - ST7701 `36h` / `3Ah` 命令被 BSP 外部初始化序列覆盖。
+- 启动日志：`/tmp/opencode/esp-lcd4-boot.log`
+- 原厂备份：`/home/perch/esp/backups/lcd4-factory-2026-11-11-1132.bin`
+  （16,777,216 bytes，SHA-256 `c996b103...f963e2c7`）
+
+### 期望画面
+
+设备应停留在 480×480 Terminal Aesthetic Mock：
+
+```text
+MEETAGENT // TERMINAL
+SCENE: AMBIENT
+┌──────────────────────────────┐
+│       ASCII CORE（静态）      │
+└──────────────────────────────┘
+┌──────────────────────────────┐
+│ SYSTEM ACTIVE / IDLE / ...   │
+│ AGENTS 01  SESSIONS 01 ...   │
+└──────────────────────────────┘
+E2 MOCK // ASCII RENDERER E3
+```
+
+Mock 状态每 3 秒循环：ACTIVE → APPROVAL → COMPLETED → OFFLINE。
+期望颜色为近黑背景、磷光绿、琥珀、红色；**实际颜色/方向/触摸命中需人工确认**。
+
+## 8. 待确认清单
+
+1. 480×480 实际颜色顺序、ST7701 方向、背光亮度曲线（初始化已通过）。
+2. GT911 坐标方向、镜像、单点触摸命中（检测已通过：0x14 / ID 39:31:31）。
 3. CH32V003 电池 ADC 与电量百分比映射（BSP v3.0.0 未提供，当前返回未知 255）。
-4. 16MB Flash / Octal PSRAM 与实物丝印一致。
-5. LVGL draw buffer 的分配位置（内部 RAM vs PSRAM）与真实余量。
-6. BSP 在 ESP-IDF 5.4.4 上的运行时稳定性（官方示例推荐 5.5.5/6）。
-7. 烧录后的启动日志、背光、触摸和 480×480 布局。
+4. ~~16MB Flash / Octal PSRAM 与实物丝印一致~~（启动日志已确认 16MB / 8MB 80MHz）。
+5. LVGL draw buffer 的分配位置（内部 RAM vs PSRAM）与真实余量（启动成功，未测余量）。
+6. ~~BSP 在 ESP-IDF 5.5.5 上的运行时稳定性~~（已启动，长时间运行未测）。
+7. ~~烧录后的启动日志、背光、触摸和 480×480 布局~~（启动已通过；画面/触摸仍人工确认）。

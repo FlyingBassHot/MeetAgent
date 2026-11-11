@@ -7,7 +7,7 @@
 | Core / Node | 主会话 | M0 + M1 + M4 Core | 完成；审计/限流/重连边界加固 | M6 可选增强 |
 | Protocol v2 | 主会话 | M0 | 完成 | 随实现补兼容测试 |
 | Mobile | omp | M5b + UX P0/P1/P2 | 视觉与原生交互改造完成（信息层级/聊天流/触感/键盘/返回键/下拉刷新/视觉打磨） | iOS/Release |
-| Terminal / ESPUI | pi | E0–E2 + E3a + LCD-4 BSP | 官方 BSP 3.0.0 + 480×480 构建通过（app 502 KB） | LCD-4 实物显示/触摸验收 |
+| Terminal / ESPUI | pi | E0–E3a + LCD-4 Bring-up | 真机烧录/启动成功（ESP-IDF 5.5.5，LCD/GT911/PSRAM OK） | 颜色/方向/触摸人工确认；E3b/E4 |
 | Cloud relay | 主会话 | 可选 | 保留 V1 实现 | M6 再验证混合模式 |
 
 ## 已完成
@@ -23,7 +23,8 @@
 - mDNS `_meetagent._tcp`（avahi-browse 实测）
 - 测试：`go test ./... -race -count=1` 通过
 - Mobile：`npm run typecheck` / `npm run build` 通过；390/1440 截图
-- Terminal：host tests 807/807；syntax 33/33；ESP-IDF v5.4.4 + LVGL 8.4.0 + 官方 BSP 3.0.0 `idf.py build` 成功，app 502,272 bytes，480×480 布局已适配
+- Terminal：host tests 807/807；syntax 33/33；ESP-IDF v5.5.5 + LVGL 8.4.0 + 官方 BSP 3.0.0 构建/烧录成功，app 506,240 bytes，480×480 布局已适配
+- Terminal 真机 bring-up（2026-11-11）：16MB QIO Flash、8MB Octal PSRAM 80MHz、240MHz、ST7701 480×480、GT911 0x14、ESPUI 初始化成功；无 panic/assert/reset loop；原厂 16MB Flash 已备份（SHA-256 `c996b103...e2c7`）
 - Terminal 硬件目标确定为 **Waveshare ESP32-S3-Touch-LCD-4 V4**（480×480 RGB LCD + GT911 + CH32V003 helper）；真实 BSP 已接入，显示/触摸方向/PSRAM 待实物验证
 
 ## 真实联调（主会话）
@@ -56,7 +57,7 @@
 
 ## 阻塞 / 暂停
 
-- **ESP32 硬件未到**：LCD-4 V4 BSP 已接入并编译通过（app 502,272 bytes），但未烧录/接串口；显示颜色/方向、GT911 触摸方向、CH32V003 背光/电源、PSRAM/Flash 需实物验证；官方 BSP 推荐 ESP-IDF 5.5.5/6，本机 5.4.4 仅验证编译/链接
+- **ESP32 真机 bring-up 已完成**：ESP-IDF 5.5.5 烧录/启动成功；屏幕实际颜色/方向、GT911 触摸方向/命中、CH32V003 背光/电池 ADC、多点触控与长时间运行仍需人工/后续验证；PHOSPHOR CORE 新规格暂不下发
 - Mobile：使用 5174，避免与 V1 的 5173 冲突
 - 语音/STT：按用户要求暂缓
 - 多客户端/同 Token 多标签页：M4 处理

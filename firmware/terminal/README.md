@@ -15,23 +15,28 @@
 
 已验证：
 
-- **真实 ESP-IDF 构建**：ESP-IDF v5.4.4 + esp32s3 工具链 + LVGL 8.4.0，`idf.py build` 成功
-- 固件：`meetagent_terminal.bin` 502,272 bytes；app 分区剩余 67%
+- **真机 bring-up 成功（2026-11-11）**：ESP-IDF v5.5.5 构建、烧录、启动通过
+- 启动证据：16MB QIO Flash、8MB Octal PSRAM 80MHz、240MHz、ST7701 480×480、GT911 0x14、ESPUI 初始化
+- 固件：`meetagent_terminal.bin` 506,240 bytes（SHA-256 `cc09416c...5882655`）；app 分区剩余 67%
+- 原厂 16MB Flash 已备份：`/home/perch/esp/backups/lcd4-factory-2026-11-11-1132.bin`
 - 主机测试：`807 checks, 0 failure(s)`（ASan/UBSan + `-Werror`）
 - 主机语法检查：33 个固件 C 文件通过（board_lcd4.c 由真实 IDF 构建验证）
 - E3a 帧预览：`make preview STATE=working FRAMES=3 DELAY=300`
-- **未验证**：未烧录、未接串口；未验证真实 LCD/触摸/旋钮/PSRAM
+- 启动日志：`/tmp/opencode/esp-lcd4-boot.log`
+- **待人工确认**：屏幕实际颜色/方向、GT911 触摸方向/命中、背光亮度
 
 当前环境：
 
 ```text
-ESP-IDF  : v5.4.4 (/home/perch/esp/esp-idf)
+ESP-IDF  : v5.5.5 (/home/perch/esp/esp-idf-5.5.5)
 目标     : esp32s3
 工具链   : xtensa-esp32s3-elf
 LVGL     : 8.4.0（Component Manager）
 BSP      : waveshare/esp32_s3_touch_lcd_4 3.0.0
 构建     : idf.py build 成功
-烧录     : 未执行（硬件未到）
+烧录     : idf.py -p /dev/ttyACM0 flash 成功
+启动     : 成功，无 panic/assert/reset loop
+串口     : /dev/ttyACM0 (28:84:85:ac:74:6c)
 ```
 
 ## 目标硬件
@@ -63,12 +68,17 @@ idf.py size
 # idf.py -p /dev/ttyACM0 flash monitor
 ```
 
-本次已用 ESP-IDF v5.4.4 完成 LCD-4 BSP 真实构建。Component Manager 解析到
-BSP 3.0.0、LVGL 8.4.0、esp_lvgl_port 2.9.0；LVGL 固定为 `8.4.*`，不启用
-`lv_demo_*` 或额外字体。`sdkconfig`、`dependencies.lock`、`managed_components/`
-和 `build/` 均由 `.gitignore` 忽略。
+本次已用 ESP-IDF v5.5.5 完成 LCD-4 BSP 真机构建/烧录/启动。Component Manager
+解析到 BSP 3.0.0、LVGL 8.4.0、esp_lvgl_port 2.9.0；LVGL 固定为 `8.4.*`，
+不启用 `lv_demo_*` 或额外字体。`sdkconfig`、`dependencies.lock`、
+`managed_components/` 和 `build/` 均由 `.gitignore` 忽略。
 
-> 未烧录、未接串口。构建大小、内存与限制详见 `docs/BUILD_STATUS.md`。
+烧录前已完整备份原厂 16MB Flash 到 `/home/perch/esp/backups/`。首次 `idf.py flash`
+因 sudo 的 `HOME=/root` 找不到 Python 环境而失败（未接触设备），修正 `HOME` /
+`IDF_TOOLS_PATH` / `IDF_PYTHON_ENV_PATH` 后一次成功。
+
+> 已烧录并启动；屏幕颜色/方向/触摸命中仍需人工确认。详细证据、固件 hash、
+> 启动日志与风险见 `docs/BUILD_STATUS.md` / `docs/HARDWARE.md`。
 
 ## 主机测试
 
