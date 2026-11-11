@@ -9,6 +9,18 @@
 
 typedef struct _lv_obj_t lv_obj_t;
 typedef struct _lv_disp_t lv_disp_t;
+typedef int16_t lv_coord_t;
+
+typedef struct {
+    lv_coord_t x1;
+    lv_coord_t y1;
+    lv_coord_t x2;
+    lv_coord_t y2;
+} lv_area_t;
+
+typedef enum {
+    LV_IMG_CF_TRUE_COLOR = 0,
+} lv_img_cf_t;
 
 typedef struct {
     uint8_t blue;
@@ -32,6 +44,7 @@ typedef enum {
 
 #define LV_OBJ_FLAG_HIDDEN (1u << 0)
 #define LV_OBJ_FLAG_SCROLLABLE (1u << 1)
+#define LV_OBJ_FLAG_CLICKABLE (1u << 2)
 
 lv_disp_t *lv_disp_get_default(void);
 
@@ -61,3 +74,8 @@ lv_color_t lv_color_hex(uint32_t value);
 void lv_scr_load(lv_obj_t *screen);
 lv_obj_t *lv_scr_act(void);
 void lv_obj_invalidate(lv_obj_t *obj);
+void lv_obj_invalidate_area(lv_obj_t *obj, const lv_area_t *area);
+
+lv_obj_t *lv_canvas_create(lv_obj_t *parent);
+void lv_canvas_set_buffer(lv_obj_t *canvas, void *buffer, lv_coord_t width,
+                          lv_coord_t height, lv_img_cf_t cf);

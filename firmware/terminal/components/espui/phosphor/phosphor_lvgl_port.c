@@ -1,9 +1,10 @@
 /*
- * PHOSPHOR CORE P1 LVGL platform adapter.
+ * PHOSPHOR CORE platform adapter.
  *
- * This is the only PHOSPHOR file that includes LVGL. It owns one PSRAM
- * canvas buffer and one top-layer overlay; it does not create labels or
- * per-frame objects. P1 is deliberately static (no timer/animation).
+ * The renderer owns the LVGL canvas; this module owns one PSRAM RGB565 buffer
+ * and the render task. There is no top-layer overlay: the terminal theme
+ * creates a canvas widget in its Ambient scene and attaches it here. The P5
+ * core/motion/dirty rasterizer is unchanged.
  */
 #include "phosphor_lvgl_port.h"
 
@@ -11,38 +12,49 @@
 
 #include "esp_heap_caps.h"
 #include "esp_timer.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
 #include "esp_log.h"
-#include "lvgl.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
+#include "freertos/task.h"
+
 #include "glyph_dirty.h"
 #include "phosphor_demo.h"
 #include "phosphor_input_publisher.h"
 #include "phosphor_motion.h"
-#include "phosphor_state.h"
 #include "phosphor_scene.h"
+#include "phosphor_state.h"
 #include "phosphor_types.h"
 
-#if LV_COLOR_16_SWAP
-#error "PHOSPHOR P2 expects LV_COLOR_16_SWAP=0"
-#endif
-
 #define TAG "phosphor_lvgl"
+#define P3_IDLE_FPS 7u
+#define P3_WORKING_FPS 12u
+#define PHOSPHOR_IDLE_SLEEP_MS 100u
 
+static const espui_display_hal_t *s_display;
 static uint16_t *s_canvas_buf;
-static lv_obj_t *s_overlay;
-static lv_obj_t *s_canvas;
+static espui_ui_widget_t *s_canvas_widget;
+static const espui_renderer_ops_t *s_renderer;
+static SemaphoreHandle_t s_state_lock;
+static volatile bool s_active;
+
 static phosphor_motion_state_t s_motion;
 static phosphor_state_resolver_t s_resolver;
 static glyph_dirty_state_t s_dirty;
 
-#define P3_DEMO_SWITCH_MS 6000u
-#define P3_IDLE_FPS 7u
-#define P3_WORKING_FPS 12u
+static bool phosphor_canvas_ready(void)
+{
+    if (s_state_lock == NULL ||
+        xSemaphoreTake(s_state_lock, portMAX_DELAY) != pdTRUE) {
+        return false;
+    }
+    bool ready = s_canvas_widget != NULL && s_renderer != NULL;
+    (void)xSemaphoreGive(s_state_lock);
+    return ready;
+}
 
 static void phosphor_anim_task(void *arg)
 {
-    const espui_display_hal_t *display = (const espui_display_hal_t *)arg;
+    (void)arg;
     phosphor_motion_init(&s_motion, PHOSPHOR_MODE_IDLE);
     phosphor_state_resolver_init(&s_resolver);
     glyph_dirty_reset(&s_dirty);
@@ -63,8 +75,24 @@ static void phosphor_anim_task(void *arg)
     phosphor_demo_phase_t last_phase = (phosphor_demo_phase_t)-1;
     bool was_offline = false;
     uint32_t offline_start_ms = 0;
+    bool last_active = true;
 
     while (true) {
+        if (!s_active || !phosphor_canvas_ready()) {
+            if (last_active) {
+                ESP_LOGI(TAG, "canvas inactive; rendering paused");
+                last_active = false;
+            }
+            vTaskDelay(pdMS_TO_TICKS(PHOSPHOR_IDLE_SLEEP_MS));
+            last_frame_start_us = 0;
+            continue;
+        }
+        if (!last_active) {
+            ESP_LOGI(TAG, "canvas active; rendering resumed");
+            last_active = true;
+            last_phase = (phosphor_demo_phase_t)-1;
+        }
+
         uint64_t loop_start_us = esp_timer_get_time();
         if (last_frame_start_us != 0) {
             period_us_total += loop_start_us - last_frame_start_us;
@@ -111,7 +139,7 @@ static void phosphor_anim_task(void *arg)
         uint64_t build_done_us = esp_timer_get_time();
         glyph_dirty_bbox_t dirty;
         bool changed = false;
-        if (display->lock(1000) == ESP_OK) {
+        if (s_display->lock(1000) == ESP_OK) {
             changed = glyph_dirty_render(
                 &s_dirty, &frame, s_canvas_buf, PHOSPHOR_CANVAS_W,
                 PHOSPHOR_CANVAS_H, phosphor_palette_default(), &dirty);
@@ -119,29 +147,25 @@ static void phosphor_anim_task(void *arg)
             last_bbox_w = (uint32_t)dirty.w;
             last_bbox_h = (uint32_t)dirty.h;
             last_bbox_full = dirty.full;
-            if (changed) {
-                uint32_t dirty_area =
-                    (uint32_t)dirty.w * (uint32_t)dirty.h;
-                if (dirty.full ||
-                    dirty_area * 100u >=
-                        (uint32_t)PHOSPHOR_CANVAS_W *
-                            PHOSPHOR_CANVAS_H * 70u) {
-                    lv_obj_invalidate(s_canvas);
-                } else if (dirty.w > 0 && dirty.h > 0) {
-                    lv_area_t area = {
-                        .x1 = dirty.x,
-                        .y1 = dirty.y,
-                        .x2 = dirty.x + dirty.w - 1,
-                        .y2 = dirty.y + dirty.h - 1,
-                    };
-                    lv_obj_invalidate_area(s_canvas, &area);
+            if (changed && s_state_lock != NULL &&
+                xSemaphoreTake(s_state_lock, portMAX_DELAY) == pdTRUE) {
+                if (s_canvas_widget != NULL && s_renderer != NULL) {
+                    if (dirty.full || s_renderer->widget_canvas_invalidate_area ==
+                                          NULL) {
+                        (void)s_renderer->widget_canvas_invalidate(
+                            s_canvas_widget);
+                    } else if (dirty.w > 0 && dirty.h > 0) {
+                        (void)s_renderer->widget_canvas_invalidate_area(
+                            s_canvas_widget, dirty.x, dirty.y,
+                            (uint16_t)dirty.w, (uint16_t)dirty.h);
+                    }
                 }
+                (void)xSemaphoreGive(s_state_lock);
             }
             invalidate_us_total +=
                 (uint64_t)(esp_timer_get_time() - raster_done_us);
-            display->unlock();
-            raster_us_total +=
-                (uint64_t)(raster_done_us - build_done_us);
+            s_display->unlock();
+            raster_us_total += (uint64_t)(raster_done_us - build_done_us);
         } else {
             raster_us_total +=
                 (uint64_t)(esp_timer_get_time() - build_done_us);
@@ -167,17 +191,14 @@ static void phosphor_anim_task(void *arg)
                                          : 0;
             ESP_LOGI(TAG,
                      "P4 anim stats state=%s activity=%d attention=%u "
-                     "frames=%u fps=%u render_avg_us=%u "
-                     "build_avg_us=%u raster_avg_us=%u "
-                     "invalidate_avg_us=%u dirty_changed=%d dirty_cells=%d "
-                     "redraw_cells=%d bbox=%ux%u full=%d stack_hwm=%u "
-                     "loop_avg_us=%u "
-                     "period_avg_us=%u delay=%u tick=%u internal_free=%u "
-                     "psram_free=%u",
+                     "frames=%u fps=%u render_avg_us=%u build_avg_us=%u "
+                     "raster_avg_us=%u invalidate_avg_us=%u dirty_changed=%d "
+                     "dirty_cells=%d redraw_cells=%d bbox=%ux%u full=%d "
+                     "stack_hwm=%u loop_avg_us=%u period_avg_us=%u delay=%u "
+                     "tick=%u internal_free=%u psram_free=%u",
                      using_demo ? phosphor_demo_phase_name(phase) : "node",
                      (int)visual.activity, (unsigned)visual.attention,
-                     (unsigned)frames,
-                     (unsigned)fps, avg_us,
+                     (unsigned)frames, (unsigned)fps, avg_us,
                      frames > 0 ? (unsigned)(build_us_total / frames) : 0,
                      frames > 0 ? (unsigned)(raster_us_total / frames) : 0,
                      frames > 0 ? (unsigned)(invalidate_us_total / frames) : 0,
@@ -206,9 +227,7 @@ static void phosphor_anim_task(void *arg)
                                   : P3_IDLE_FPS;
         uint32_t frame_ms = 1000u / fps_target;
         uint32_t render_ms = (uint32_t)(render_elapsed_us / 1000u);
-        uint32_t delay_ms = frame_ms > render_ms
-                                ? frame_ms - render_ms
-                                : 1u;
+        uint32_t delay_ms = frame_ms > render_ms ? frame_ms - render_ms : 1u;
         last_delay_ms = delay_ms;
         vTaskDelay(pdMS_TO_TICKS(delay_ms));
     }
@@ -219,19 +238,23 @@ esp_err_t phosphor_lvgl_port_init(const espui_display_hal_t *display)
     if (display == NULL || display->lock == NULL || display->unlock == NULL) {
         return ESP_ERR_INVALID_ARG;
     }
-    if (s_canvas != NULL) {
+    if (s_canvas_buf != NULL) {
         return ESP_OK;
     }
-    if (lv_disp_get_default() == NULL) {
-        ESP_LOGE(TAG, "no LVGL display registered");
-        return ESP_ERR_INVALID_STATE;
-    }
+
     phosphor_input_publisher_init();
+    s_display = display;
+    s_state_lock = xSemaphoreCreateMutex();
+    if (s_state_lock == NULL) {
+        return ESP_ERR_NO_MEM;
+    }
 
     const size_t bytes =
         (size_t)PHOSPHOR_CANVAS_W * PHOSPHOR_CANVAS_H * sizeof(uint16_t);
     s_canvas_buf = heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (s_canvas_buf == NULL) {
+        vSemaphoreDelete(s_state_lock);
+        s_state_lock = NULL;
         ESP_LOGE(TAG, "PSRAM canvas allocation failed (%u bytes)",
                  (unsigned)bytes);
         return ESP_ERR_NO_MEM;
@@ -239,58 +262,59 @@ esp_err_t phosphor_lvgl_port_init(const espui_display_hal_t *display)
     phosphor_scene_render_rgb565(s_canvas_buf, PHOSPHOR_CANVAS_W,
                                  PHOSPHOR_CANVAS_H);
 
-    esp_err_t lock_err = display->lock(1000);
-    if (lock_err != ESP_OK) {
-        ESP_LOGE(TAG, "display lock failed: %s", esp_err_to_name(lock_err));
+    if (xTaskCreatePinnedToCore(phosphor_anim_task, "phosphor_p3", 6144, NULL,
+                                4, NULL, tskNO_AFFINITY) != pdPASS) {
         heap_caps_free(s_canvas_buf);
         s_canvas_buf = NULL;
-        return lock_err;
-    }
-
-    s_overlay = lv_obj_create(lv_layer_top());
-    if (s_overlay == NULL) {
-        display->unlock();
-        heap_caps_free(s_canvas_buf);
-        s_canvas_buf = NULL;
+        vSemaphoreDelete(s_state_lock);
+        s_state_lock = NULL;
+        ESP_LOGE(TAG, "PHOSPHOR render task creation failed");
         return ESP_ERR_NO_MEM;
     }
-    lv_obj_set_pos(s_overlay, 0, 0);
-    lv_obj_set_size(s_overlay, 480, 480);
-    lv_obj_set_style_bg_color(s_overlay, lv_color_hex(0x080C0A), 0);
-    lv_obj_set_style_bg_opa(s_overlay, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_width(s_overlay, 0, 0);
-    lv_obj_set_style_radius(s_overlay, 0, 0);
-    lv_obj_set_style_pad_all(s_overlay, 0, 0);
-    lv_obj_clear_flag(s_overlay, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_clear_flag(s_overlay, LV_OBJ_FLAG_CLICKABLE);
-
-    s_canvas = lv_canvas_create(s_overlay);
-    if (s_canvas == NULL) {
-        lv_obj_del(s_overlay);
-        s_overlay = NULL;
-        display->unlock();
-        heap_caps_free(s_canvas_buf);
-        s_canvas_buf = NULL;
-        return ESP_ERR_NO_MEM;
-    }
-    lv_canvas_set_buffer(s_canvas, s_canvas_buf, PHOSPHOR_CANVAS_W,
-                         PHOSPHOR_CANVAS_H, LV_IMG_CF_TRUE_COLOR);
-    lv_obj_set_pos(s_canvas, PHOSPHOR_CANVAS_X, PHOSPHOR_CANVAS_Y);
-    lv_obj_clear_flag(s_canvas, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_invalidate(s_overlay);
-    display->unlock();
-
-    ESP_LOGI(TAG,
-             "P4 canvas ready: %ux%u at (%d,%d), PSRAM=%u bytes",
-             PHOSPHOR_CANVAS_W, PHOSPHOR_CANVAS_H, PHOSPHOR_CANVAS_X,
-             PHOSPHOR_CANVAS_Y, (unsigned)bytes);
-
-    if (xTaskCreatePinnedToCore(phosphor_anim_task, "phosphor_p3", 6144,
-                                (void *)display, 4, NULL,
-                                tskNO_AFFINITY) != pdPASS) {
-        ESP_LOGW(TAG, "P3 animation task not started");
-    } else {
-        ESP_LOGI(TAG, "P3 animation started: demo 6s Idle / 6s Working");
-    }
+    ESP_LOGI(TAG, "canvas runtime ready: %ux%u, PSRAM=%u bytes (detached)",
+             PHOSPHOR_CANVAS_W, PHOSPHOR_CANVAS_H, (unsigned)bytes);
     return ESP_OK;
+}
+
+esp_err_t phosphor_lvgl_port_attach(espui_ui_widget_t *canvas,
+                                    const espui_renderer_ops_t *renderer)
+{
+    if (canvas == NULL || renderer == NULL ||
+        renderer->widget_canvas_set_buffer == NULL ||
+        renderer->widget_canvas_invalidate == NULL ||
+        s_canvas_buf == NULL || s_state_lock == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    esp_err_t err = renderer->widget_canvas_set_buffer(
+        canvas, s_canvas_buf, PHOSPHOR_CANVAS_W, PHOSPHOR_CANVAS_H);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    if (xSemaphoreTake(s_state_lock, portMAX_DELAY) != pdTRUE) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    s_canvas_widget = canvas;
+    s_renderer = renderer;
+    s_active = false;
+    (void)xSemaphoreGive(s_state_lock);
+    return ESP_OK;
+}
+
+void phosphor_lvgl_port_detach(void)
+{
+    s_active = false;
+    if (s_state_lock == NULL ||
+        xSemaphoreTake(s_state_lock, portMAX_DELAY) != pdTRUE) {
+        return;
+    }
+    s_canvas_widget = NULL;
+    s_renderer = NULL;
+    (void)xSemaphoreGive(s_state_lock);
+}
+
+void phosphor_lvgl_port_set_active(bool active)
+{
+    s_active = active;
 }

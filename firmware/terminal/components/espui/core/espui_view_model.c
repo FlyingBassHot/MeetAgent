@@ -365,6 +365,54 @@ uint16_t espui_view_model_attention_count(const espui_view_model_t *model)
                       model->completion_count);
 }
 
+void espui_view_model_push_activity(espui_view_model_t *model,
+                                    const char *type,
+                                    const char *session_id,
+                                    const char *short_text,
+                                    uint32_t timestamp_ms)
+{
+    if (model == NULL) {
+        return;
+    }
+
+    uint8_t slot;
+    if (model->activity_count < ESPUI_MAX_ACTIVITY) {
+        slot = model->activity_count++;
+    } else {
+        memmove(&model->activity[0], &model->activity[1],
+                sizeof(model->activity[0]) * (ESPUI_MAX_ACTIVITY - 1));
+        slot = ESPUI_MAX_ACTIVITY - 1;
+    }
+
+    espui_activity_view_t *entry = &model->activity[slot];
+    memset(entry, 0, sizeof(*entry));
+    entry->in_use = true;
+    espui_strlcpy(entry->type, type != NULL ? type : "event",
+                  sizeof(entry->type));
+    espui_strlcpy(entry->session_id, session_id != NULL ? session_id : "",
+                  sizeof(entry->session_id));
+    espui_strlcpy(entry->short_text,
+                  short_text != NULL ? short_text : entry->type,
+                  sizeof(entry->short_text));
+    entry->timestamp_ms = timestamp_ms;
+    espui_view_model_touch(model);
+}
+
+uint8_t espui_view_model_activity_count(const espui_view_model_t *model)
+{
+    return model != NULL ? model->activity_count : 0;
+}
+
+const espui_activity_view_t *espui_view_model_activity_at(
+    const espui_view_model_t *model, uint8_t index)
+{
+    if (model == NULL || index >= model->activity_count ||
+        index >= ESPUI_MAX_ACTIVITY) {
+        return NULL;
+    }
+    return &model->activity[index];
+}
+
 void espui_view_model_copy(espui_view_model_t *dst,
                            const espui_view_model_t *src)
 {

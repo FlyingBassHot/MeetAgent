@@ -29,6 +29,12 @@ void espui_input_router_set_attention_count(espui_input_router_t *router,
     }
 }
 
+uint16_t espui_input_router_focus_index(
+    const espui_input_router_t *router)
+{
+    return router != NULL ? router->focus_index : 0;
+}
+
 espui_nav_intent_t espui_input_router_feed(espui_input_router_t *router,
                                            const espui_input_event_t *event)
 {

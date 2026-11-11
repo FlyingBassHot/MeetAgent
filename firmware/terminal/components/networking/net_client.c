@@ -612,6 +612,32 @@ static void fail_pending_commands(const char *reason)
     }
 }
 
+/* Caller must hold s_model_lock. */
+static void record_activity(const char *type, const char *session_id,
+                            cJSON *business)
+{
+    char text[ESPUI_ACTIVITY_TEXT_MAX];
+    char status[24] = {0};
+    char payload_session[ESPUI_ID_MAX] = {0};
+
+    if (business != NULL) {
+        json_get_string(business, "status", status, sizeof(status));
+        json_get_string(business, "session_id", payload_session,
+                        sizeof(payload_session));
+    }
+    const char *id = session_id;
+    if ((id == NULL || id[0] == '\0') && payload_session[0] != '\0') {
+        id = payload_session;
+    }
+    if (status[0] != '\0') {
+        snprintf(text, sizeof(text), "%s", status);
+    } else {
+        snprintf(text, sizeof(text), "%s", type);
+    }
+    espui_view_model_push_activity(&s_model, type, id, text,
+                                   (uint32_t)(esp_timer_get_time() / 1000));
+}
+
 static void process_event(cJSON *root)
 {
     uint32_t started_us = (uint32_t)esp_timer_get_time();
@@ -712,6 +738,7 @@ static void process_event(cJSON *root)
     uint32_t active = 0;
     uint32_t alerts = 0;
     if (significant) {
+        record_activity(type, session_id, business);
         s_model_dirty = true;
         post_model_locked();
         agents = espui_view_model_agent_count(&s_model);

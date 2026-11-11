@@ -27,6 +27,8 @@ void espui_input_router_set_scene(espui_input_router_t *router,
                                   espui_scene_id_t scene);
 void espui_input_router_set_attention_count(espui_input_router_t *router,
                                             uint16_t attention_count);
+uint16_t espui_input_router_focus_index(
+    const espui_input_router_t *router);
 
 /* Returns ESPUI_NAV_NONE for unknown/disabled input. */
 espui_nav_intent_t espui_input_router_feed(espui_input_router_t *router,

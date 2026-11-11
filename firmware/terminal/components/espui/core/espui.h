@@ -81,6 +81,7 @@ esp_err_t espui_request_scene(const espui_context_t *ctx,
 esp_err_t espui_dispatch_action(const espui_context_t *ctx,
                                 const espui_action_t *action);
 bool espui_motion_enabled(const espui_context_t *ctx);
+uint16_t espui_focus_index(const espui_context_t *ctx);
 uint32_t espui_uptime_ms(const espui_context_t *ctx);
 
 #ifdef __cplusplus

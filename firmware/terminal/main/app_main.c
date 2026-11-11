@@ -111,6 +111,13 @@ void app_main(void)
         return;
     }
 
+    /* The canvas runtime must exist before theme init attaches its widget. */
+    err = phosphor_lvgl_port_init(board->display);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "PHOSPHOR canvas runtime not started: %s",
+                 esp_err_to_name(err));
+    }
+
     meet_net_config_t net_config = {
         .host = NULL, /* Set by provisioning in E4. */
         .port = MEET_PROTOCOL_DEFAULT_PORT,
@@ -156,12 +163,6 @@ void app_main(void)
         ESP_LOGE(TAG, "ESPUI start failed: %s", esp_err_to_name(err));
         (void)espui_stop();
         return;
-    }
-
-    err = phosphor_lvgl_port_init(board->display);
-    if (err != ESP_OK) {
-        ESP_LOGW(TAG, "PHOSPHOR P1 overlay not started: %s",
-                 esp_err_to_name(err));
     }
 
     err = meet_mock_state_start(3000);

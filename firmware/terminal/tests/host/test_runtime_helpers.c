@@ -16,10 +16,12 @@ static void test_input_router(void)
     espui_input_router_t router;
     espui_input_router_init(&router);
     TEST_ASSERT_EQ_INT(ESPUI_SCENE_AMBIENT, router.scene);
+    TEST_ASSERT_EQ_INT(0, espui_input_router_focus_index(&router));
 
     espui_input_event_t event = {.type = ESPUI_INPUT_ENCODER_CW};
     TEST_ASSERT_EQ_INT(ESPUI_NAV_NEXT, espui_input_router_feed(&router, &event));
     TEST_ASSERT_EQ_INT(1, router.focus_index);
+    TEST_ASSERT_EQ_INT(1, espui_input_router_focus_index(&router));
 
     event.type = ESPUI_INPUT_ENCODER_CCW;
     TEST_ASSERT_EQ_INT(ESPUI_NAV_PREV, espui_input_router_feed(&router, &event));

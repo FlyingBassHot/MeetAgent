@@ -7,16 +7,35 @@
  */
 #include "espui.h"
 
+static const espui_view_model_t *s_test_model;
+static const espui_renderer_ops_t *s_test_renderer;
+static uint16_t s_test_focus_index;
+
+void host_espui_stub_set_model(const espui_view_model_t *model)
+{
+    s_test_model = model;
+}
+
+void host_espui_stub_set_renderer(const espui_renderer_ops_t *ops)
+{
+    s_test_renderer = ops;
+}
+
+void host_espui_stub_set_focus_index(uint16_t index)
+{
+    s_test_focus_index = index;
+}
+
 const espui_view_model_t *espui_view_model(const espui_context_t *ctx)
 {
     (void)ctx;
-    return NULL;
+    return s_test_model;
 }
 
 const espui_renderer_ops_t *espui_renderer(const espui_context_t *ctx)
 {
     (void)ctx;
-    return NULL;
+    return s_test_renderer;
 }
 
 const espui_tokens_t *espui_tokens(const espui_context_t *ctx)
@@ -63,6 +82,12 @@ bool espui_motion_enabled(const espui_context_t *ctx)
 {
     (void)ctx;
     return true;
+}
+
+uint16_t espui_focus_index(const espui_context_t *ctx)
+{
+    (void)ctx;
+    return s_test_focus_index;
 }
 
 uint32_t espui_uptime_ms(const espui_context_t *ctx)

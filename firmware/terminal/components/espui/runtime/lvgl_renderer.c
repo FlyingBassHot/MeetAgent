@@ -6,6 +6,10 @@
 #include "esp_log.h"
 #include "lvgl.h"
 
+#if LV_COLOR_16_SWAP
+#error "ESPUI canvas expects LV_COLOR_16_SWAP=0"
+#endif
+
 #define TAG "espui_lvgl"
 #define ESPUI_RENDERER_MAX_WIDGETS 32
 
@@ -53,6 +57,9 @@ static void apply_spec(espui_ui_widget_t *widget,
         lv_obj_set_style_bg_opa(widget->obj, spec->transparent_bg ? 0 : 255, 0);
         lv_obj_set_style_border_width(widget->obj, 0, 0);
         lv_obj_set_style_radius(widget->obj, 0, 0);
+        lv_obj_set_style_pad_all(widget->obj, 0, 0);
+    } else if (widget->kind == ESPUI_WIDGET_CANVAS) {
+        lv_obj_set_style_border_width(widget->obj, 0, 0);
         lv_obj_set_style_pad_all(widget->obj, 0, 0);
     }
 }
@@ -151,6 +158,12 @@ static espui_ui_widget_t *widget_create(espui_ui_scene_t *scene,
     case ESPUI_WIDGET_RECT:
         obj = lv_obj_create(scene->root);
         break;
+    case ESPUI_WIDGET_CANVAS:
+        obj = lv_canvas_create(scene->root);
+        if (obj != NULL) {
+            lv_obj_clear_flag(obj, LV_OBJ_FLAG_CLICKABLE);
+        }
+        break;
     default:
         return NULL;
     }
@@ -199,6 +212,47 @@ static esp_err_t widget_set_visible(espui_ui_widget_t *widget, bool visible)
     return ESP_OK;
 }
 
+static esp_err_t widget_canvas_set_buffer(espui_ui_widget_t *widget,
+                                          void *buffer, uint16_t width,
+                                          uint16_t height)
+{
+    if (widget == NULL || widget->kind != ESPUI_WIDGET_CANVAS ||
+        buffer == NULL || width == 0 || height == 0) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    lv_canvas_set_buffer(widget->obj, buffer, width, height,
+                         LV_IMG_CF_TRUE_COLOR);
+    return ESP_OK;
+}
+
+static esp_err_t widget_canvas_invalidate(espui_ui_widget_t *widget)
+{
+    if (widget == NULL || widget->kind != ESPUI_WIDGET_CANVAS) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    lv_obj_invalidate(widget->obj);
+    return ESP_OK;
+}
+
+static esp_err_t widget_canvas_invalidate_area(espui_ui_widget_t *widget,
+                                               int16_t x, int16_t y,
+                                               uint16_t width,
+                                               uint16_t height)
+{
+    if (widget == NULL || widget->kind != ESPUI_WIDGET_CANVAS ||
+        width == 0 || height == 0) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    lv_area_t area = {
+        .x1 = x,
+        .y1 = y,
+        .x2 = (lv_coord_t)(x + (int16_t)width - 1),
+        .y2 = (lv_coord_t)(y + (int16_t)height - 1),
+    };
+    lv_obj_invalidate_area(widget->obj, &area);
+    return ESP_OK;
+}
+
 static const espui_renderer_ops_t s_ops = {
     .init = renderer_init,
     .deinit = renderer_deinit,
@@ -209,6 +263,9 @@ static const espui_renderer_ops_t s_ops = {
     .widget_set_text = widget_set_text,
     .widget_set_spec = widget_set_spec,
     .widget_set_visible = widget_set_visible,
+    .widget_canvas_set_buffer = widget_canvas_set_buffer,
+    .widget_canvas_invalidate = widget_canvas_invalidate,
+    .widget_canvas_invalidate_area = widget_canvas_invalidate_area,
 };
 
 static const espui_renderer_t s_renderer = {

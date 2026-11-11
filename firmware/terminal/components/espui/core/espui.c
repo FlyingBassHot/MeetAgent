@@ -736,6 +736,12 @@ bool espui_motion_enabled(const espui_context_t *ctx)
     return ctx != NULL && ctx->model.device.motion_enabled;
 }
 
+uint16_t espui_focus_index(const espui_context_t *ctx)
+{
+    return ctx != NULL ? espui_input_router_focus_index(&ctx->input_router)
+                       : 0;
+}
+
 uint32_t espui_uptime_ms(const espui_context_t *ctx)
 {
     if (ctx == NULL) {

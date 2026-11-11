@@ -10,6 +10,8 @@ void test_manifest_run(void);
 void test_input_gesture_run(void);
 void test_phosphor_run(void);
 void test_phosphor_view_model_run(void);
+void test_activity_ring_run(void);
+void test_terminal_scenes_run(void);
 void test_motion_profiles_run(void);
 void test_runtime_helpers_run(void);
 void test_scene_manager_run(void);
@@ -32,6 +34,8 @@ int main(void)
     RUN(test_input_gesture_run);
     RUN(test_phosphor_run);
     RUN(test_phosphor_view_model_run);
+    RUN(test_activity_ring_run);
+    RUN(test_terminal_scenes_run);
     RUN(test_motion_profiles_run);
     RUN(test_runtime_helpers_run);
     RUN(test_scene_manager_run);

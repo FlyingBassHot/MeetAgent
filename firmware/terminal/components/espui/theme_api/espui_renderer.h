@@ -24,6 +24,7 @@ typedef struct espui_ui_widget espui_ui_widget_t;
 typedef enum {
     ESPUI_WIDGET_LABEL = 0,
     ESPUI_WIDGET_RECT,
+    ESPUI_WIDGET_CANVAS,
 } espui_widget_kind_t;
 
 typedef enum {
@@ -60,6 +61,20 @@ typedef struct {
     esp_err_t (*widget_set_spec)(espui_ui_widget_t *widget,
                                  const espui_widget_spec_t *spec);
     esp_err_t (*widget_set_visible)(espui_ui_widget_t *widget, bool visible);
+
+    /*
+     * CANVAS widgets own an external RGB565 buffer. The buffer must stay valid
+     * until the widget/scene is destroyed. These ops are called on the UI task
+     * (or the PHOSPHOR render task under display lock).
+     */
+    esp_err_t (*widget_canvas_set_buffer)(espui_ui_widget_t *widget,
+                                          void *buffer, uint16_t width,
+                                          uint16_t height);
+    esp_err_t (*widget_canvas_invalidate)(espui_ui_widget_t *widget);
+    esp_err_t (*widget_canvas_invalidate_area)(espui_ui_widget_t *widget,
+                                               int16_t x, int16_t y,
+                                               uint16_t width,
+                                               uint16_t height);
 } espui_renderer_ops_t;
 
 typedef struct {
