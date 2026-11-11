@@ -14,6 +14,7 @@
 - E3a：字符网格、glyph ramp 密度场、ASCII Geometry、六态 Motion、Completed 有限脉冲、Scheduler/Scene 绑定、host CLI
 - E4a：Wi-Fi NVS 配网、SoftAP portal、STA/断线重连、Node `/api/v2/info` 可达性
 - E4b-1：真实 Node WebSocket、pairing_code→token、welcome/snapshot、heartbeat、自动重连
+- E4b-2：真实事件 apply、sequence 去重、replay 重建、4Hz ViewModel 节流、active-first session 截断
 
 已验证：
 
@@ -27,6 +28,7 @@
 - 启动日志：`/tmp/opencode/esp-lcd4-boot.log`
 - E4a 实测：STA 172.20.10.2，Node developer-machine/2.1.0，`/status` node_reachable=true
 - E4b-1 实测：pairing→token→snapshot、token 重启、Node 重启自动重连、heartbeat RTT 59/53ms
+- E4b-2 实测：真实事件 seq 53–59 apply、agent/session 状态与 completion 计数、Node 重启 replay 后 seq 46–52 继续 apply
 - GT911 触摸已实机确认：TL/TR/BL/BR/C 五点 + 180° 映射；临时 Touch Test overlay 已移除
 - **待人工确认**：屏幕颜色/背光亮度；AP portal `/save` 需第二台设备
 - 注意：正式固件仍不轮询 touch HAL，Mock UI 暂无可点击控件
@@ -111,7 +113,7 @@ make clean
 - Input Router、Navigation、Action Dispatcher
 - Motion Scheduler 调速、暂停、追帧上限
 - Asset Registry、Memory Budget
-- Protocol 状态映射、Snapshot → ViewModel、事件接口 stub
+- Protocol 状态映射、Snapshot/Event → ViewModel、sequence 去重、事件计数
 - ASCII Renderer：glyph ramp、密度场、几何、六态解析、Motion 缩放、Completed 脉冲、Offline 静止
 - Animation Scheduler 绑定、Scene Manager → Attention 状态联动
 - 多帧确定性快照、Canvas 裁剪与文本/几何分层
@@ -151,14 +153,14 @@ firmware/terminal/
 - `docs/VIEWMODEL.md`：ViewModel 维度、容量、所有权与状态适配
 - `docs/HARDWARE.md`：HAL 契约、stub 板、待确认硬件项
 - `docs/ASCII_RENDERER.md`：E3a 字符网格、几何、六态 Motion、CLI 与集成
-- `docs/NETWORK.md`：E4a Wi-Fi 配网、E4b-1 WebSocket/配对/心跳/重连、NVS 清理、portal 验证
+- `docs/NETWORK.md`：E4a Wi-Fi 配网、E4b-1 WebSocket/配对/心跳/重连、E4b-2 事件 apply/replay、NVS 清理、portal 验证
 - `docs/BUILD_STATUS.md`：本次构建/测试结果、阻塞与下一步
 
 ## 未实现（明确不在本次范围）
 
 - E3b：把 ASCII 帧接到 LVGL 字符网格 widget、字体/颜色 Token 映射、局部刷新
 - E3 剩余：Focus / Activity / Settings 完整场景布局、文本打字/滚动动效、真机 FPS/内存验收
-- E4b-2：event apply/replay、command/审批发送、无效 token/pairing 重试
+- E4b-3：command/审批发送、无效 token/pairing 重试、sequence gap 补偿
 - E5：主题设置持久化、亮度/夜间模式、低功耗、OTA
 - 语音 / STT、本地 AI、完整聊天、文件浏览、长历史
 - 生产 UI 触摸交互 / 旋钮驱动 / 显示颜色校准

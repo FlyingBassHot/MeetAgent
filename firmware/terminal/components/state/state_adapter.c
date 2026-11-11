@@ -1,5 +1,6 @@
 #include "state_adapter.h"
 
+#include <ctype.h>
 #include <string.h>
 
 #include "esp_log.h"
@@ -173,15 +174,328 @@ esp_err_t meet_state_adapter_apply_snapshot(
     return ESP_OK;
 }
 
+
+/* ------------------------------------------------------------------------- */
+/* Minimal JSON string extraction from event->payload_json (no cJSON)        */
+
+static const char *event_json_find_key(const char *json, const char *key)
+{
+    if (json == NULL || key == NULL) {
+        return NULL;
+    }
+    size_t key_len = strlen(key);
+    const char *p = json;
+    while (*p != '\0') {
+        if (*p != '"') {
+            ++p;
+            continue;
+        }
+        const char *start = ++p;
+        while (*p != '\0' && *p != '"') {
+            if (*p == '\\' && p[1] != '\0') {
+                p += 2;
+            } else {
+                ++p;
+            }
+        }
+        if (*p != '"') {
+            break;
+        }
+        size_t length = (size_t)(p - start);
+        const char *after = p + 1;
+        if (length == key_len && memcmp(start, key, key_len) == 0) {
+            const char *q = after;
+            while (isspace((unsigned char)*q)) {
+                ++q;
+            }
+            if (*q == ':') {
+                ++q;
+                while (isspace((unsigned char)*q)) {
+                    ++q;
+                }
+                return q;
+            }
+        }
+        ++p;
+    }
+    return NULL;
+}
+
+static bool event_json_get_string(const char *json, const char *key, char *out,
+                                  size_t size)
+{
+    if (out == NULL || size == 0) {
+        return false;
+    }
+    out[0] = '\0';
+    const char *value = event_json_find_key(json, key);
+    if (value == NULL || *value != '"') {
+        return false;
+    }
+    ++value;
+    size_t out_len = 0;
+    while (*value != '\0' && *value != '"') {
+        char c = *value++;
+        if (c == '\\') {
+            c = *value++;
+            switch (c) {
+            case '"':
+            case '\\':
+            case '/':
+                break;
+            case 'b':
+                c = '\b';
+                break;
+            case 'f':
+                c = '\f';
+                break;
+            case 'n':
+                c = '\n';
+                break;
+            case 'r':
+                c = '\r';
+                break;
+            case 't':
+                c = '\t';
+                break;
+            case 'u':
+                /* Keep the basic ASCII extractor allocation-free. */
+                for (int i = 0; i < 4 && *value != '\0'; ++i) {
+                    ++value;
+                }
+                c = '?';
+                break;
+            default:
+                break;
+            }
+        }
+        if (out_len + 1 >= size) {
+            return false;
+        }
+        out[out_len++] = c;
+    }
+    if (*value != '"') {
+        return false;
+    }
+    out[out_len] = '\0';
+    return true;
+}
+
+static void update_agent_active_sessions(espui_view_model_t *model,
+                                         const char *agent_id)
+{
+    if (model == NULL || espui_str_empty(agent_id)) {
+        return;
+    }
+    espui_agent_view_t *agent = espui_view_model_find_agent(model, agent_id);
+    if (agent != NULL) {
+        agent->active_session_count = count_active_sessions(model, agent_id);
+    }
+}
+
+static void event_get_agent_id(const meet_protocol_event_t *event,
+                               char *out, size_t size)
+{
+    if (event->agent_id[0] != '\0') {
+        espui_strlcpy(out, event->agent_id, size);
+        return;
+    }
+    (void)event_json_get_string(event->payload_json, "agent_id", out, size);
+}
+
+static void event_get_session_id(const meet_protocol_event_t *event,
+                                 char *out, size_t size)
+{
+    if (event->session_id[0] != '\0') {
+        espui_strlcpy(out, event->session_id, size);
+        return;
+    }
+    (void)event_json_get_string(event->payload_json, "session_id", out, size);
+}
+
+static espui_agent_status_t event_agent_status(const meet_protocol_event_t *event)
+{
+    if (strcmp(event->type, MEET_PROTOCOL_EVENT_AGENT_DISCONNECTED) == 0) {
+        return ESPUI_AGENT_OFFLINE;
+    }
+    if (strcmp(event->type, MEET_PROTOCOL_EVENT_AGENT_ERROR) == 0) {
+        return ESPUI_AGENT_ERROR;
+    }
+
+    char status[32];
+    if (!event_json_get_string(event->payload_json, "status", status,
+                               sizeof(status))) {
+        return ESPUI_AGENT_IDLE;
+    }
+    return map_agent(meet_protocol_agent_status_from_string(status));
+}
+
+static void apply_agent_event(const meet_protocol_event_t *event,
+                              espui_view_model_t *model)
+{
+    char agent_id[ESPUI_ID_MAX];
+    event_get_agent_id(event, agent_id, sizeof(agent_id));
+    if (espui_str_empty(agent_id)) {
+        return;
+    }
+    espui_agent_view_t *agent =
+        espui_view_model_upsert_agent(model, agent_id);
+    if (agent == NULL) {
+        ESP_LOGW(TAG, "agent capacity reached for %s", agent_id);
+        return;
+    }
+    agent->status = event_agent_status(event);
+    if (strcmp(event->type, MEET_PROTOCOL_EVENT_AGENT_CONNECTED) == 0) {
+        char status[32];
+        if (event_json_get_string(event->payload_json, "status", status,
+                                  sizeof(status))) {
+            agent->status = map_agent(
+                meet_protocol_agent_status_from_string(status));
+        } else {
+            agent->status = ESPUI_AGENT_IDLE;
+        }
+    }
+}
+
+static void apply_session_event(const meet_protocol_event_t *event,
+                                espui_view_model_t *model, uint32_t now_ms)
+{
+    char session_id[ESPUI_ID_MAX];
+    event_get_session_id(event, session_id, sizeof(session_id));
+    if (espui_str_empty(session_id)) {
+        return;
+    }
+
+    if (strcmp(event->type, MEET_PROTOCOL_EVENT_SESSION_DELETED) == 0) {
+        espui_session_view_t *existing =
+            espui_view_model_find_session(model, session_id);
+        char agent_id[ESPUI_ID_MAX] = {0};
+        if (existing != NULL) {
+            espui_strlcpy(agent_id, existing->agent_id, sizeof(agent_id));
+        }
+        if (espui_view_model_remove_session(model, session_id)) {
+            update_agent_active_sessions(model, agent_id);
+        }
+        return;
+    }
+
+    espui_session_view_t *session =
+        espui_view_model_upsert_session(model, session_id);
+    if (session == NULL) {
+        ESP_LOGW(TAG, "session capacity reached for %s", session_id);
+        return;
+    }
+
+    char agent_id[ESPUI_ID_MAX] = {0};
+    event_get_agent_id(event, agent_id, sizeof(agent_id));
+    if (agent_id[0] == '\0') {
+        espui_strlcpy(agent_id, session->agent_id, sizeof(agent_id));
+    }
+    if (agent_id[0] != '\0') {
+        espui_strlcpy(session->agent_id, agent_id, sizeof(session->agent_id));
+    }
+
+    char title[ESPUI_TITLE_MAX];
+    if (event_json_get_string(event->payload_json, "title", title,
+                              sizeof(title)) &&
+        title[0] != '\0') {
+        espui_strlcpy(session->title, title, sizeof(session->title));
+    }
+    char status[32];
+    if (event_json_get_string(event->payload_json, "status", status,
+                              sizeof(status)) &&
+        status[0] != '\0') {
+        session->status =
+            map_session(meet_protocol_session_status_from_string(status));
+    }
+    session->updated_at_ms = now_ms;
+    update_agent_active_sessions(model, session->agent_id);
+}
+
+static void apply_permission_event(const meet_protocol_event_t *event,
+                                   espui_view_model_t *model, uint32_t now_ms)
+{
+    char permission_id[ESPUI_ID_MAX];
+    if (!event_json_get_string(event->payload_json, "permission_id",
+                               permission_id, sizeof(permission_id))) {
+        return;
+    }
+
+    if (strcmp(event->type, MEET_PROTOCOL_EVENT_PERMISSION_RESOLVED) == 0) {
+        (void)espui_view_model_resolve_attention(model, permission_id);
+        return;
+    }
+
+    char description[ESPUI_TITLE_MAX];
+    char action[ESPUI_TITLE_MAX];
+    event_json_get_string(event->payload_json, "description", description,
+                          sizeof(description));
+    event_json_get_string(event->payload_json, "action", action,
+                          sizeof(action));
+    char session_id[ESPUI_ID_MAX] = {0};
+    event_get_session_id(event, session_id, sizeof(session_id));
+    if (session_id[0] == '\0') {
+        event_json_get_string(event->payload_json, "session_id", session_id,
+                              sizeof(session_id));
+    }
+
+    espui_attention_view_t *attention = espui_view_model_push_attention(
+        model, permission_id, ESPUI_ATTENTION_APPROVAL);
+    if (attention == NULL) {
+        ESP_LOGW(TAG, "attention capacity reached for %s", permission_id);
+        return;
+    }
+    espui_strlcpy(attention->session_id, session_id,
+                  sizeof(attention->session_id));
+    espui_strlcpy(attention->summary,
+                  description[0] != '\0' ? description : action,
+                  sizeof(attention->summary));
+    attention->created_at_ms = now_ms;
+}
+
 esp_err_t meet_state_adapter_apply_event(meet_state_adapter_t *adapter,
                                          const meet_protocol_event_t *event,
                                          uint32_t now_ms,
                                          espui_view_model_t *model)
 {
-    (void)adapter;
-    (void)event;
-    (void)now_ms;
-    (void)model;
-    ESP_LOGW(TAG, "event application is an E4 task");
-    return ESP_ERR_NOT_SUPPORTED;
+    if (adapter == NULL || event == NULL || model == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (event->schema_version != MEET_PROTOCOL_SCHEMA_VERSION) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (event->sequence <= adapter->last_sequence) {
+        ++adapter->ignored_events;
+        return ESP_OK;
+    }
+
+    adapter->last_sequence = event->sequence;
+
+    if (strcmp(event->type, MEET_PROTOCOL_EVENT_AGENT_CONNECTED) == 0 ||
+        strcmp(event->type, MEET_PROTOCOL_EVENT_AGENT_DISCONNECTED) == 0 ||
+        strcmp(event->type, MEET_PROTOCOL_EVENT_AGENT_STATUS_CHANGED) == 0 ||
+        strcmp(event->type, MEET_PROTOCOL_EVENT_AGENT_ERROR) == 0) {
+        apply_agent_event(event, model);
+    } else if (strcmp(event->type, MEET_PROTOCOL_EVENT_SESSION_CREATED) == 0 ||
+               strcmp(event->type, MEET_PROTOCOL_EVENT_SESSION_UPDATED) == 0 ||
+               strcmp(event->type,
+                      MEET_PROTOCOL_EVENT_SESSION_STATUS_CHANGED) == 0 ||
+               strcmp(event->type, MEET_PROTOCOL_EVENT_SESSION_DELETED) == 0) {
+        apply_session_event(event, model, now_ms);
+    } else if (strcmp(event->type,
+                      MEET_PROTOCOL_EVENT_PERMISSION_REQUESTED) == 0 ||
+               strcmp(event->type,
+                      MEET_PROTOCOL_EVENT_PERMISSION_RESOLVED) == 0) {
+        apply_permission_event(event, model, now_ms);
+    } else if (strcmp(event->type, MEET_PROTOCOL_EVENT_TOOL_FAILED) == 0) {
+        espui_view_model_note_error(model);
+    } else if (strcmp(event->type,
+                      MEET_PROTOCOL_EVENT_MESSAGE_COMPLETED) == 0) {
+        espui_view_model_note_completion(model);
+    } else {
+        ESP_LOGD(TAG, "ignored event type=%s seq=%llu", event->type,
+                 (unsigned long long)event->sequence);
+    }
+
+    return ESP_OK;
 }

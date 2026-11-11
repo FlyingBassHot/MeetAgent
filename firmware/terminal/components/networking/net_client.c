@@ -1,5 +1,5 @@
 /*
- * MeetAgent V2.1 terminal WebSocket client (E4b-1).
+ * MeetAgent V2.1 terminal WebSocket client (E4b-2).
  *
  * Large welcome frames are accumulated in a 128 KB PSRAM buffer. Before cJSON
  * touches a welcome, the snapshot.events array is replaced with [] in place
@@ -64,6 +64,7 @@ static EventGroupHandle_t s_events;
 static esp_websocket_client_handle_t s_ws;
 static TaskHandle_t s_task;
 static SemaphoreHandle_t s_lifecycle_lock;
+static SemaphoreHandle_t s_model_lock;
 static volatile bool s_running;
 
 static char s_token[256];
@@ -89,6 +90,8 @@ static char s_hb_nonce[40];
 static volatile bool s_hb_pending;
 static uint32_t s_hb_sent_ms;
 static volatile uint32_t s_hb_missed;
+static bool s_model_dirty;
+static uint32_t s_last_post_ms;
 
 static void copy_str(char *dst, size_t size, const char *src)
 {
@@ -544,8 +547,37 @@ static void process_heartbeat(cJSON *root)
     ESP_LOGI(TAG, "heartbeat RTT=%u ms", (unsigned)rtt_ms);
 }
 
+/* Caller must hold s_model_lock. */
+static void post_model_locked(void)
+{
+    if (!s_model_dirty) {
+        return;
+    }
+    uint32_t now_ms = (uint32_t)(esp_timer_get_time() / 1000);
+    if (s_last_post_ms != 0 && now_ms - s_last_post_ms < 250) {
+        return; /* at most 4 posts/second */
+    }
+    if (espui_post_view_model(&s_model) == ESP_OK) {
+        s_model_dirty = false;
+        s_last_post_ms = now_ms;
+    }
+}
+
+static void post_model_if_due(void)
+{
+    if (s_model_lock == NULL) {
+        return;
+    }
+    if (xSemaphoreTake(s_model_lock, portMAX_DELAY) != pdTRUE) {
+        return;
+    }
+    post_model_locked();
+    (void)xSemaphoreGive(s_model_lock);
+}
+
 static void process_event(cJSON *root)
 {
+    uint32_t started_us = (uint32_t)esp_timer_get_time();
     /* Event envelope: {type:"event", payload:{type, sequence, ...}}. */
     cJSON *payload = json_item(root, "payload");
     if (!cJSON_IsObject(payload)) {
@@ -556,21 +588,115 @@ static void process_event(cJSON *root)
     char agent_id[40];
     char session_id[40];
     char event_id[40];
+    char node_id[64];
     json_get_string(payload, "type", type, sizeof(type));
     json_get_string(payload, "agent_id", agent_id, sizeof(agent_id));
     json_get_string(payload, "session_id", session_id, sizeof(session_id));
     json_get_string(payload, "event_id", event_id, sizeof(event_id));
+    json_get_string(payload, "node_id", node_id, sizeof(node_id));
     uint64_t sequence = json_get_u64(payload, "sequence");
-    if (sequence > s_last_sequence) {
-        s_last_sequence = sequence;
+
+    /* Only state-bearing events need their business payload re-serialized.
+     * message.delta, tool events and message.completed are counted/ignored
+     * without copying potentially large text into internal RAM. */
+    bool needs_payload =
+        strncmp(type, "agent.", 6) == 0 ||
+        strncmp(type, "session.", 8) == 0 ||
+        strncmp(type, "permission.", 11) == 0;
+    cJSON *business = needs_payload ? json_item(payload, "payload") : NULL;
+    char *payload_json =
+        business != NULL ? cJSON_PrintUnformatted(business) : NULL;
+    if (payload_json == NULL && business != NULL) {
+        ESP_LOGW(TAG, "event payload serialization failed type=%s seq=%llu",
+                 type, (unsigned long long)sequence);
     }
-    ESP_LOGI(TAG, "event type=%s seq=%llu event_id=%s agent=%s session=%s",
-             type[0] != '\0' ? type : "unknown",
-             (unsigned long long)sequence,
-             event_id[0] != '\0' ? event_id : "-",
-             agent_id[0] != '\0' ? agent_id : "-",
-             session_id[0] != '\0' ? session_id : "-");
-    /* E4b-2 will apply the event; E4b-1 only observes the stream. */
+
+    meet_protocol_event_t event;
+    memset(&event, 0, sizeof(event));
+    event.schema_version = MEET_PROTOCOL_SCHEMA_VERSION;
+    copy_str(event.event_id, sizeof(event.event_id), event_id);
+    copy_str(event.node_id, sizeof(event.node_id), node_id);
+    copy_str(event.type, sizeof(event.type), type);
+    copy_str(event.agent_id, sizeof(event.agent_id), agent_id);
+    copy_str(event.session_id, sizeof(event.session_id), session_id);
+    event.sequence = sequence;
+    event.payload_json = payload_json;
+    event.payload_len = payload_json != NULL ? strlen(payload_json) : 0;
+
+    uint64_t previous = s_adapter.last_sequence;
+    bool old = sequence <= previous;
+    if (!old && previous > 0 && sequence > previous + 1) {
+        ESP_LOGW(TAG, "sequence gap previous=%llu current=%llu",
+                 (unsigned long long)previous,
+                 (unsigned long long)sequence);
+    }
+
+    if (s_model_lock == NULL) {
+        if (payload_json != NULL) {
+            cJSON_free(payload_json);
+        }
+        return;
+    }
+    if (xSemaphoreTake(s_model_lock, portMAX_DELAY) != pdTRUE) {
+        if (payload_json != NULL) {
+            cJSON_free(payload_json);
+        }
+        return;
+    }
+    esp_err_t apply_err = meet_state_adapter_apply_event(
+        &s_adapter, &event, (uint32_t)(esp_timer_get_time() / 1000), &s_model);
+    if (payload_json != NULL) {
+        cJSON_free(payload_json);
+    }
+    if (apply_err != ESP_OK) {
+        (void)xSemaphoreGive(s_model_lock);
+        ESP_LOGW(TAG, "event apply failed type=%s seq=%llu err=%s", type,
+                 (unsigned long long)sequence, esp_err_to_name(apply_err));
+        return;
+    }
+    s_last_sequence = s_adapter.last_sequence;
+
+    if (old) {
+        (void)xSemaphoreGive(s_model_lock);
+        ESP_LOGD(TAG, "old event ignored type=%s seq=%llu adapter_seq=%llu",
+                 type, (unsigned long long)sequence,
+                 (unsigned long long)s_adapter.last_sequence);
+        return;
+    }
+
+    bool significant =
+        strncmp(type, "session.", 8) == 0 ||
+        strncmp(type, "agent.", 6) == 0 ||
+        strncmp(type, "permission.", 11) == 0 ||
+        strcmp(type, MEET_PROTOCOL_EVENT_MESSAGE_COMPLETED) == 0 ||
+        strcmp(type, MEET_PROTOCOL_EVENT_TOOL_FAILED) == 0;
+    uint32_t agents = 0;
+    uint32_t sessions = 0;
+    uint32_t active = 0;
+    uint32_t alerts = 0;
+    if (significant) {
+        s_model_dirty = true;
+        post_model_locked();
+        agents = espui_view_model_agent_count(&s_model);
+        sessions = espui_view_model_session_count(&s_model);
+        active = espui_view_model_active_session_count(&s_model);
+        alerts = espui_view_model_attention_count(&s_model);
+    }
+    (void)xSemaphoreGive(s_model_lock);
+
+    if (significant) {
+        uint32_t took_us =
+            (uint32_t)esp_timer_get_time() - started_us;
+        ESP_LOGI(TAG,
+                 "event applied type=%s seq=%llu agents=%u sessions=%u "
+                 "active=%u alerts=%u took_us=%u",
+                 type, (unsigned long long)sequence, (unsigned)agents,
+                 (unsigned)sessions, (unsigned)active, (unsigned)alerts,
+                 (unsigned)took_us);
+    } else {
+        ESP_LOGD(TAG, "event observed type=%s seq=%llu", type,
+                 (unsigned long long)sequence);
+    }
 }
 
 static void process_error(cJSON *root)
@@ -696,36 +822,49 @@ static void process_welcome(cJSON *root, uint32_t parse_ms)
         int session_count = cJSON_GetArraySize(sessions);
         sessions_total += session_count;
         if (agent != NULL) {
-            for (int j = 0; j < session_count; ++j) {
-                if (sessions_stored >= ESPUI_MAX_SESSIONS ||
-                    agent->session_count >= MEET_PROTOCOL_MAX_SESSIONS) {
-                    break;
+            /* Store active sessions first, then completed/other ones. */
+            for (int pass = 0; pass < 2; ++pass) {
+                for (int j = 0; j < session_count; ++j) {
+                    if (sessions_stored >= ESPUI_MAX_SESSIONS ||
+                        agent->session_count >= MEET_PROTOCOL_MAX_SESSIONS) {
+                        break;
+                    }
+                    cJSON *session_obj = cJSON_GetArrayItem(sessions, j);
+                    if (!cJSON_IsObject(session_obj)) {
+                        continue;
+                    }
+                    char status_text[32] = {0};
+                    json_get_string(session_obj, "status", status_text,
+                                    sizeof(status_text));
+                    meet_session_status_t mapped =
+                        meet_protocol_session_status_from_string(status_text);
+                    bool active = mapped == MEET_SESSION_RUNNING ||
+                                  mapped == MEET_SESSION_WAITING_APPROVAL;
+                    if ((pass == 0 && !active) || (pass == 1 && active)) {
+                        continue;
+                    }
+
+                    meet_protocol_session_t *session =
+                        &agent->sessions[agent->session_count];
+                    char session_id[40], session_agent[40], title[48];
+                    json_get_string(session_obj, "session_id", session_id,
+                                    sizeof(session_id));
+                    if (session_id[0] == '\0') {
+                        continue;
+                    }
+                    json_get_string(session_obj, "agent_id", session_agent,
+                                    sizeof(session_agent));
+                    json_get_string(session_obj, "title", title, sizeof(title));
+                    copy_str(session->session_id, sizeof(session->session_id),
+                             session_id);
+                    copy_str(session->agent_id, sizeof(session->agent_id),
+                             session_agent[0] != '\0' ? session_agent
+                                                      : agent->agent_id);
+                    copy_str(session->title, sizeof(session->title), title);
+                    session->status = mapped;
+                    ++agent->session_count;
+                    ++sessions_stored;
                 }
-                cJSON *session_obj = cJSON_GetArrayItem(sessions, j);
-                if (!cJSON_IsObject(session_obj)) {
-                    continue;
-                }
-                meet_protocol_session_t *session =
-                    &agent->sessions[agent->session_count];
-                char session_id[40], session_agent[40], title[48], status[32];
-                json_get_string(session_obj, "session_id", session_id,
-                                sizeof(session_id));
-                if (session_id[0] == '\0') {
-                    continue;
-                }
-                json_get_string(session_obj, "agent_id", session_agent,
-                                sizeof(session_agent));
-                json_get_string(session_obj, "title", title, sizeof(title));
-                json_get_string(session_obj, "status", status, sizeof(status));
-                copy_str(session->session_id, sizeof(session->session_id),
-                         session_id);
-                copy_str(session->agent_id, sizeof(session->agent_id),
-                         session_agent[0] != '\0' ? session_agent : agent->agent_id);
-                copy_str(session->title, sizeof(session->title), title);
-                session->status =
-                    meet_protocol_session_status_from_string(status);
-                ++agent->session_count;
-                ++sessions_stored;
             }
             if (agent->agent_id[0] != '\0') {
                 ++stored_agents;
@@ -786,29 +925,41 @@ static void process_welcome(cJSON *root, uint32_t parse_ms)
     }
 
     uint32_t now_ms = (uint32_t)(esp_timer_get_time() / 1000);
+    if (s_model_lock == NULL) {
+        ESP_LOGE(TAG, "model lock missing; snapshot not applied");
+        return;
+    }
+    if (xSemaphoreTake(s_model_lock, portMAX_DELAY) != pdTRUE) {
+        ESP_LOGE(TAG, "model lock unavailable; snapshot not applied");
+        return;
+    }
     esp_err_t apply_err = meet_state_adapter_apply_snapshot(
         &s_adapter, s_snapshot, now_ms, &s_model);
     if (apply_err != ESP_OK) {
+        (void)xSemaphoreGive(s_model_lock);
         ESP_LOGE(TAG, "snapshot apply failed: %s", esp_err_to_name(apply_err));
         return;
     }
 
     int vm_sessions = espui_view_model_session_count(&s_model);
     s_summary.sessions_stored = vm_sessions;
-    esp_err_t post_err = ESP_FAIL;
-    for (int attempt = 0; attempt < 3; ++attempt) {
-        post_err = espui_post_view_model(&s_model);
-        if (post_err == ESP_OK) {
-            break;
-        }
-        vTaskDelay(pdMS_TO_TICKS(100));
-    }
+    esp_err_t post_err = espui_post_view_model(&s_model);
     if (post_err != ESP_OK) {
-        ESP_LOGW(TAG, "snapshot post failed: %s", esp_err_to_name(post_err));
-    } else if (!s_mock_stopped) {
+        s_model_dirty = true;
+        s_last_post_ms = 0;
+    } else {
+        s_model_dirty = false;
+        s_last_post_ms = now_ms;
+    }
+    (void)xSemaphoreGive(s_model_lock);
+
+    if (!s_mock_stopped) {
         (void)meet_mock_state_stop();
         s_mock_stopped = true;
         ESP_LOGI(TAG, "mock state stopped; real snapshot owns the ViewModel");
+    }
+    if (post_err != ESP_OK) {
+        ESP_LOGW(TAG, "snapshot post failed: %s", esp_err_to_name(post_err));
     }
 
     save_last_sequence();
@@ -1094,10 +1245,11 @@ static void heartbeat_loop(void)
     while (s_running) {
         EventBits_t bits = xEventGroupWaitBits(
             s_events, WS_CLOSED_BIT | WS_AUTH_FAILED_BIT, pdFALSE, pdFALSE,
-            pdMS_TO_TICKS(1000));
+            pdMS_TO_TICKS(250));
         if ((bits & (WS_CLOSED_BIT | WS_AUTH_FAILED_BIT)) != 0) {
             break;
         }
+        post_model_if_due();
 
         meet_wifi_status_t wifi;
         meet_wifi_prov_get_status(&wifi);
@@ -1152,6 +1304,10 @@ static void net_task_cleanup(void)
         heap_caps_free(s_snapshot);
         s_snapshot = NULL;
     }
+    if (s_model_lock != NULL) {
+        vSemaphoreDelete(s_model_lock);
+        s_model_lock = NULL;
+    }
     if (s_lifecycle_lock != NULL) {
         (void)xSemaphoreTake(s_lifecycle_lock, portMAX_DELAY);
     }
@@ -1159,10 +1315,12 @@ static void net_task_cleanup(void)
         vEventGroupDelete(s_events);
         s_events = NULL;
     }
-    s_task = NULL;
     if (s_lifecycle_lock != NULL) {
         (void)xSemaphoreGive(s_lifecycle_lock);
     }
+    /* Publish task exit only after dropping s_lifecycle_lock; stop() may then
+     * delete the lifecycle mutex. */
+    s_task = NULL;
 }
 
 static void net_task(void *arg)
@@ -1334,8 +1492,18 @@ esp_err_t meet_net_client_start(meet_net_client_t *client)
             return ESP_ERR_NO_MEM;
         }
     }
+    if (s_model_lock == NULL) {
+        s_model_lock = xSemaphoreCreateMutex();
+        if (s_model_lock == NULL) {
+            vSemaphoreDelete(s_lifecycle_lock);
+            s_lifecycle_lock = NULL;
+            return ESP_ERR_NO_MEM;
+        }
+    }
     s_events = xEventGroupCreate();
     if (s_events == NULL) {
+        vSemaphoreDelete(s_model_lock);
+        s_model_lock = NULL;
         vSemaphoreDelete(s_lifecycle_lock);
         s_lifecycle_lock = NULL;
         return ESP_ERR_NO_MEM;
@@ -1348,6 +1516,8 @@ esp_err_t meet_net_client_start(meet_net_client_t *client)
         s_task = NULL;
         vEventGroupDelete(s_events);
         s_events = NULL;
+        vSemaphoreDelete(s_model_lock);
+        s_model_lock = NULL;
         vSemaphoreDelete(s_lifecycle_lock);
         s_lifecycle_lock = NULL;
         return ESP_ERR_NO_MEM;
@@ -1401,7 +1571,7 @@ esp_err_t meet_net_client_send_action(meet_net_client_t *client,
     }
     static bool warned;
     if (!warned) {
-        ESP_LOGW(TAG, "send_action is not implemented in E4b-1");
+        ESP_LOGW(TAG, "send_action is not implemented before E4b-3");
         warned = true;
     }
     return ESP_ERR_NOT_SUPPORTED;

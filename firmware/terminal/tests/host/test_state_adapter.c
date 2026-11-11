@@ -239,22 +239,244 @@ static void test_invalid_snapshot_does_not_mutate(void)
                                                          NULL));
 }
 
-static void test_apply_event_is_stubbed(void)
+static meet_protocol_event_t make_event(const char *type, uint64_t sequence,
+                                        const char *agent_id,
+                                        const char *session_id,
+                                        const char *payload_json)
+{
+    meet_protocol_event_t event;
+    memset(&event, 0, sizeof(event));
+    event.schema_version = MEET_PROTOCOL_SCHEMA_VERSION;
+    event.sequence = sequence;
+    snprintf(event.type, sizeof(event.type), "%s", type);
+    if (agent_id != NULL) {
+        snprintf(event.agent_id, sizeof(event.agent_id), "%s", agent_id);
+    }
+    if (session_id != NULL) {
+        snprintf(event.session_id, sizeof(event.session_id), "%s", session_id);
+    }
+    event.payload_json = payload_json;
+    event.payload_len = payload_json != NULL ? strlen(payload_json) : 0;
+    return event;
+}
+
+static void test_event_agent_status_and_sequence(void)
 {
     meet_state_adapter_t adapter;
     meet_state_adapter_init(&adapter);
     espui_view_model_t model;
     espui_view_model_init(&model);
 
-    meet_protocol_event_t event;
-    memset(&event, 0, sizeof(event));
-    event.schema_version = MEET_PROTOCOL_SCHEMA_VERSION;
-    event.sequence = 200;
+    meet_protocol_event_t event = make_event(
+        MEET_PROTOCOL_EVENT_AGENT_STATUS_CHANGED, 100, "agent-1", NULL,
+        "{\"status\":\"busy\",\"previous\":\"idle\"}");
+    TEST_ASSERT_EQ_INT(ESP_OK, meet_state_adapter_apply_event(&adapter, &event,
+                                                              1234, &model));
+    TEST_ASSERT_EQ_INT(100, adapter.last_sequence);
+    const espui_agent_view_t *agent =
+        espui_view_model_find_agent_const(&model, "agent-1");
+    TEST_ASSERT_NOT_NULL(agent);
+    TEST_ASSERT_EQ_INT(ESPUI_AGENT_BUSY, agent->status);
 
-    TEST_ASSERT_EQ_INT(ESP_ERR_NOT_SUPPORTED,
-                       meet_state_adapter_apply_event(&adapter, &event, 1,
+    uint32_t revision = model.revision;
+    event = make_event(MEET_PROTOCOL_EVENT_AGENT_STATUS_CHANGED, 100, "agent-1",
+                       NULL, "{\"status\":\"idle\"}");
+    TEST_ASSERT_EQ_INT(ESP_OK, meet_state_adapter_apply_event(&adapter, &event,
+                                                              1234, &model));
+    TEST_ASSERT_EQ_INT(100, adapter.last_sequence);
+    TEST_ASSERT_EQ_INT(1, adapter.ignored_events);
+    TEST_ASSERT_EQ_INT(revision, model.revision);
+
+    event = make_event(MEET_PROTOCOL_EVENT_AGENT_DISCONNECTED, 101, "agent-1",
+                       NULL, "{}");
+    TEST_ASSERT_EQ_INT(ESP_OK, meet_state_adapter_apply_event(&adapter, &event,
+                                                              1234, &model));
+    agent = espui_view_model_find_agent_const(&model, "agent-1");
+    TEST_ASSERT_EQ_INT(ESPUI_AGENT_OFFLINE, agent->status);
+
+    event = make_event(MEET_PROTOCOL_EVENT_AGENT_ERROR, 102, "agent-1", NULL,
+                       "{\"error\":\"boom\"}");
+    TEST_ASSERT_EQ_INT(ESP_OK, meet_state_adapter_apply_event(&adapter, &event,
+                                                              1234, &model));
+    agent = espui_view_model_find_agent_const(&model, "agent-1");
+    TEST_ASSERT_EQ_INT(ESPUI_AGENT_ERROR, agent->status);
+
+    event = make_event(MEET_PROTOCOL_EVENT_AGENT_CONNECTED, 103, "agent-1",
+                       NULL, "{}");
+    TEST_ASSERT_EQ_INT(ESP_OK, meet_state_adapter_apply_event(&adapter, &event,
+                                                              1234, &model));
+    agent = espui_view_model_find_agent_const(&model, "agent-1");
+    TEST_ASSERT_EQ_INT(ESPUI_AGENT_IDLE, agent->status);
+    TEST_ASSERT_EQ_INT(103, adapter.last_sequence);
+}
+
+static void test_event_session_lifecycle(void)
+{
+    meet_state_adapter_t adapter;
+    meet_state_adapter_init(&adapter);
+    espui_view_model_t model;
+    espui_view_model_init(&model);
+    TEST_ASSERT_NOT_NULL(espui_view_model_upsert_agent(&model, "agent-1"));
+
+    meet_protocol_event_t event = make_event(
+        MEET_PROTOCOL_EVENT_SESSION_CREATED, 200, "agent-1", "ses-1",
+        "{\"session_id\":\"ses-1\",\"title\":\"First\","
+        "\"status\":\"running\"}");
+    TEST_ASSERT_EQ_INT(ESP_OK, meet_state_adapter_apply_event(&adapter, &event,
+                                                              500, &model));
+    const espui_session_view_t *session =
+        espui_view_model_find_session_const(&model, "ses-1");
+    TEST_ASSERT_NOT_NULL(session);
+    TEST_ASSERT_EQ_INT(ESPUI_SESSION_RUNNING, session->status);
+    TEST_ASSERT_STR_EQ("First", session->title);
+    TEST_ASSERT_EQ_INT(500, session->updated_at_ms);
+    const espui_agent_view_t *agent =
+        espui_view_model_find_agent_const(&model, "agent-1");
+    TEST_ASSERT_EQ_INT(1, agent->active_session_count);
+
+    event = make_event(MEET_PROTOCOL_EVENT_SESSION_STATUS_CHANGED, 201,
+                       "agent-1", "ses-1",
+                       "{\"session_id\":\"ses-1\","
+                       "\"status\":\"waiting_approval\"}");
+    TEST_ASSERT_EQ_INT(ESP_OK, meet_state_adapter_apply_event(&adapter, &event,
+                                                              600, &model));
+    session = espui_view_model_find_session_const(&model, "ses-1");
+    TEST_ASSERT_EQ_INT(ESPUI_SESSION_WAITING_APPROVAL, session->status);
+    TEST_ASSERT_EQ_INT(600, session->updated_at_ms);
+    agent = espui_view_model_find_agent_const(&model, "agent-1");
+    TEST_ASSERT_EQ_INT(1, agent->active_session_count);
+
+    event = make_event(MEET_PROTOCOL_EVENT_SESSION_STATUS_CHANGED, 202,
+                       "agent-1", "ses-1",
+                       "{\"session_id\":\"ses-1\","
+                       "\"status\":\"completed\"}");
+    TEST_ASSERT_EQ_INT(ESP_OK, meet_state_adapter_apply_event(&adapter, &event,
+                                                              700, &model));
+    agent = espui_view_model_find_agent_const(&model, "agent-1");
+    TEST_ASSERT_EQ_INT(0, agent->active_session_count);
+
+    event = make_event(MEET_PROTOCOL_EVENT_SESSION_UPDATED, 203, "agent-1",
+                       "ses-1",
+                       "{\"session_id\":\"ses-1\","
+                       "\"title\":\"Renamed\",\"status\":\"running\"}");
+    TEST_ASSERT_EQ_INT(ESP_OK, meet_state_adapter_apply_event(&adapter, &event,
+                                                              800, &model));
+    session = espui_view_model_find_session_const(&model, "ses-1");
+    TEST_ASSERT_STR_EQ("Renamed", session->title);
+    TEST_ASSERT_EQ_INT(ESPUI_SESSION_RUNNING, session->status);
+    agent = espui_view_model_find_agent_const(&model, "agent-1");
+    TEST_ASSERT_EQ_INT(1, agent->active_session_count);
+
+    event = make_event(MEET_PROTOCOL_EVENT_SESSION_DELETED, 204, "agent-1",
+                       "ses-1",
+                       "{\"session_id\":\"ses-1\",\"status\":\"deleted\"}");
+    TEST_ASSERT_EQ_INT(ESP_OK, meet_state_adapter_apply_event(&adapter, &event,
+                                                              900, &model));
+    TEST_ASSERT_NULL(espui_view_model_find_session_const(&model, "ses-1"));
+    agent = espui_view_model_find_agent_const(&model, "agent-1");
+    TEST_ASSERT_EQ_INT(0, agent->active_session_count);
+
+    /* A late replay of the deleted session must not resurrect it. */
+    event = make_event(MEET_PROTOCOL_EVENT_SESSION_CREATED, 203, "agent-1",
+                       "ses-1",
+                       "{\"status\":\"running\",\"title\":\"Old\"}");
+    TEST_ASSERT_EQ_INT(ESP_OK, meet_state_adapter_apply_event(&adapter, &event,
+                                                              1000, &model));
+    TEST_ASSERT_NULL(espui_view_model_find_session_const(&model, "ses-1"));
+    TEST_ASSERT_EQ_INT(204, adapter.last_sequence);
+}
+
+static void test_event_permission_and_alerts(void)
+{
+    meet_state_adapter_t adapter;
+    meet_state_adapter_init(&adapter);
+    espui_view_model_t model;
+    espui_view_model_init(&model);
+
+    meet_protocol_event_t event = make_event(
+        MEET_PROTOCOL_EVENT_PERMISSION_REQUESTED, 300, "agent-1", "ses-1",
+        "{\"permission_id\":\"per-1\","
+        "\"description\":\"read \\\"file\\\"\","
+        "\"action\":\"read\",\"status\":\"pending\"}");
+    TEST_ASSERT_EQ_INT(ESP_OK, meet_state_adapter_apply_event(&adapter, &event,
+                                                              1100, &model));
+    TEST_ASSERT_EQ_INT(1, model.approval_count);
+    TEST_ASSERT_EQ_INT(1, espui_view_model_attention_count(&model));
+    const espui_attention_view_t *attention = &model.attention[0];
+    TEST_ASSERT_STR_EQ("per-1", attention->permission_id);
+    TEST_ASSERT_STR_EQ("read \"file\"", attention->summary);
+    TEST_ASSERT_STR_EQ("ses-1", attention->session_id);
+    TEST_ASSERT_EQ_INT(1100, attention->created_at_ms);
+
+    event = make_event(MEET_PROTOCOL_EVENT_PERMISSION_RESOLVED, 301, "agent-1",
+                       "ses-1",
+                       "{\"permission_id\":\"per-1\","
+                       "\"status\":\"approved\",\"decision\":\"once\"}");
+    TEST_ASSERT_EQ_INT(ESP_OK, meet_state_adapter_apply_event(&adapter, &event,
+                                                              1200, &model));
+    TEST_ASSERT_EQ_INT(0, model.approval_count);
+    TEST_ASSERT_EQ_INT(0, espui_view_model_attention_count(&model));
+
+    event = make_event(MEET_PROTOCOL_EVENT_TOOL_FAILED, 302, "agent-1", NULL,
+                       "{\"call_id\":\"c1\",\"status\":\"failed\"}");
+    TEST_ASSERT_EQ_INT(ESP_OK, meet_state_adapter_apply_event(&adapter, &event,
+                                                              1300, &model));
+    TEST_ASSERT_EQ_INT(1, model.error_count);
+    event.sequence = 303;
+    TEST_ASSERT_EQ_INT(ESP_OK, meet_state_adapter_apply_event(&adapter, &event,
+                                                              1300, &model));
+    TEST_ASSERT_EQ_INT(2, model.error_count);
+
+    event = make_event(MEET_PROTOCOL_EVENT_MESSAGE_COMPLETED, 304, "agent-1",
+                       NULL, "{}");
+    TEST_ASSERT_EQ_INT(ESP_OK, meet_state_adapter_apply_event(&adapter, &event,
+                                                              1400, &model));
+    TEST_ASSERT_EQ_INT(1, model.completion_count);
+    event.sequence = 305;
+    TEST_ASSERT_EQ_INT(ESP_OK, meet_state_adapter_apply_event(&adapter, &event,
+                                                              1400, &model));
+    TEST_ASSERT_EQ_INT(2, model.completion_count);
+}
+
+static void test_event_alert_cap_and_unknown(void)
+{
+    meet_state_adapter_t adapter;
+    meet_state_adapter_init(&adapter);
+    espui_view_model_t model;
+    espui_view_model_init(&model);
+
+    for (uint64_t seq = 400; seq < 400 + ESPUI_ALERT_COUNT_MAX + 5; ++seq) {
+        meet_protocol_event_t event = make_event(
+            MEET_PROTOCOL_EVENT_TOOL_FAILED, seq, "agent-1", NULL, "{}");
+        TEST_ASSERT_EQ_INT(ESP_OK, meet_state_adapter_apply_event(
+                                       &adapter, &event, 1500, &model));
+    }
+    TEST_ASSERT_EQ_INT(ESPUI_ALERT_COUNT_MAX, model.error_count);
+
+    uint64_t last = adapter.last_sequence;
+    espui_view_model_t before = model;
+    meet_protocol_event_t event = make_event(
+        MEET_PROTOCOL_EVENT_MESSAGE_DELTA, last + 1, "agent-1", "ses-1",
+        "{\"delta\":\"sensitive text\"}");
+    TEST_ASSERT_EQ_INT(ESP_OK, meet_state_adapter_apply_event(&adapter, &event,
+                                                              1600, &model));
+    TEST_ASSERT_EQ_INT(last + 1, adapter.last_sequence);
+    /* Unknown/stream events advance sequence without changing ViewModel. */
+    TEST_ASSERT_EQ_INT(0, memcmp(&before, &model, sizeof(model)));
+
+    event.schema_version = 99;
+    event.sequence = last + 2;
+    TEST_ASSERT_EQ_INT(ESP_ERR_INVALID_ARG,
+                       meet_state_adapter_apply_event(&adapter, &event, 1700,
                                                       &model));
-    TEST_ASSERT_EQ_INT(0, adapter.last_sequence);
+    TEST_ASSERT_EQ_INT(last + 1, adapter.last_sequence);
+
+    TEST_ASSERT_EQ_INT(ESP_ERR_INVALID_ARG,
+                       meet_state_adapter_apply_event(NULL, &event, 1, &model));
+    TEST_ASSERT_EQ_INT(ESP_ERR_INVALID_ARG,
+                       meet_state_adapter_apply_event(&adapter, NULL, 1, &model));
+    TEST_ASSERT_EQ_INT(ESP_ERR_INVALID_ARG,
+                       meet_state_adapter_apply_event(&adapter, &event, 1, NULL));
 }
 
 void test_state_adapter_run(void)
@@ -264,5 +486,8 @@ void test_state_adapter_run(void)
     test_apply_snapshot();
     test_apply_snapshot_replaces_state();
     test_invalid_snapshot_does_not_mutate();
-    test_apply_event_is_stubbed();
+    test_event_agent_status_and_sequence();
+    test_event_session_lifecycle();
+    test_event_permission_and_alerts();
+    test_event_alert_cap_and_unknown();
 }

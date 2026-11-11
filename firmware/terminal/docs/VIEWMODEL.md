@@ -65,6 +65,9 @@ ESPUI_TITLE_MAX      48
 - Snapshot 中协议容量（8/8/6）与 ViewModel 一致；Protocol 校验会拒绝超限。
 - 若多 Agent 的 Session 总数超过 8，State Adapter 跳过放不下的 Session，不破坏已有数据。
 - Attention 计数由 `recount` 从 `in_use` 项重算，避免手工计数漂移。
+- `error_count` / `completion_count` 分别统计 approval 之外的
+  `tool.failed` / `message.completed` 瞬态通知；transient 计数上限 99，
+  与 `ESPUI_ALERT_COUNT_MAX` 一致；Snapshot 清零。
 
 ## 6. 状态枚举
 
@@ -89,7 +92,7 @@ espui_attention_kind_t APPROVAL / ERROR / COMPLETION
 
 代码：`components/state/state_adapter.c`
 
-E2 已实现 Snapshot → ViewModel：
+E2 已实现 Snapshot → ViewModel；E4b-2 补齐 Event → ViewModel：
 
 ```text
 meet_protocol_snapshot_t
@@ -103,8 +106,13 @@ meet_protocol_snapshot_t
 
 - 时间字段使用设备 uptime `now_ms`（到达时间），不混用 Node 墙钟。
 - 非 `pending` 的权限不进入 Attention。
-- Snapshot 带 `last_sequence`，但不回发事件；E4 的 Event 追加逻辑仍为 stub。
-- 事件接口 `meet_state_adapter_apply_event()` 返回 `ESP_ERR_NOT_SUPPORTED`，留给 E4。
+- Snapshot 带 `last_sequence`；`apply_event` 只接受更大的序号。
+- 事件接口 `meet_state_adapter_apply_event()` 已实现：agent/session/permission
+  更新、`tool.failed`/`message.completed` 计数、未知事件推进序号；
+  `sequence <= last_sequence` 忽略。业务字段用最小无分配 JSON 提取器读取，
+  不把 cJSON 引入 state 层。
+- `espui_view_model_note_error()` / `note_completion()` 更新瞬态计数并触发
+  attention 重算。
 
 ## 9. Mock 状态
 
@@ -123,4 +131,5 @@ meet_protocol_snapshot_t
 
 - 多 Node：ViewModel 需要节点集合，当前按“一个主 Node”实现；协议结构保留 `node_id`。
 - 更多 Agent/Session：优先提升固定上限或分页，不引入无界历史。
-- Event 增量：在 State Adapter 中按 sequence 去重、补发和 Snapshot 重建；ViewModel 容量不变。
+- Event 增量：已按 sequence 去重；缺号当前仅告警，补偿/重连策略留待 E4b-3；
+  Snapshot 重建时 ViewModel 容量不变。

@@ -73,6 +73,9 @@ typedef struct {
     uint16_t approval_count;
     uint16_t error_count;
     uint16_t completion_count;
+    /* Transient alerts not represented by an attention queue entry. */
+    uint16_t transient_error_count;
+    uint16_t transient_completion_count;
     espui_device_view_t device;
 } espui_view_model_t;
 
@@ -120,6 +123,10 @@ uint16_t espui_view_model_attention_count(const espui_view_model_t *model);
 
 /* Recomputes attention counters after a bulk mutation. */
 void espui_view_model_recount_attention(espui_view_model_t *model);
+
+/* Transient alert counters for tool.failed / message.completed (capped). */
+void espui_view_model_note_error(espui_view_model_t *model);
+void espui_view_model_note_completion(espui_view_model_t *model);
 
 /* Fixed-size copy. */
 void espui_view_model_copy(espui_view_model_t *dst,

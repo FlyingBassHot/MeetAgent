@@ -296,9 +296,9 @@ void espui_view_model_recount_attention(espui_view_model_t *model)
     if (model == NULL) {
         return;
     }
-    model->approval_count = 0;
-    model->error_count = 0;
-    model->completion_count = 0;
+    uint16_t approvals = 0;
+    uint16_t errors = 0;
+    uint16_t completions = 0;
 
     for (size_t i = 0; i < ESPUI_MAX_ATTENTION; ++i) {
         if (!model->attention[i].in_use) {
@@ -306,18 +306,54 @@ void espui_view_model_recount_attention(espui_view_model_t *model)
         }
         switch (model->attention[i].kind) {
         case ESPUI_ATTENTION_APPROVAL:
-            ++model->approval_count;
+            ++approvals;
             break;
         case ESPUI_ATTENTION_ERROR:
-            ++model->error_count;
+            ++errors;
             break;
         case ESPUI_ATTENTION_COMPLETION:
-            ++model->completion_count;
+            ++completions;
             break;
         default:
             break;
         }
     }
+
+    uint32_t total_errors = (uint32_t)errors + model->transient_error_count;
+    uint32_t total_completions =
+        (uint32_t)completions + model->transient_completion_count;
+    model->approval_count = approvals;
+    model->error_count = (uint16_t)(total_errors > ESPUI_ALERT_COUNT_MAX
+                                        ? ESPUI_ALERT_COUNT_MAX
+                                        : total_errors);
+    model->completion_count =
+        (uint16_t)(total_completions > ESPUI_ALERT_COUNT_MAX
+                       ? ESPUI_ALERT_COUNT_MAX
+                       : total_completions);
+}
+
+void espui_view_model_note_error(espui_view_model_t *model)
+{
+    if (model == NULL) {
+        return;
+    }
+    if (model->transient_error_count < ESPUI_ALERT_COUNT_MAX) {
+        ++model->transient_error_count;
+    }
+    espui_view_model_touch(model);
+    espui_view_model_recount_attention(model);
+}
+
+void espui_view_model_note_completion(espui_view_model_t *model)
+{
+    if (model == NULL) {
+        return;
+    }
+    if (model->transient_completion_count < ESPUI_ALERT_COUNT_MAX) {
+        ++model->transient_completion_count;
+    }
+    espui_view_model_touch(model);
+    espui_view_model_recount_attention(model);
 }
 
 uint16_t espui_view_model_attention_count(const espui_view_model_t *model)

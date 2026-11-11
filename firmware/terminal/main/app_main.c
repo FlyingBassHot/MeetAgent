@@ -157,6 +157,6 @@ void app_main(void)
     }
 
     ESP_LOGI(TAG, "terminal scaffold running (LCD-4 BSP, mock state)");
-    ESP_LOGI(TAG, "Wi-Fi provisioning + Node WebSocket started (E4b-1)");
+    ESP_LOGI(TAG, "Wi-Fi provisioning + Node WebSocket started (E4b-2)");
     vTaskDelay(pdMS_TO_TICKS(10000));
 }

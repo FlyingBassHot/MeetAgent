@@ -7,7 +7,7 @@
 | Core / Node | 主会话 | M0 + M1 + M4 Core | 完成；审计/限流/重连边界加固 | M6 可选增强 |
 | Protocol v2 | 主会话 | M0 | 完成 | 随实现补兼容测试 |
 | Mobile | omp | M5b + UX P0/P1/P2 | 视觉与原生交互改造完成（信息层级/聊天流/触感/键盘/返回键/下拉刷新/视觉打磨） | iOS/Release |
-| Terminal / ESPUI | pi | E0–E3a + LCD-4 Bring-up + E4a + E4b-1 | 真机启动成功；Wi-Fi STA 172.20.10.2；Node WS hello/welcome/snapshot、token NVS、心跳与重连已验证 | E4b-2（事件/命令）、AP portal `/save` 实测 |
+| Terminal / ESPUI | pi | E0–E3a + LCD-4 Bring-up + E4a + E4b-1/2 | 真机启动成功；Wi-Fi STA 172.20.10.2；Node WS snapshot + 事件 apply/replay、token NVS、心跳与重连已验证 | E4b-3（命令/审批）、AP portal `/save` 实测 |
 | Cloud relay | 主会话 | 可选 | 保留 V1 实现 | M6 再验证混合模式 |
 
 ## 已完成
@@ -29,6 +29,7 @@
 - Terminal GT911 触摸：临时 Touch Test overlay 实机捕获 `TOUCH x=46 y=125`，用户确认 TL/TR/BL/BR/C 五点均跟随手指，180° 映射正确；测试 overlay 已移除
 - Terminal E4a（2026-11-11）：Wi-Fi NVS 配网、STA 自动连接手机热点、断线重连、Node `/api/v2/info` 可达已验证；ESP32 `172.20.10.2`，Node `developer-machine/2.1.0`；AP portal `/save` 待第二设备实测
 - Terminal E4b-1（2026-11-11）：Node WebSocket hello/welcome/snapshot 已通；50KB welcome 在 PSRAM 中剥离 events 后解析（10ms）；token 写入 NVS，重启仅用 token 重连；heartbeat RTT 约 50–60ms；Node 重启后自动重连并以 snapshot 重建；events apply/命令留 E4b-2
+- Terminal E4b-2（2026-11-11）：真实事件 apply 到 ViewModel；session/agent/permission 状态、active 计数、completion/error 计数随事件更新；sequence 去重/旧事件忽略；Node 重启 `replay_truncated=1` 用 snapshot 重建；host tests 974/974；命令/审批留 E4b-3
 - Terminal 硬件目标确定为 **Waveshare ESP32-S3-Touch-LCD-4 V4**（480×480 RGB LCD + GT911 + CH32V003 helper）；真实 BSP 已接入，显示/触摸方向/PSRAM 待实物验证
 
 ## 真实联调（主会话）

@@ -3,7 +3,7 @@
 日期：2026-11-11  
 范围：`firmware/terminal/` only  
 目标：Waveshare ESP32-S3-Touch-LCD-4 V4.0（ESP32-S3N16R8）  
-状态：**E4a Wi-Fi + E4b-1 WebSocket 配对/快照/心跳/重连已验证；GT911 触摸已确认**；屏幕颜色/背光仍需人工确认
+状态：**E4a Wi-Fi + E4b-1 WebSocket + E4b-2 事件 apply/replay 已验证；GT911 触摸已确认**；屏幕颜色/背光仍需人工确认
 
 ## 1. 真机信息
 
@@ -255,7 +255,8 @@ idf.py flash: SUCCESS (exit 0)
 - [ ] CH32V003 电池 ADC → 电量映射
 - [ ] 多点触控（BSP port 只注册 1 点）
 - [ ] 长时间运行、内存泄漏、FPS
-- [ ] E3b LVGL 字符网格 / E4b-2 event apply/commands
+- [x] E4b-2 event apply / replay / sequence 去重
+- [ ] E3b LVGL 字符网格 / E4b-3 command/审批发送
 
 ## 10. 风险
 
@@ -393,8 +394,8 @@ I (26244) touch_test: TOUCH release
   - heartbeat RTT=53ms
 - `/status` 仍为 connected / node_reachable=true；STA 172.20.10.2
 - 无 panic/assert/OOM
-- E4b-1 不 apply event；`send_action` 未实现，只日志一次
-- E4b-2：event apply/replay、command/审批、无效 token 重试
+- E4b-1 只观察 event；`send_action` 未实现，只日志一次
+- E4b-2 已补齐 event apply/replay；command/审批与无效 token 重试留待 E4b-3
 
 ### 11.8 E4b-1 review fixes（2026-11-11）
 
@@ -417,6 +418,53 @@ I (26244) touch_test: TOUCH release
   SHA-256 `66464b51...aa295dd`）恢复真实 token；token welcome + heartbeat
   52/51ms 正常。
 - 无 panic/assert/OOM；主机网络未切换。
+
+### 11.9 E4b-2 事件 apply / replay（2026-11-11）
+
+- State Adapter 实现真实 `apply_event`：sequence 去重、agent/session/permission
+  映射、`tool.failed`/`message.completed` 计数（上限 99）、未知事件只推进序号。
+- 事件 payload 用无分配 JSON 字符串提取器读取；`components/state` 仍不依赖
+  cJSON。ViewModel 增加 transient error/completion 计数。
+- `process_event()` 解析内层 payload → apply → 250ms/4Hz 脏标记 post；
+  `message.delta` 不 post；sequence gap 告警；`s_last_sequence` 与 adapter
+  同步，断开时写 NVS。
+- Snapshot session active-first 截断，仍为 8 条总容量；`sessions_total` 保留
+  42 条统计。
+- 主机测试：`make test` **974 checks, 0 failures**；`syntax_check.sh` 32 files OK。
+- 最终固件：1,250,736 B，SHA-256
+  `084a8210...029b9270`，app 剩余 19%，DIRAM 58.36%。
+  （事件计时日志来自功能等价的 `487b117a...` 构建；后续仅改日志文案与
+  并发锁，最终构建启动/事件验证 `last_sequence=114`、snapshot seq=114。）
+- 真机实时事件（`/tmp/e4b2-final.log`）：
+  - boot `last_sequence=52`，welcome 35,203 B / 11 ms / 52 events；
+  - snapshot 1 agent / 8 of 42 sessions / seq 52；
+  - seq 53–59 apply：agent/session 状态、`message.completed`，
+    `active 1→0`，`alerts=1`，`took_us` 102–301；
+  - internal_free=65,763 B，psram_free=6,516,232 B；heartbeat 77/131 ms。
+- Node 重启（`/tmp/e4b2-node-restart.log`）：`replay_truncated=1`，
+  welcome 32,615 B / 9 ms / 45 events，seq 243→45，后续 seq 46–52 apply；
+  无 panic/assert/OOM。
+- 未做：真机 permission 审批、4Hz 高频压力、主动 sequence gap、心跳 3 次
+  失联、无效 token + pairing retry、多 Agent 全局 active-first、UI 人工视觉确认。
+- 命令/审批发送仍属 E4b-3；`send_action` 未实现。
+
+### 11.10 E4b-2 并发修正（2026-11-11 review）
+
+- 问题：WS 回调（welcome/event）与 heartbeat 的 post 同时访问
+  `s_model` / `s_model_dirty` / `s_last_post_ms`，存在数据竞争。
+- 修正：新增 `s_model_lock`（start 创建、cleanup 删除）；
+  `post_model_locked()` 需持锁，`post_model_if_due()` 取锁后调用；
+  `process_welcome` / `process_event` 在 apply + dirty + post + 计数期间持锁；
+  heartbeat 通过 wrapper 取锁。Snapshot post 失败改由 dirty + heartbeat 重试。
+- 生命周期：`net_task_cleanup()` 先释放 `s_lifecycle_lock` 再置
+  `s_task = NULL`，避免 stop 在 cleanup 持锁时删除 lifecycle mutex。
+- 最终固件：1,250,736 B，SHA-256 `084a8210...029b9270`，app 剩余 19%，
+  DIRAM 58.36%。
+- 验证 `/tmp/opencode/e4b2fix-verify.log`：welcome 54,301 B / 11 ms，
+  snapshot 8/42 seq=114，事件 115–121 apply，`took_us` 99–341，
+  heartbeat 62/13 ms，无 panic/OOM。
+- Host：`make test` 974 checks；`syntax_check.sh` 32 files OK。
+- stop 竞态为代码审查修正，尚无真机 stop 入口压测。
 
 ## 12. 仓库约束
 

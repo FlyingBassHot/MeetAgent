@@ -254,10 +254,11 @@ memory        : internal_free=65,895 B, psram_free=6,516,920 B
 
 - [x] token 无效 → `auth_failed` → 清 token（bogus token 实测）
 - [ ] token 无效 + 有效 pairing_code 自动重试
-- [x] `replay_truncated=1` 时以 snapshot 重建（Node 重启实测；后续 replay 事件未验证）
+- [x] `replay_truncated=1` 时以 snapshot 重建（Node 重启实测）
+- [x] replay 重建后的后续事件 apply（seq 46–52 实测）
 - [ ] 连续 3 次 heartbeat 无回包触发重连（未主动断 WS）
-- [ ] 事件 apply/replay（E4b-2）
-- [ ] 命令/审批发送（E4b-2）
+- [x] 事件 apply / sequence 去重（E4b-2 实测）
+- [ ] 命令/审批发送（E4b-3）
 - [ ] 多客户端、权限撤销、token 轮换
 
 ## 4.1 2026-11-11 review fixes
@@ -278,7 +279,7 @@ memory        : internal_free=65,895 B, psram_free=6,516,920 B
   {"schema_version":1,"type":"heartbeat","payload":{"nonce":"hb-..."}}
   ```
 - 连续 3 个心跳周期无回包 → 关闭 WS 重连。
-- 事件：E4b-1 只记录 `type/seq/agent/session`，不修改 ViewModel；E4b-2 再做 apply/replay。
+- 事件：E4b-1 只记录 `type/seq/agent/session`；E4b-2 起由 State Adapter apply 到 ViewModel。
 
 ## 6. 真机验证
 
@@ -290,9 +291,155 @@ memory        : internal_free=65,895 B, psram_free=6,516,920 B
 - token 重启 + Node 重启日志：`/tmp/opencode/e4b1-token-reboot.log`
 - `/status` 仍正常，`node_reachable=true`。
 
-### E4b-2 待办
+### E4b-2 已完成
 
-- event apply / replay / sequence 补偿
-- command gateway：session.prompt / interrupt / permission.respond
+- event apply / replay / sequence 去重
+- snapshot session active-first 截断
+- command gateway（session.prompt / interrupt / permission.respond）留待 E4b-3
 - token 轮换/撤销、无效 token + pairing retry 验证
 - 多客户端一致性、WS 心跳失联强制测试
+
+---
+
+# E4b-2：事件 apply / replay（2026-11-11）
+
+## 1. State Adapter
+
+`meet_state_adapter_apply_event()` 现在是真实实现，仍不依赖 cJSON：
+
+```text
+event.schema_version 必须为 1
+sequence <= adapter.last_sequence  → ignored_events++，ESP_OK
+否则 last_sequence = sequence
+  agent.connected/disconnected/status_changed/error → upsert agent + 状态映射
+  session.created/updated/status_changed          → upsert session
+  session.deleted                                 → remove session
+  permission.requested                            → Attention(APPROVAL)
+  permission.resolved                             → resolve Attention
+  tool.failed                                     → error_count（上限 99）
+  message.completed                               → completion_count（上限 99）
+  unknown                                         → 只推进 sequence + debug
+```
+
+- 业务字段由 `event->payload_json` 的最小 JSON 字符串提取器读取；支持基本
+  `\" \\ / b f n r t` 转义，`\u` 跳过 4 位并输出 `?`；不分配内存。
+- Session 变化后重算所属 Agent 的 `active_session_count`（只算 RUNNING /
+  WAITING_APPROVAL）。
+- 未知/流式事件（`message.started/delta`）也推进 sequence，但不改 ViewModel。
+- ViewModel 新增 transient `error_count`/`completion_count`（上限 99），由
+  `recount_attention` 与 approval 分开统计；Snapshot 会清零。
+
+## 2. Net Client 集成
+
+- `process_event()` 从外层 `payload` 取事件元数据，把内层 `payload` 对象
+  `cJSON_PrintUnformatted` 后交给 State Adapter，随后立即释放。
+- 只对 session/agent/permission、`message.completed`、`tool.failed` 触发
+  ViewModel post；`message.delta` 不 post。所有 post 经过 250ms（最多 4Hz）
+  脏标记节流，snapshot 仍立即投递。
+- 事件序号：
+  - `sequence <= last_sequence` 忽略（adapter 计数）；
+  - 非连续但更大的序号打印 `sequence gap previous/current`，不强制重连
+    （E4b-3 再决定补偿/重连策略）；
+  - `s_last_sequence` 始终与 adapter 同步；WS 断开/退出时写 NVS。
+- `replay_truncated=1`：以 welcome snapshot 全量重建 ViewModel，更新
+  `last_sequence`，后续新序号事件继续 apply；旧序号忽略。
+- Snapshot Session 截断：每个 Agent 第一遍存 RUNNING/WAITING_APPROVAL，第二遍
+  存其余，直到全局 8 条；`sessions_total` 仍统计全部（当前 42），日志输出
+  `sessions_stored/total`。
+
+## 3. 真机验证
+
+最终固件：
+
+```text
+app: build/meetagent_terminal.bin
+size: 1,250,736 bytes (0x1315b0)
+sha256: 084a8210fc26884b9771f6bea42cc763481f6f682e0e7b6042774918029b9270
+app partition free: 0x45a50 (19%)
+DIRAM: 199,455 / 341,760 (58.36%)
+IRAM: 16,384 / 16,384（size 工具的固定窗口；链接断言通过）
+```
+
+启动 + 实时事件（`/tmp/e4b2-final.log`）：
+
+```text
+auth last_sequence=52
+welcome 35,203 B, parse 11 ms, events_skipped=52
+snapshot agents=1 sessions=8/42 seq=52
+internal_free=65,763 B psram_free=6,516,232 B
+event #53 agent.status_changed  took_us=138  active=0
+event #54 session.status_changed took_us=213 active=1
+event #57 message.completed      took_us=102 active=1 alerts=1
+event #58 session.status_changed took_us=144 active=0 alerts=1
+event #59 agent.status_changed   took_us=301 active=0 alerts=1
+heartbeat RTT=77/131 ms
+```
+
+- `message.started/delta` 不产生 ViewModel post；`message.completed` 更新
+  completion alert；agent/session 状态和 active 计数按事件变化。
+- 无 sequence gap、panic、assert、OOM。
+- Node 重启（`/tmp/e4b2-node-restart.log`）：WS 断开 → 1s 重连 →
+  welcome 32,615 B / 9ms / events_skipped=45 / `replay_truncated=1`，
+  snapshot seq 从 243 重置为 45，并成功 apply；随后 seq 46–52 事件继续
+  apply（`/tmp/e4b2-events4.log`）。
+- 日志只输出 type/sequence/计数/耗时，不输出 prompt/delta 文本。
+- 并发修正前构建（`2fbd2f25...`）启动验证：NVS `last_sequence=59`，
+  welcome 37,812 B / 11 ms / 59 events，snapshot seq=59，heartbeat 53 ms。
+
+## 4. 未验证 / 留待 E4b-3
+
+- 真机 permission.requested / permission.resolved（host tests 已覆盖）。
+- 高频事件下 4Hz 节流的压力/丢帧表现。
+- 主动制造 sequence gap 的补偿策略（当前只告警）。
+- 连续 3 次 heartbeat 无回包强制重连。
+- 无效 token + 有效 pairing_code 自动重试。
+- 多 Agent 时的全局 active-first 截断（当前仅单 Agent 实测）。
+- UI 视觉更新需人工确认；命令/审批发送仍未实现，`send_action` 返回
+  `ESP_ERR_NOT_SUPPORTED`。
+
+
+## 5. 并发修正（2026-11-11 review）
+
+问题：`s_model` / `s_model_dirty` / `s_last_post_ms` 同时被 WS event 回调
+（`process_welcome` / `process_event`）和 `heartbeat_loop` 的
+`post_model_if_due()` 访问，可能在 apply 中途复制出撕裂的 ViewModel。
+
+修正：
+
+- 新增 `s_model_lock`，在 `meet_net_client_start()` 创建、`net_task_cleanup()`
+  删除。
+- `post_model_locked()` 假定已持锁；`post_model_if_due()` 取锁后调用。
+  `process_event()` 在 apply + dirty + post + 计数读取期间持锁；
+  `process_welcome()` 在 apply_snapshot + post + dirty 期间持锁；
+  `heartbeat_loop()` 通过 `post_model_if_due()` 取锁。
+- Snapshot post 改为单次非阻塞投递；失败置 dirty，由 heartbeat 的 250ms
+  节流路径重试，避免持锁 `vTaskDelay`。
+- `net_task_cleanup()` 先释放 `s_lifecycle_lock`，再把 `s_task = NULL`，
+  避免 `meet_net_client_stop()` 在 cleanup 仍持 lifecycle mutex 时删除它。
+
+修正后固件：
+
+```text
+size: 1,250,736 bytes (0x1315b0)
+sha256: 084a8210fc26884b9771f6bea42cc763481f6f682e0e7b6042774918029b9270
+app partition free: 0x45a50 (19%)
+DIRAM: 199,455 / 341,760 (58.36%)
+```
+
+验证日志 `/tmp/opencode/e4b2fix-verify.log`：
+
+```text
+auth last_sequence=114
+welcome 54,301 B / 11 ms / 100 events
+snapshot agents=1 sessions=8/42 seq=114
+internal_free=65,687 B psram_free=6,516,104 B
+event #115 agent.status_changed  took_us=144
+event #116 session.status_changed took_us=189 active=1
+event #119 message.completed      took_us=99  alerts=1
+event #120 session.status_changed took_us=341 active=0
+event #121 agent.status_changed   took_us=337 active=0
+heartbeat RTT=62/13 ms
+```
+
+无 panic/assert/OOM；host tests 974 checks、syntax 32 files 均通过。
+stop 竞态修正目前为代码审查验证，尚无运行入口做真机 stop 压测。
