@@ -527,6 +527,14 @@ static void test_core_six_states(void)
     TEST_ASSERT_EQ_INT(7, m[3].error_break_cells);
     TEST_ASSERT_EQ_INT(3, m[4].completion_wave_layers);
     TEST_ASSERT_TRUE(m[5].offline_removed_cells > 0);
+    TEST_ASSERT_TRUE(m[2].attention_cells > 0);
+    TEST_ASSERT_TRUE(m[3].attention_cells > 0);
+    TEST_ASSERT_TRUE((int)m[2].body_glyph_cells * 100 >=
+                     (int)m[2].attention_cells * 70);
+    TEST_ASSERT_TRUE((int)m[3].body_glyph_cells * 100 >=
+                     (int)m[3].attention_cells * 70);
+    TEST_ASSERT_EQ_INT(m[2].attention_cells, m[2].body_color_cells);
+    TEST_ASSERT_EQ_INT(m[3].attention_cells, m[3].body_color_cells);
     int idle_cells = 0;
     int working_cells = 0;
     for (int r = 0; r < PHOSPHOR_GRID_H; ++r) {
@@ -541,6 +549,44 @@ static void test_core_six_states(void)
     TEST_ASSERT_TRUE(memcmp(&frames[1], &frames[3], sizeof(frames[1])) != 0);
     TEST_ASSERT_TRUE(memcmp(&frames[1], &frames[4], sizeof(frames[1])) != 0);
     TEST_ASSERT_TRUE(memcmp(&frames[1], &frames[5], sizeof(frames[1])) != 0);
+}
+
+static void test_attention_body(void)
+{
+    phosphor_state_resolver_t resolver;
+    phosphor_input_state_t input;
+    phosphor_visual_state_t visual;
+    phosphor_core_metrics_t early;
+    phosphor_core_metrics_t settled;
+    glyph_frame_t frame;
+
+    TEST_ASSERT_EQ_INT(0xF5AB, phosphor_rgb565_from_hex(0xF2B75E));
+    TEST_ASSERT_EQ_INT(0xF36C, phosphor_rgb565_from_hex(0xF06C67));
+
+    /* Approval converts over 450 ms; final body is ? + Warning only. */
+    phosphor_state_resolver_init(&resolver);
+    phosphor_demo_build_input(PHOSPHOR_DEMO_APPROVAL, 1, &input);
+    phosphor_state_resolver_update(&resolver, &input, 0, &visual);
+    phosphor_core_build_frame(&frame, &visual, &early);
+    TEST_ASSERT_TRUE(early.attention_cells > 0);
+    TEST_ASSERT_TRUE((int)early.body_glyph_cells * 100 <
+                     (int)early.attention_cells * 70);
+    phosphor_state_resolver_update(&resolver, &input, 600, &visual);
+    phosphor_core_build_frame(&frame, &visual, &settled);
+    TEST_ASSERT_TRUE((int)settled.body_glyph_cells * 100 >=
+                     (int)settled.attention_cells * 70);
+    TEST_ASSERT_EQ_INT(settled.attention_cells, settled.body_color_cells);
+
+    /* Error uses the same rule with ! and Error red, after glitch. */
+    phosphor_state_resolver_init(&resolver);
+    phosphor_demo_build_input(PHOSPHOR_DEMO_ERROR, 1, &input);
+    phosphor_state_resolver_update(&resolver, &input, 0, &visual);
+    phosphor_state_resolver_update(&resolver, &input, 600, &visual);
+    phosphor_core_build_frame(&frame, &visual, &settled);
+    TEST_ASSERT_TRUE(settled.attention_cells > 0);
+    TEST_ASSERT_TRUE((int)settled.body_glyph_cells * 100 >=
+                     (int)settled.attention_cells * 70);
+    TEST_ASSERT_EQ_INT(settled.attention_cells, settled.body_color_cells);
 }
 
 static void test_core_motion(void)
@@ -669,6 +715,7 @@ void test_phosphor_run(void)
     test_motion_and_scene();
     test_state_resolver();
     test_core_six_states();
+    test_attention_body();
     test_core_motion();
     test_band_neighbors();
     test_scene_nucleus_and_rasterizer();

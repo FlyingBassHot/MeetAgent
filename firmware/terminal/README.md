@@ -163,6 +163,7 @@ firmware/terminal/
 - `docs/PHOSPHOR_P3.md`：P3/P3.1–P3.6 Idle/Working motion、水层/漂浮物、字符串运输、相邻 cell、中心减量、FPS/内存、SDL golden
 - `docs/PHOSPHOR_R1.md`：R1.1 state-first 六态静态几何、contact、pixel diff
 - `docs/PHOSPHOR_R2.md`：R2 state-first motion、六态动画、Offline 恢复、实机烧录/FPS/内存
+- `docs/PHOSPHOR_R2B.md`：R2.1 Approval/Error 状态主导 `?`/`!`、单一主体色、450ms 转换、实机结果
 - `docs/BUILD_STATUS.md`：构建/测试结果、阻塞与下一步
 
 ## 未实现（明确不在本次范围）

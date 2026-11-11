@@ -739,6 +739,7 @@ I (26244) touch_test: TOUCH release
 
 ### 11.26 PHOSPHOR R2 motion + 烧录（2026-11-11）
 
+
 - 在 R1.1 state-first core 上接 motion：Idle 0.08/-0.045/0.025（8s breath），
   Working 0.22/-0.55/0.32（5s），过渡 600ms，delta 200ms，LUT。
 - Approval 1.35rad gap + 2 `?` + 1.75s edge breath；Error 220ms 一次性 glitch
@@ -750,6 +751,22 @@ I (26244) touch_test: TOUCH release
   no panic/OOM；internal_free 55.7→64.9KB，PSRAM 6,129,748 B；
   Idle 6–7 FPS，Working 7 FPS（10–15 未达，留 P5）。
 - Host：**3708 checks, 0 failures**；syntax **48 files OK**。
+- P5/P6 未开始；未 commit/push。
+
+### 11.27 PHOSPHOR R2.1 状态主导字符 + 单一主体色（2026-11-11）
+
+- Approval/Error 在 core 末尾做状态主导 pass：除 label 行/2× `>_` 外，
+  全部变为 `?`/`!` 并统一 Warning `0xF5AB` / Error `0xF36C`；
+- 450ms 逐 cell 阈值转换；Approval 之后 1.75s 全局 intensity 呼吸；
+  Error 220ms glitch 后稳定；
+- 稳态整幅：Approval `?` 99/110 (90.0%)，Warning 110/110；
+  Error `!` 101/109 (92.7%)，Error 109/109；Error 中无 `?`；
+- r2b_contact + 六态 + 2 GIF；pixel diff Approval 23,893 / Error 20,973；
+- **已 app-flash**：1,285,136 B，SHA-256
+  `22685bdc...205f217`，free 16%，DIRAM 59.88%；
+- 实机 70s：2 周期、Offline→Idle 两次；Wi-Fi/Node/WS online；无 panic/OOM；
+  internal_free 55.7→64.9KB，PSRAM 6,129,748 B；Idle 6–7 / Working 7 FPS（P5）。
+- Host：**3723 checks, 0 failures**；syntax **48 files OK**。
 - P5/P6 未开始；未 commit/push。
 
 ## 12. 仓库约束

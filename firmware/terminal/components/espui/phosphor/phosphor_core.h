@@ -15,6 +15,9 @@ typedef struct {
     uint16_t error_break_cells;
     uint8_t completion_wave_layers;
     uint16_t offline_removed_cells;
+    uint16_t attention_cells;
+    uint16_t body_glyph_cells;
+    uint16_t body_color_cells;
 } phosphor_core_metrics_t;
 
 void phosphor_core_build_frame(glyph_frame_t *frame,

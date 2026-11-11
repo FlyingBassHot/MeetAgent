@@ -66,6 +66,8 @@ typedef struct {
     uint64_t completion_event_id;
     bool error_glitch_active;
     uint32_t error_glitch_elapsed_ms;
+    uint32_t approval_elapsed_ms;
+    uint32_t error_elapsed_ms;
     float approval_breath;
 } phosphor_visual_state_t;
 
@@ -76,6 +78,10 @@ typedef struct {
     uint64_t last_error_event_id;
     uint32_t error_start_ms;
     bool error_glitch_active;
+    uint32_t approval_start_ms;
+    uint32_t error_attention_start_ms;
+    bool approval_attention_seen;
+    bool error_attention_seen;
     char slot_ids[PHOSPHOR_MAX_SATELLITES][40];
 } phosphor_state_resolver_t;
 

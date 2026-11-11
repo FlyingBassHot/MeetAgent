@@ -68,6 +68,10 @@ void phosphor_state_resolver_update(phosphor_state_resolver_t *resolver,
         visual->error_glitch_active = false;
         resolver->completion_active = false;
         resolver->error_glitch_active = false;
+        resolver->approval_attention_seen = false;
+        resolver->error_attention_seen = false;
+        visual->approval_elapsed_ms = 0;
+        visual->error_elapsed_ms = 0;
         visual->approval_breath = 0.5f;
         return;
     }
@@ -79,6 +83,30 @@ void phosphor_state_resolver_update(phosphor_state_resolver_t *resolver,
     }
     if (input->error_count > 0 || visual->error_count > 0) {
         visual->attention |= PHOSPHOR_ATTENTION_ERROR;
+    }
+
+    bool approval_active =
+        (visual->attention & PHOSPHOR_ATTENTION_APPROVAL) != 0;
+    if (approval_active) {
+        if (!resolver->approval_attention_seen) {
+            resolver->approval_attention_seen = true;
+            resolver->approval_start_ms = now_ms;
+        }
+        visual->approval_elapsed_ms = now_ms - resolver->approval_start_ms;
+    } else {
+        resolver->approval_attention_seen = false;
+        visual->approval_elapsed_ms = 0;
+    }
+    bool error_active = (visual->attention & PHOSPHOR_ATTENTION_ERROR) != 0;
+    if (error_active) {
+        if (!resolver->error_attention_seen) {
+            resolver->error_attention_seen = true;
+            resolver->error_attention_start_ms = now_ms;
+        }
+        visual->error_elapsed_ms = now_ms - resolver->error_attention_start_ms;
+    } else {
+        resolver->error_attention_seen = false;
+        visual->error_elapsed_ms = 0;
     }
 
     if (input->completed_event_id != 0 &&

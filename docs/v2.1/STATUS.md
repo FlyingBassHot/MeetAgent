@@ -7,7 +7,7 @@
 | Core / Node | 主会话 | M0 + M1 + M4 Core | 完成；审计/限流/重连边界加固 | M6 可选增强 |
 | Protocol v2 | 主会话 | M0 | 完成 | 随实现补兼容测试 |
 | Mobile | omp | M5b + UX P0/P1/P2 | 视觉与原生交互改造完成（信息层级/聊天流/触感/键盘/返回键/下拉刷新/视觉打磨） | iOS/Release |
-| Terminal / ESPUI | pi | E0–E3a + LCD-4 Bring-up + E4a + E4b-1/2/3 + PHOSPHOR R2 + net QA fixes | PHOSPHOR state-first 重构 + R2 motion 已烧录；六态 demo 连续 2 周期、Offline→Idle 恢复，state label/大缺口/断裂/三层波/NO LINK 已上屏 | P6 真实 ViewModel 映射（并行中）、P5 性能、interrupt/permission、AP portal `/save` |
+| Terminal / ESPUI | pi | E0–E3a + LCD-4 Bring-up + E4a + E4b-1/2/3 + PHOSPHOR R2.1 + net QA fixes | R2.1 已烧录：Approval 90% `?` / Warning 琥珀主体色 + 1.35 rad 缺口；Error 92.7% `!` / Error 红主体色 + 1.55 rad 断裂；450ms 转换、2 周期、Offline→Idle 恢复 | P6 真实 ViewModel 映射（worktree 已改）、P5 性能、interrupt/permission、AP portal `/save` |
 | Cloud relay | 主会话 | 可选 | 保留 V1 实现 | M6 再验证混合模式 |
 
 ## 已完成
@@ -44,6 +44,7 @@
 - Terminal PHOSPHOR P4b（2026-11-11）：重写 state visual 层（旧版薄 overlay 验收失败）；Approval Outer 0.65 rad 缺口 + 2 个 `?`；Error 局部 5 个红色断裂字符 + 220ms glitch，无残留 `?`；Completed 3 层径向波 + 8 粒子；Offline 轨道解体 + `NO LINK` + `LAST SYNC --`；4 sessions demo；顶部 state label；contact sheet `p4_contact.png`；host tests 3683/3683；真机 FPS≈7，Wi-Fi/Node 在线
 - Terminal PHOSPHOR R1/R1.1（2026-11-11）：按规格书从头重构为 state-first 核心，取消 base+overlay；visual state 直接生成轨道/缺口/断裂/解体/波；Approval gap 1.35 rad（77°）+ 2 `?`；Error gap 1.55 rad（89°）+ 7 红字 shards；Completed 3 层 16/24/32 波 + 8 粒子；Offline 103 cells 解体 + NO LINK + LAST SYNC；4 sessions + state label；r1_contact.png 六态已验收；pixel diff Approval 8,171 / Error 8,558；host tests 3693/3693；build-only app 1,284,080 B；**未烧录**，R2 motion/flash 待做
 - Terminal PHOSPHOR R2（2026-11-11）：motion 加到 state-first core；Idle/Working 0.08/-0.045/0.025 与 0.22/-0.55/0.32 rad/s、600ms transition；Approval 1.75s 呼吸、Error 220ms glitch、Completed 900ms 环收束+三层波+8 粒子、Offline 550ms 降速冻结/恢复；4 sessions 30s demo；**app-flash 成功** 1,284,512 B / 16% free；70s 日志 2 个完整周期、两次 Offline→Idle、无 panic/OOM、Wi-Fi/Node 在线；host tests 3708/3708；FPS 6–7，P5 待做
+- Terminal PHOSPHOR R2.1（2026-11-11）：Approval 除 label/Nucleus 外全面 `?` + Warning 琥珀主体色（? 99/110 = 90.0%）；Error 全面 `!` + Error 红主体色（! 101/109 = 92.7%）；450ms 逐 cell 转换；保留 1.35/1.55 rad 缺口；**app-flash 成功** 1,285,136 B / 16% free；70s 2 周期、Offline→Idle、无 panic/OOM、Wi-Fi/Node 在线；host tests 3723/3723；FPS 6–7
 - Terminal network QA fixes（2026-11-11）：F1 welcome 空/缺失 events、F3 stale pairing code、F5 mock stop、F7 字符串 NUL、F8 heartbeat 时序、F10 node_url 变化清 token 已合并；组合固件 0x135f00 / 17% free；启动日志 token=set、pairing_code=empty、welcome 49KB、snapshot applied、heartbeat RTT 298ms；host tests 3589/3589；F9/F4/F6/F2 仍待后续
 - Terminal 硬件目标确定为 **Waveshare ESP32-S3-Touch-LCD-4 V4**（480×480 RGB LCD + GT911 + CH32V003 helper）；真实 BSP 已接入，显示/触摸方向/PSRAM 待实物验证
 

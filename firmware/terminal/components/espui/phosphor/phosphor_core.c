@@ -466,17 +466,70 @@ static void draw_label(glyph_frame_t *frame,
     if (visual->completion_active) {
         snprintf(text, sizeof(text), "COMPLETED");
         put_center_label(frame, 0, text, GLYPH_COLOR_HIGHLIGHT, 255);
+    } else if (visual->attention & PHOSPHOR_ATTENTION_ERROR) {
+        snprintf(text, sizeof(text), "ERROR %u", (unsigned)visual->error_count);
+        put_center_label(frame, 0, text, GLYPH_COLOR_ERROR, 255);
     } else if (visual->attention & PHOSPHOR_ATTENTION_APPROVAL) {
         snprintf(text, sizeof(text), "APPROVAL %u",
                  (unsigned)visual->waiting_count);
         put_center_label(frame, 0, text, GLYPH_COLOR_WARNING, 255);
-    } else if (visual->attention & PHOSPHOR_ATTENTION_ERROR) {
-        snprintf(text, sizeof(text), "ERROR %u", (unsigned)visual->error_count);
-        put_center_label(frame, 0, text, GLYPH_COLOR_ERROR, 255);
     } else if (visual->activity == PHOSPHOR_ACTIVITY_WORKING) {
         put_center_label(frame, 0, "WORKING", GLYPH_COLOR_PRIMARY, 255);
     } else {
         put_center_label(frame, 0, "IDLE", GLYPH_COLOR_SECONDARY, 255);
+    }
+}
+
+#define CORE_ATTENTION_TRANSITION_MS 450u
+
+static void apply_attention_body(glyph_frame_t *frame,
+                                 const phosphor_visual_state_t *visual,
+                                 phosphor_core_metrics_t *metrics)
+{
+    bool error_mode = (visual->attention & PHOSPHOR_ATTENTION_ERROR) != 0;
+    bool approval_mode =
+        !error_mode &&
+        (visual->attention & PHOSPHOR_ATTENTION_APPROVAL) != 0;
+    if (!error_mode && !approval_mode) return;
+
+    char body_glyph = error_mode ? '!' : '?';
+    uint8_t body_index = glyph_atlas_index(body_glyph);
+    glyph_color_id_t body_color =
+        error_mode ? GLYPH_COLOR_ERROR : GLYPH_COLOR_WARNING;
+    uint32_t elapsed = error_mode ? visual->error_elapsed_ms
+                                  : visual->approval_elapsed_ms;
+    float p = (float)elapsed / (float)CORE_ATTENTION_TRANSITION_MS;
+    if (p > 1.0f) p = 1.0f;
+    float breath = 0.82f + 0.18f * visual->approval_breath;
+
+    for (uint8_t r = 0; r < PHOSPHOR_GRID_H; ++r) {
+        for (uint8_t c = 0; c < PHOSPHOR_GRID_W; ++c) {
+            glyph_cell_t *cell = &frame->cells[r][c];
+            if (cell->glyph == 0) continue;
+            if (metrics != NULL) ++metrics->attention_cells;
+
+            bool protected_cell =
+                (r == 0) || ((cell->flags & GLYPH_FLAG_NUCLEUS) != 0);
+            float threshold =
+                (float)(((unsigned)c * 13u + (unsigned)r * 7u) % 17u) /
+                17.0f;
+            if (!protected_cell && p >= threshold) {
+                cell->glyph = body_index;
+            }
+            if (p >= 1.0f || protected_cell ||
+                (!protected_cell && p >= threshold)) {
+                cell->color = (uint8_t)body_color;
+            }
+            if (!error_mode) {
+                cell->intensity = (uint8_t)((float)cell->intensity * breath);
+            }
+            if (cell->glyph == body_index && metrics != NULL) {
+                ++metrics->body_glyph_cells;
+            }
+            if (cell->color == (uint8_t)body_color && metrics != NULL) {
+                ++metrics->body_color_cells;
+            }
+        }
     }
 }
 
@@ -525,6 +578,7 @@ void phosphor_core_build_frame_motion(
                            GLYPH_COLOR_HIGHLIGHT, ni, GLYPH_FLAG_NUCLEUS, 2);
     glyph_frame_set_scaled(frame, 12, 7, glyph_atlas_index('_'),
                            GLYPH_COLOR_HIGHLIGHT, ni, GLYPH_FLAG_NUCLEUS, 2);
+    apply_attention_body(frame, visual, metrics);
 }
 
 void phosphor_core_build_frame(glyph_frame_t *frame,
