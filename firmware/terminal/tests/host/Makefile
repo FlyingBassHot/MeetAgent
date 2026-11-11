@@ -47,6 +47,7 @@ PURE_SRCS := \
 	$(filter-out $(ESPUI)/phosphor/phosphor_lvgl_port.c, $(wildcard $(ESPUI)/phosphor/*.c)) \
 	$(wildcard $(COMPONENTS)/protocol/*.c) \
 	$(wildcard $(COMPONENTS)/networking/command_table.c) \
+	$(wildcard $(COMPONENTS)/networking/welcome_elision.c) \
 	$(wildcard $(COMPONENTS)/state/state_adapter.c)
 
 TEST_SRCS := $(wildcard test_*.c) stubs/espui_runtime_stub.c

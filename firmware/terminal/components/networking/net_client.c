@@ -25,6 +25,7 @@
 #include "mock_state.h"
 #include "nvs.h"
 #include "state_adapter.h"
+#include "welcome_elision.h"
 #include "wifi_prov.h"
 
 static const char *TAG = "meet_net";
@@ -89,6 +90,7 @@ static welcome_summary_t s_summary;
 
 static char s_ws_uri[192];
 static char s_hb_nonce[40];
+static SemaphoreHandle_t s_hb_lock;
 static volatile bool s_hb_pending;
 static uint32_t s_hb_sent_ms;
 static volatile uint32_t s_hb_missed;
@@ -214,148 +216,36 @@ static void clear_token(void)
     s_token[0] = '\0';
 }
 
+static void clear_pairing_code(void)
+{
+    bool had_code = s_pairing_code[0] != '\0';
+    if (!had_code) {
+        return;
+    }
+    s_pairing_code[0] = '\0';
+
+    nvs_handle_t handle;
+    esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle);
+    if (err == ESP_OK) {
+        err = nvs_set_str(handle, NVS_KEY_PAIRING, "");
+        if (err == ESP_OK) {
+            err = nvs_commit(handle);
+        }
+        nvs_close(handle);
+    }
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "pairing_code clear failed: %s", esp_err_to_name(err));
+    } else if (had_code) {
+        ESP_LOGI(TAG, "pairing_code cleared; token is authoritative");
+    }
+}
+
 /* ------------------------------------------------------------------------- */
 /* JSON helpers (raw PSRAM buffer; cJSON only sees the pruned welcome)       */
 
-static const char *json_find_key(const char *json, const char *key)
-{
-    if (json == NULL || key == NULL) {
-        return NULL;
-    }
-    size_t key_len = strlen(key);
-    const char *p = json;
-    while (*p != '\0') {
-        if (*p != '"') {
-            ++p;
-            continue;
-        }
-        const char *start = ++p;
-        while (*p != '\0' && *p != '"') {
-            if (*p == '\\' && p[1] != '\0') {
-                p += 2;
-            } else {
-                ++p;
-            }
-        }
-        if (*p != '"') {
-            break;
-        }
-        size_t length = (size_t)(p - start);
-        const char *after = p + 1;
-        if (length == key_len && memcmp(start, key, key_len) == 0) {
-            const char *q = after;
-            while (isspace((unsigned char)*q)) {
-                ++q;
-            }
-            if (*q == ':') {
-                ++q;
-                while (isspace((unsigned char)*q)) {
-                    ++q;
-                }
-                return q;
-            }
-        }
-        ++p;
-    }
-    return NULL;
-}
-
-static char *json_matching_array(char *open)
-{
-    if (open == NULL || *open != '[') {
-        return NULL;
-    }
-    int depth = 0;
-    bool in_string = false;
-    bool escaped = false;
-    for (char *p = open; *p != '\0'; ++p) {
-        char c = *p;
-        if (in_string) {
-            if (escaped) {
-                escaped = false;
-            } else if (c == '\\') {
-                escaped = true;
-            } else if (c == '"') {
-                in_string = false;
-            }
-            continue;
-        }
-        if (c == '"') {
-            in_string = true;
-        } else if (c == '[') {
-            ++depth;
-        } else if (c == ']') {
-            --depth;
-            if (depth == 0) {
-                return p;
-            }
-        }
-    }
-    return NULL;
-}
-
-static int json_count_array_items(const char *open, const char *close)
-{
-    int count = 0;
-    int depth = 0;
-    bool in_string = false;
-    bool escaped = false;
-    bool in_item = false;
-    for (const char *p = open + 1; p < close; ++p) {
-        char c = *p;
-        if (in_string) {
-            if (escaped) {
-                escaped = false;
-            } else if (c == '\\') {
-                escaped = true;
-            } else if (c == '"') {
-                in_string = false;
-            }
-            continue;
-        }
-        if (c == '"') {
-            in_string = true;
-        } else if (c == '[' || c == '{') {
-            if (depth == 0 && !in_item) {
-                ++count;
-                in_item = true;
-            }
-            ++depth;
-        } else if (c == ']' || c == '}') {
-            if (depth > 0) {
-                --depth;
-            }
-        } else if (depth == 0) {
-            if (c == ',') {
-                in_item = false;
-            } else if (!isspace((unsigned char)c) && !in_item) {
-                ++count;
-                in_item = true;
-            }
-        }
-    }
-    return count;
-}
-
-static int json_elide_events(char *json)
-{
-    char *value = (char *)json_find_key(json, "events");
-    if (value == NULL || *value != '[') {
-        return 0;
-    }
-    char *open = value;
-    char *close = json_matching_array(open);
-    if (close == NULL) {
-        return -1;
-    }
-    int count = json_count_array_items(open, close);
-    memmove(open + 1, close, strlen(close) + 1);
-    return count;
-}
-
 static bool json_top_type(const char *json, char *out, size_t size)
 {
-    const char *value = json_find_key(json, "type");
+    const char *value = meet_json_find_key(json, "type");
     if (value == NULL || *value != '"' || size == 0) {
         return false;
     }
@@ -518,19 +408,33 @@ static bool send_heartbeat(void)
         cJSON_Delete(root);
         return false;
     }
-    (void)snprintf(s_hb_nonce, sizeof(s_hb_nonce), "hb-%u",
+    char nonce[40];
+    (void)snprintf(nonce, sizeof(nonce), "hb-%u",
                    (unsigned)++s_message_counter);
-    cJSON_AddStringToObject(payload, "nonce", s_hb_nonce);
+    cJSON_AddStringToObject(payload, "nonce", nonce);
     char *json = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
     if (json == NULL) {
         return false;
     }
+    if (s_hb_lock == NULL ||
+        xSemaphoreTake(s_hb_lock, portMAX_DELAY) != pdTRUE) {
+        cJSON_free(json);
+        return false;
+    }
+    copy_str(s_hb_nonce, sizeof(s_hb_nonce), nonce);
+    s_hb_pending = true;
+    s_hb_sent_ms = (uint32_t)(esp_timer_get_time() / 1000);
+    (void)xSemaphoreGive(s_hb_lock);
+
     bool ok = send_text(json, strlen(json), "heartbeat");
     cJSON_free(json);
-    if (ok) {
-        s_hb_pending = true;
-        s_hb_sent_ms = (uint32_t)(esp_timer_get_time() / 1000);
+    if (!ok && s_hb_lock != NULL &&
+        xSemaphoreTake(s_hb_lock, portMAX_DELAY) == pdTRUE) {
+        if (strcmp(s_hb_nonce, nonce) == 0) {
+            s_hb_pending = false;
+        }
+        (void)xSemaphoreGive(s_hb_lock);
     }
     return ok;
 }
@@ -543,14 +447,22 @@ static void process_heartbeat(cJSON *root)
     cJSON *payload = json_item(root, "payload");
     char nonce[40];
     json_get_string(payload, "nonce", nonce, sizeof(nonce));
-    if (!s_hb_pending || nonce[0] == '\0' || strcmp(nonce, s_hb_nonce) != 0) {
+    if (s_hb_lock == NULL || nonce[0] == '\0' ||
+        xSemaphoreTake(s_hb_lock, portMAX_DELAY) != pdTRUE) {
         return;
     }
-    uint32_t now_ms = (uint32_t)(esp_timer_get_time() / 1000);
-    uint32_t rtt_ms = now_ms - s_hb_sent_ms;
-    s_hb_pending = false;
-    s_hb_missed = 0;
-    ESP_LOGI(TAG, "heartbeat RTT=%u ms", (unsigned)rtt_ms);
+    bool matched = s_hb_pending && strcmp(nonce, s_hb_nonce) == 0;
+    uint32_t rtt_ms = 0;
+    if (matched) {
+        uint32_t now_ms = (uint32_t)(esp_timer_get_time() / 1000);
+        rtt_ms = now_ms - s_hb_sent_ms;
+        s_hb_pending = false;
+        s_hb_missed = 0;
+    }
+    (void)xSemaphoreGive(s_hb_lock);
+    if (matched) {
+        ESP_LOGI(TAG, "heartbeat RTT=%u ms", (unsigned)rtt_ms);
+    }
 }
 
 /* Caller must hold s_model_lock. */
@@ -876,13 +788,22 @@ static void process_welcome(cJSON *root, uint32_t parse_ms)
     if (client_id[0] != '\0') {
         copy_str(s_client_id, sizeof(s_client_id), client_id);
     }
+    bool token_persisted = false;
     if (token[0] != '\0') {
         copy_str(s_token, sizeof(s_token), token);
         esp_err_t auth_err = save_auth(token, client_id);
         if (auth_err != ESP_OK) {
             ESP_LOGW(TAG, "NVS token save failed: %s",
                      esp_err_to_name(auth_err));
+        } else {
+            token_persisted = true;
         }
+    } else if (s_token[0] != '\0') {
+        /* Token already in NVS; it remains authoritative. */
+        token_persisted = true;
+    }
+    if (token_persisted) {
+        clear_pairing_code();
     }
     s_summary.token_set = s_token[0] != '\0';
 
@@ -1053,6 +974,19 @@ static void process_welcome(cJSON *root, uint32_t parse_ms)
         return;
     }
 
+    /* Stop the demo source before posting the real model, so a late mock post
+     * cannot overwrite the snapshot. The stop is cooperative and waits. */
+    if (!s_mock_stopped) {
+        esp_err_t mock_err = meet_mock_state_stop();
+        s_mock_stopped = mock_err == ESP_OK;
+        if (mock_err == ESP_OK) {
+            ESP_LOGI(TAG, "mock state stopped; real snapshot owns the ViewModel");
+        } else {
+            ESP_LOGW(TAG, "mock state stop failed: %s",
+                     esp_err_to_name(mock_err));
+        }
+    }
+
     uint32_t now_ms = (uint32_t)(esp_timer_get_time() / 1000);
     if (s_model_lock == NULL) {
         ESP_LOGE(TAG, "model lock missing; snapshot not applied");
@@ -1082,11 +1016,6 @@ static void process_welcome(cJSON *root, uint32_t parse_ms)
     }
     (void)xSemaphoreGive(s_model_lock);
 
-    if (!s_mock_stopped) {
-        (void)meet_mock_state_stop();
-        s_mock_stopped = true;
-        ESP_LOGI(TAG, "mock state stopped; real snapshot owns the ViewModel");
-    }
     if (post_err != ESP_OK) {
         ESP_LOGW(TAG, "snapshot post failed: %s", esp_err_to_name(post_err));
     }
@@ -1114,25 +1043,23 @@ static void process_message(char *raw, int length)
     bool welcome = strcmp(type, "welcome") == 0;
     if (welcome) {
         s_summary.bytes = length;
-        int events_skipped = json_elide_events(raw);
-        if (events_skipped < 0) {
-            ESP_LOGE(TAG, "welcome events array malformed; skip parse");
+        meet_json_elision_t elision = meet_json_elide_events(raw);
+        if (meet_welcome_elision_reject((size_t)length, &elision)) {
+            if (elision.malformed) {
+                ESP_LOGE(TAG, "welcome events array malformed; skip parse");
+            } else {
+                ESP_LOGE(TAG,
+                         "large welcome without events elision (%d bytes)",
+                         length);
+            }
             if (s_events != NULL) {
                 (void)xEventGroupSetBits(s_events, WS_CLOSED_BIT);
             }
             return;
         }
-        if (length > 20000 && events_skipped == 0) {
-            ESP_LOGE(TAG, "large welcome without events elision (%d bytes)",
-                     length);
-            if (s_events != NULL) {
-                (void)xEventGroupSetBits(s_events, WS_CLOSED_BIT);
-            }
-            return;
-        }
-        s_summary.events_skipped = events_skipped;
+        s_summary.events_skipped = elision.count;
         ESP_LOGI(TAG, "welcome received: raw_bytes=%d events_skipped=%d",
-                 length, events_skipped);
+                 length, elision.count);
     }
 
     uint64_t start_us = esp_timer_get_time();
@@ -1370,8 +1297,13 @@ static void cleanup_ws(void)
 static void heartbeat_loop(void)
 {
     uint32_t last_sent = (uint32_t)(esp_timer_get_time() / 1000);
+    if (s_hb_lock == NULL ||
+        xSemaphoreTake(s_hb_lock, portMAX_DELAY) != pdTRUE) {
+        return;
+    }
     s_hb_pending = false;
     s_hb_missed = 0;
+    (void)xSemaphoreGive(s_hb_lock);
 
     while (s_running) {
         EventBits_t bits = xEventGroupWaitBits(
@@ -1394,13 +1326,20 @@ static void heartbeat_loop(void)
         if (now_ms - last_sent < HEARTBEAT_INTERVAL_MS) {
             continue;
         }
-        if (s_hb_pending) {
-            ++s_hb_missed;
-            if (s_hb_missed >= HEARTBEAT_MAX_MISSED) {
-                ESP_LOGW(TAG, "heartbeat missed %u times; reconnect",
-                         (unsigned)s_hb_missed);
-                break;
-            }
+        if (s_hb_lock == NULL ||
+            xSemaphoreTake(s_hb_lock, portMAX_DELAY) != pdTRUE) {
+            break;
+        }
+        bool pending = s_hb_pending;
+        uint32_t missed = s_hb_missed;
+        if (pending) {
+            missed = ++s_hb_missed;
+        }
+        (void)xSemaphoreGive(s_hb_lock);
+        if (pending && missed >= HEARTBEAT_MAX_MISSED) {
+            ESP_LOGW(TAG, "heartbeat missed %u times; reconnect",
+                     (unsigned)missed);
+            break;
         }
         if (!send_heartbeat()) {
             break;
@@ -1411,18 +1350,16 @@ static void heartbeat_loop(void)
 
 static void handle_auth_failure(void)
 {
-    if (!s_used_token) {
-        ESP_LOGW(TAG, "pairing code authentication failed");
-        return;
-    }
-
-    ESP_LOGW(TAG, "token authentication failed; token cleared");
-    clear_token();
-    if (s_pairing_code[0] != '\0') {
-        ESP_LOGW(TAG, "retrying once with stored pairing_code");
+    if (s_used_token) {
+        ESP_LOGW(TAG, "token authentication failed; token cleared");
+        clear_token();
     } else {
-        ESP_LOGW(TAG, "no pairing_code available; backoff");
+        ESP_LOGW(TAG, "pairing code authentication failed; code cleared");
     }
+    clear_pairing_code();
+    ESP_LOGE(TAG,
+             "authentication failed; re-provision required (no automatic "
+             "pairing retry)");
 }
 
 static void net_task_cleanup(void)
@@ -1443,6 +1380,10 @@ static void net_task_cleanup(void)
     if (s_cmd_lock != NULL) {
         vSemaphoreDelete(s_cmd_lock);
         s_cmd_lock = NULL;
+    }
+    if (s_hb_lock != NULL) {
+        vSemaphoreDelete(s_hb_lock);
+        s_hb_lock = NULL;
     }
     if (s_lifecycle_lock != NULL) {
         (void)xSemaphoreTake(s_lifecycle_lock, portMAX_DELAY);
@@ -1572,11 +1513,9 @@ static void net_task(void *arg)
             backoff = 1;
             heartbeat_loop();
         } else if ((bits & WS_AUTH_FAILED_BIT) != 0) {
-            bool used_token = s_used_token;
             handle_auth_failure();
-            if (used_token && s_pairing_code[0] != '\0') {
-                backoff = 1;
-            }
+            set_state(client, MEET_NET_ERROR);
+            backoff = 10; /* wait for re-provisioning; do not retry stale auth */
         } else {
             ESP_LOGW(TAG, "welcome timeout/closed before welcome");
         }
@@ -1647,9 +1586,23 @@ esp_err_t meet_net_client_start(meet_net_client_t *client)
             return ESP_ERR_NO_MEM;
         }
     }
+    if (s_hb_lock == NULL) {
+        s_hb_lock = xSemaphoreCreateMutex();
+        if (s_hb_lock == NULL) {
+            vSemaphoreDelete(s_cmd_lock);
+            s_cmd_lock = NULL;
+            vSemaphoreDelete(s_model_lock);
+            s_model_lock = NULL;
+            vSemaphoreDelete(s_lifecycle_lock);
+            s_lifecycle_lock = NULL;
+            return ESP_ERR_NO_MEM;
+        }
+    }
     meet_pending_commands_init(&s_pending_commands);
     s_events = xEventGroupCreate();
     if (s_events == NULL) {
+        vSemaphoreDelete(s_hb_lock);
+        s_hb_lock = NULL;
         vSemaphoreDelete(s_cmd_lock);
         s_cmd_lock = NULL;
         vSemaphoreDelete(s_model_lock);
@@ -1666,6 +1619,8 @@ esp_err_t meet_net_client_start(meet_net_client_t *client)
         s_task = NULL;
         vEventGroupDelete(s_events);
         s_events = NULL;
+        vSemaphoreDelete(s_hb_lock);
+        s_hb_lock = NULL;
         vSemaphoreDelete(s_cmd_lock);
         s_cmd_lock = NULL;
         vSemaphoreDelete(s_model_lock);

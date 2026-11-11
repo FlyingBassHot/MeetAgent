@@ -71,6 +71,7 @@ pairing_code  可选，≤32
 
 - 实现按 NUL 结尾复制到 `wifi_config_t`，SSID 有效上限 31 字节，密码有效上限 63 字节；常规手机热点不受影响。
 - `node_url` 必须是 Node 的 LAN 地址，例如 `http://<host-lan-ip>:8787`。
+- 修改 `node_url` 会清除旧 Node 的 token/client_id/last_sequence；需要重新配对。
 - ESP32 只连 Node，不直接访问 OpenCode。
 - `/save` 只在 AP / AP_FALLBACK 状态接受；STA 模式返回 403。
 - 保存成功后延迟 800 ms 重启。
@@ -207,21 +208,24 @@ namespace `meet_wifi` 新增：
 client_token    string（welcome 返回 token 后保存）
 client_id       string
 last_sequence   u64
-pairing_code    继续复用 E4a key
+pairing_code    继续复用 E4a key；仅在首次配对时使用
 ```
 
 - token 存在时 `hello` 只发 token；否则发 pairing_code。
-- token 无效：清 token；若有 pairing_code，重试一次 pairing；否则退避。
+- welcome 保存 token 后清除 NVS `pairing_code`（服务端配对码成功即轮换，旧码不可复用）。
+- token/pairing 认证失败：清 token 和 pairing_code，进入“需要重新配网”状态，**不自动重试**旧码。
+- 修改 `node_url` 时清除 `client_token/client_id/last_sequence`，避免把旧 Node 的 token 发给新 Node。
 - 日志只打 `token=set/empty`、`pairing_code=set/empty`，不打印值。
 
 ## 3. 47KB welcome 内存策略
 
 - WebSocket buffer：1024 bytes；分片累积到 **128KB PSRAM** 原始缓冲。
 - 不把原始 welcome 直接交给 cJSON。
-- 在原始 JSON 上做字符串/转义/嵌套感知的扫描：
+- 在原始 JSON 上做字符串/转义/嵌套感知的扫描（`welcome_elision.c`，host 可测）：
   - 找到 `snapshot.events` 数组；
   - 统计事件数；
   - 将数组内容原地替换为 `[]`（memmove，只缩小）。
+- `events` 缺失且 welcome >20KB 才拒绝；`events: []` 放行（不能把“无回放事件”误判为损坏）。
 - 之后 cJSON 只解析约 3KB 的 node/agents/sessions/pending_permissions。
 - 大缓冲与 snapshot 结构均 `heap_caps_*` PSRAM；cJSON 小对象用内部 RAM。
 - 42 sessions 安全截断到 8（ViewModel 容量）；日志记录 `sessions_stored/total`。
@@ -252,8 +256,8 @@ memory        : internal_free=65,895 B, psram_free=6,516,920 B
 
 未验证：
 
-- [x] token 无效 → `auth_failed` → 清 token（bogus token 实测）
-- [ ] token 无效 + 有效 pairing_code 自动重试
+- [x] token 无效 → `auth_failed` → 清 token/pairing_code（代码实现，待真机）
+- [x] 不再自动重试已轮换的 pairing_code；需重新配网（代码实现，待真机）
 - [x] `replay_truncated=1` 时以 snapshot 重建（Node 重启实测）
 - [x] replay 重建后的后续事件 apply（seq 46–52 实测）
 - [ ] 连续 3 次 heartbeat 无回包触发重连（未主动断 WS）
@@ -393,7 +397,6 @@ heartbeat RTT=77/131 ms
 - 高频事件下 4Hz 节流的压力/丢帧表现。
 - 主动制造 sequence gap 的补偿策略（当前只告警）。
 - 连续 3 次 heartbeat 无回包强制重连。
-- 无效 token + 有效 pairing_code 自动重试。
 - 多 Agent 时的全局 active-first 截断（当前仅单 Agent 实测）。
 - UI 视觉更新需人工确认；E4b-3 已实现安全命令发送，未实现 session.prompt。
 

@@ -25,6 +25,9 @@ static const char *TAG = "wifi_prov";
 #define NVS_KEY_PASS "wifi_pass"
 #define NVS_KEY_NODE_URL "node_url"
 #define NVS_KEY_PAIRING "pairing_code"
+#define NVS_KEY_TOKEN "client_token"
+#define NVS_KEY_CLIENT_ID "client_id"
+#define NVS_KEY_LAST_SEQ "last_sequence"
 
 #define WIFI_CONNECTED_BIT (1u << 0)
 #define WIFI_FAIL_BIT (1u << 1)
@@ -205,6 +208,36 @@ static esp_err_t save_config(const char *ssid, const char *password,
         status_set_config(ssid, node_url, true);
     }
     return err;
+}
+
+static void clear_client_identity(void)
+{
+    nvs_handle_t handle;
+    esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "client identity clear failed: %s",
+                 esp_err_to_name(err));
+        return;
+    }
+    const char *keys[] = {NVS_KEY_TOKEN, NVS_KEY_CLIENT_ID, NVS_KEY_LAST_SEQ};
+    for (size_t i = 0; i < sizeof(keys) / sizeof(keys[0]); ++i) {
+        esp_err_t key_err = nvs_erase_key(handle, keys[i]);
+        if (key_err != ESP_OK && key_err != ESP_ERR_NVS_NOT_FOUND &&
+            err == ESP_OK) {
+            err = key_err;
+        }
+    }
+    if (err == ESP_OK) {
+        err = nvs_commit(handle);
+    }
+    nvs_close(handle);
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "node_url changed: cleared client_token/client_id/"
+                      "last_sequence");
+    } else {
+        ESP_LOGW(TAG, "client identity clear failed: %s",
+                 esp_err_to_name(err));
+    }
 }
 
 static void build_ap_ssid(void)
@@ -654,11 +687,18 @@ static esp_err_t portal_save(httpd_req_t *req)
         return ESP_FAIL;
     }
 
+    char previous_node_url[128];
+    copy_str(previous_node_url, sizeof(previous_node_url), s_config.node_url);
+    bool node_changed = strcmp(previous_node_url, node_url) != 0;
+
     esp_err_t err = save_config(ssid, password, node_url, pairing_code);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "NVS save failed: %s", esp_err_to_name(err));
         httpd_resp_send_500(req);
         return ESP_FAIL;
+    }
+    if (node_changed) {
+        clear_client_identity();
     }
 
     ESP_LOGI(TAG, "provisioning saved: ssid='%s' node_url='%s' password=%s "
