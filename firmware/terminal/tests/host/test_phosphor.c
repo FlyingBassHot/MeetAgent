@@ -6,6 +6,8 @@
 #include "glyph_ramp.h"
 #include "glyph_rasterizer.h"
 #include "orbit_geometry.h"
+#include "phosphor_lut.h"
+#include "phosphor_motion.h"
 #include "phosphor_palette.h"
 #include "phosphor_scene.h"
 #include "radial_field.h"
@@ -268,6 +270,86 @@ static void test_glyph_frame_priority(void)
     phosphor_scene_render_rgb565(edge, 4, 4);
 }
 
+static void test_motion_and_scene(void)
+{
+    const phosphor_motion_profile_t *idle = phosphor_motion_idle_profile();
+    const phosphor_motion_profile_t *working =
+        phosphor_motion_working_profile();
+    TEST_ASSERT_TRUE(NEAR(idle->speeds[0], 0.08f));
+    TEST_ASSERT_TRUE(NEAR(idle->speeds[1], -0.045f));
+    TEST_ASSERT_TRUE(NEAR(idle->speeds[2], 0.025f));
+    TEST_ASSERT_TRUE(NEAR(working->speeds[0], 0.22f));
+    TEST_ASSERT_TRUE(NEAR(working->speeds[1], -0.55f));
+    TEST_ASSERT_TRUE(NEAR(working->speeds[2], 0.32f));
+    TEST_ASSERT_TRUE(working->density > idle->density);
+    TEST_ASSERT_TRUE(working->brightness >= idle->brightness);
+
+    phosphor_lut_init();
+    TEST_ASSERT_TRUE(fabsf(phosphor_lut_sin(1.5707963f) - 1.0f) < 0.01f);
+    TEST_ASSERT_TRUE(fabsf(phosphor_lut_cos(0.0f) - 1.0f) < 0.01f);
+
+    phosphor_motion_state_t a;
+    phosphor_motion_state_t b;
+    phosphor_motion_init(&a, PHOSPHOR_MODE_IDLE);
+    phosphor_motion_init(&b, PHOSPHOR_MODE_IDLE);
+    for (uint32_t t = 16; t <= 1000; t += 16) {
+        phosphor_motion_update(&a, t, PHOSPHOR_MODE_IDLE);
+        phosphor_motion_update(&b, t, PHOSPHOR_MODE_IDLE);
+    }
+    TEST_ASSERT_TRUE(fabsf(a.orbit_phase[0] - b.orbit_phase[0]) < 0.0001f);
+    TEST_ASSERT_TRUE(fabsf(a.density - b.density) < 0.0001f);
+    TEST_ASSERT_TRUE(fabsf(a.breath - b.breath) < 0.0001f);
+    /* Wrapped phase is in [0, 2pi); negative middle speed appears as ~6.24. */
+    TEST_ASSERT_TRUE(a.orbit_phase[1] > 6.0f);
+
+    phosphor_motion_state_t transition;
+    phosphor_motion_init(&transition, PHOSPHOR_MODE_IDLE);
+    for (uint32_t t = 16; t <= 500; t += 16) {
+        phosphor_motion_update(&transition, t, PHOSPHOR_MODE_WORKING);
+    }
+    TEST_ASSERT_TRUE(transition.mode_mix > 0.4f);
+    TEST_ASSERT_TRUE(transition.mode_mix < 0.6f);
+    TEST_ASSERT_TRUE(transition.density > idle->density);
+    TEST_ASSERT_TRUE(transition.density < working->density);
+    for (uint32_t t = 516; t <= 1500; t += 16) {
+        phosphor_motion_update(&transition, t, PHOSPHOR_MODE_WORKING);
+    }
+    TEST_ASSERT_TRUE(transition.mode_mix >= 0.999f);
+    TEST_ASSERT_TRUE(transition.activity_energy > 0.5f);
+
+    phosphor_motion_state_t c;
+    phosphor_motion_state_t d;
+    phosphor_motion_init(&c, PHOSPHOR_MODE_WORKING);
+    phosphor_motion_init(&d, PHOSPHOR_MODE_WORKING);
+    for (uint32_t t = 16; t <= 1000; t += 16) {
+        phosphor_motion_update(&c, t, PHOSPHOR_MODE_WORKING);
+        phosphor_motion_update(&d, t, PHOSPHOR_MODE_WORKING);
+    }
+    TEST_ASSERT_EQ_INT(0, memcmp(&c, &d, sizeof(c)));
+
+    glyph_frame_t idle_frame;
+    glyph_frame_t working_frame;
+    phosphor_motion_state_t motion;
+    phosphor_motion_init(&motion, PHOSPHOR_MODE_IDLE);
+    phosphor_motion_update(&motion, 1000, PHOSPHOR_MODE_IDLE);
+    phosphor_scene_build_frame_motion(&idle_frame, &motion);
+    phosphor_motion_init(&motion, PHOSPHOR_MODE_WORKING);
+    phosphor_motion_update(&motion, 1000, PHOSPHOR_MODE_WORKING);
+    phosphor_scene_build_frame_motion(&working_frame, &motion);
+    TEST_ASSERT_TRUE(memcmp(&idle_frame, &working_frame,
+                            sizeof(idle_frame)) != 0);
+    int idle_nonempty = 0;
+    int working_nonempty = 0;
+    for (int r = 0; r < PHOSPHOR_GRID_H; ++r) {
+        for (int col = 0; col < PHOSPHOR_GRID_W; ++col) {
+            idle_nonempty += idle_frame.cells[r][col].glyph != 0;
+            working_nonempty += working_frame.cells[r][col].glyph != 0;
+        }
+    }
+    TEST_ASSERT_TRUE(idle_nonempty > 0);
+    TEST_ASSERT_TRUE(working_nonempty > 0);
+}
+
 static void test_scene_nucleus_and_rasterizer(void)
 {
     glyph_frame_t frame;
@@ -311,5 +393,6 @@ void test_phosphor_run(void)
     test_radial_field();
     test_satellite_layout();
     test_glyph_frame_priority();
+    test_motion_and_scene();
     test_scene_nucleus_and_rasterizer();
 }

@@ -178,3 +178,11 @@ P0 的 288×288 / 8×12 估算作为 P1.0 基线保留；P1.1 根据实机反馈
 - `glyph_ramp` 为纯模块；P2 密度场限制在中心 30–78，不进轨道/无 halo；
 - Palette RGB565 精确值已测试；`LV_COLOR_16_SWAP=0` 编译期检查；
 - P2 仍是静态，不含 P3 动画。
+
+
+## 14. P3 Idle/Working（2026-11-11）
+
+- 纯 motion/LUT；Idle/Working profile、1s 过渡、固定 phase 可复现；
+- 平台单任务 demo 6s Idle/6s Working；
+- 实测 Idle 7 FPS，Working 7 FPS（目标 10–15 未达成，P5 再优化）；
+- P3 未进入 P4。

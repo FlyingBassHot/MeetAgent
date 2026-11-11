@@ -1,7 +1,7 @@
 # PHOSPHOR CORE — P2 Glyph Renderer / 颜色 / 密度 / 前后合成
 
 日期：2026-11-11
-状态：P2 静态渲染层完成，真机启动通过；实屏最终视觉由用户确认。未进入 P3。
+状态：P2 静态渲染层完成；P3 已在其上完成 Idle/Working 动画。
 
 ## 1. 保持 P1.3 基线
 
@@ -144,7 +144,7 @@ syntax_check.sh    -> 42 files OK
 - compositor 优先级五级顺序、2× Nucleus、scale 3 拒绝、边缘裁剪；
 - P1.3 三轨参数/Nucleus/Satellite 回归。
 
-## 9. P3 待办（不开始）
+## 9. P3 已完成（见 PHOSPHOR_P3.md）
 
 - Motion Scheduler / Idle / Working 连续相位；
 - 动态密度、Completed/Approval/Error/Offline；

@@ -36,6 +36,8 @@ idf_component_register(
         "phosphor/phosphor_scene.c"
         "phosphor/radial_field.c"
         "phosphor/satellite_layout.c"
+        "phosphor/phosphor_motion.c"
+        "phosphor/phosphor_lut.c"
         "phosphor/phosphor_lvgl_port.c"
 
         "hal/board_stub.c"

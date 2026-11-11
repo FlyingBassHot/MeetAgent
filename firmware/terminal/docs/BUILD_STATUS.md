@@ -584,6 +584,23 @@ I (26244) touch_test: TOUCH release
 - Host：**3541 checks, 0 failures**；syntax **42 files OK**。
 - 实屏密度层次/颜色待用户确认；P3 未开始。
 
+### 11.17 PHOSPHOR P3 Idle/Working（2026-11-11）
+
+- 新增纯 `phosphor_motion` / `phosphor_lut`：Idle +0.08/-0.045/+0.025，
+  Working +0.22/-0.55/+0.32；1s 过渡、450ms energy 低通、1024 点 LUT。
+- Scene 动态相位/密度/亮度；Working 固定相位活动粒子（`+`/`%`），
+  Satellite 位置固定；Nucleus 2× 稳定。
+- ESP32 单刷新任务，demo 6s Idle ↔ 6s Working；display lock 内更新
+  PSRAM canvas + invalidate，不 scene_commit。
+- 实测：Idle 7 FPS（目标 6–8 达成）；Working 7 FPS（目标 10–15 未达成，
+  432 canvas 全量渲染/刷新限制；P5 再优化，不虚报）。
+- Host：**3613 checks, 0 failures**；syntax **45 files OK**。
+- 截图：`docs/phosphor/p3_idle.png`、`p3_working.png`（480×480）。
+- 最终固件：1,271,872 B，SHA-256 `b7c7bec7...777f8`，app 剩余 17%，
+  DIRAM 204,423/341,760 (59.81%)。
+- 真机 Wi-Fi/Node 在线，无 panic/OOM；实屏动画待用户确认。
+- P4 未开始。
+
 ## 12. 仓库约束
 
 - 只修改 `firmware/terminal/`

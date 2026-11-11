@@ -3,6 +3,8 @@
 #include <math.h>
 #include <stddef.h>
 
+#include "phosphor_lut.h"
+
 #define PHOSPHOR_TWO_PI 6.28318530718f
 
 static const phosphor_orbit_t s_orbits[3] = {
@@ -25,12 +27,12 @@ void phosphor_orbit_point(const phosphor_orbit_t *orbit, float theta,
     if (orbit == NULL || out == NULL) {
         return;
     }
-    float ct = cosf(theta);
-    float st = sinf(theta);
-    float cr = cosf(orbit->rotation);
-    float sr = sinf(orbit->rotation);
-    float ctilt = cosf(orbit->tilt);
-    float stilt = sinf(orbit->tilt);
+    float ct = phosphor_lut_cos(theta);
+    float st = phosphor_lut_sin(theta);
+    float cr = phosphor_lut_cos(orbit->rotation);
+    float sr = phosphor_lut_sin(orbit->rotation);
+    float ctilt = phosphor_lut_cos(orbit->tilt);
+    float stilt = phosphor_lut_sin(orbit->tilt);
     float r = orbit->radius;
     out->x = cx + r * ct * cr - r * st * ctilt * sr;
     out->y = cy + r * ct * sr + r * st * ctilt * cr;
@@ -43,11 +45,11 @@ void phosphor_orbit_tangent(const phosphor_orbit_t *orbit, float theta,
     if (orbit == NULL || dx == NULL || dy == NULL) {
         return;
     }
-    float ct = cosf(theta);
-    float st = sinf(theta);
-    float cr = cosf(orbit->rotation);
-    float sr = sinf(orbit->rotation);
-    float ctilt = cosf(orbit->tilt);
+    float ct = phosphor_lut_cos(theta);
+    float st = phosphor_lut_sin(theta);
+    float cr = phosphor_lut_cos(orbit->rotation);
+    float sr = phosphor_lut_sin(orbit->rotation);
+    float ctilt = phosphor_lut_cos(orbit->tilt);
     float r = orbit->radius;
     *dx = -r * st * cr - r * ct * ctilt * sr;
     *dy = -r * st * sr + r * ct * ctilt * cr;
