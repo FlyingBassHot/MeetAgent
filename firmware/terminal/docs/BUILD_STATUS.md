@@ -3,7 +3,7 @@
 日期：2026-11-11  
 范围：`firmware/terminal/` only  
 目标：Waveshare ESP32-S3-Touch-LCD-4 V4.0（ESP32-S3N16R8）  
-状态：**E4a Wi-Fi + E4b-1 WebSocket + E4b-2 事件 apply/replay + E4b-3 安全命令链路已验证；GT911 触摸已确认；PHOSPHOR R2.1/P6/P5 已烧录；交互 Stage 1+2 已合并（未烧录）**；屏幕颜色/背光仍需人工确认
+状态：**E4a Wi-Fi + E4b-1 WebSocket + E4b-2 事件 apply/replay + E4b-3 安全命令链路已验证；GT911 触摸已确认；PHOSPHOR R2.1/P6/P5 已烧录；交互 Stage 1+2+3 已合并（未烧录）**；屏幕颜色/背光仍需人工确认
 
 ## 1. 真机信息
 
@@ -805,6 +805,23 @@ I (26244) touch_test: TOUCH release
 - Stage 1+2 合并：Host **5560 checks, 0 failures**；syntax 52；
   IDF 5.5.5 build **0x13cde0 bytes / 16% free**。
 - **未 flash**；P5 2h soak 于 20:27 重启；真机四场景/touch 待 soak 后验证。
+
+### 11.31 交互 Stage 3 安全审批 / Interrupt（2026-11-11）
+
+- UI→net action queue（4 深、8192 栈 worker）：`send_action()` 只入队，
+  UI task 不再同步等 WebSocket 5s；net client 所有 precheck 失败投递 FAILED
+  result，避免 PENDING 悬挂。
+- safety attention：新增 `espui_view_model_safety_attention_count()`，只计
+  approval；completion/error 不再强制/钉住 Attention。
+- Attention 审批 UI：3 行列表、Reject/Approve Once/Approve Always（5s 二次
+  确认）、PENDING/ACK/ERR/REJECTED/TIMEOUT；截断/空 summary 隐藏
+  Approve/Always，仅显示 `OPEN MOBILE > APPROVALS`，保留 Reject。
+- Focus：tap 内容区循环 active session；Interrupt 仅 RUNNING/WAITING 可提交，
+  pending/sent 禁重复，结果更新按钮。
+- 去掉 ViewModel 4Hz 更新时的 `scene_commit()` 全屏失效，只保留 init 首次提交。
+- Host：**5962 checks, 0 failures**；syntax 52；IDF 5.5.5 build
+  **0x13e4e0 bytes / 15% free**。
+- **未 flash**；真机审批矩阵/Interrupt/触摸坐标待验证。
 
 ## 12. 仓库约束
 

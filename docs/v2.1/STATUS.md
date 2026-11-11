@@ -7,7 +7,7 @@
 | Core / Node | 主会话 | M0 + M1 + M4 Core | 完成；审计/限流/重连边界加固 | M6 可选增强 |
 | Protocol v2 | 主会话 | M0 | 完成 | 随实现补兼容测试 |
 | Mobile | omp | M5b + UX P0/P1/P2 | 视觉与原生交互改造完成（信息层级/聊天流/触感/键盘/返回键/下拉刷新/视觉打磨） | iOS/Release |
-| Terminal / ESPUI | pi | E0–E3a + LCD-4 Bring-up + E4a + E4b-1/2/3 + PHOSPHOR R2.1/P6/P5 + Stage 1+2 interaction + net QA fixes | P5 real Working 11 FPS；Stage 1 输入管线 + Stage 2 场景/canvas 已合并：host 5560/5560、IDF 5.5.5 build 0x13cde0 / 16% free，**未 flash**；P5 2h soak 于 20:27 重启，运行中 | 2h soak 完成 → flash Stage 1+2 真机验证 → Stage 3 审批/Interrupt、Stage 4 Settings、AP portal `/save` |
+| Terminal / ESPUI | pi | E0–E3a + LCD-4 Bring-up + E4a + E4b-1/2/3 + PHOSPHOR R2.1/P6/P5 + Stage 1+2+3 interaction + net QA fixes | Stage 3 安全审批/Interrupt 已合并：host 5962/5962、IDF build 0x13e4e0 / 15% free，**未 flash**；P5 2h soak 运行中（20:27 起）；Stage 1+2 真机审计进行中 | audit → flash 合并固件真机验证 touch/四场景/审批 → Stage 4 Settings、AP portal `/save` |
 | Cloud relay | 主会话 | 可选 | 保留 V1 实现 | M6 再验证混合模式 |
 
 ## 已完成
@@ -50,6 +50,7 @@
 - Terminal 交互规划（2026-11-11）：已按 TerminalUi.md E3/E4/E5 完成 gap/阶段计划；Stage 1 输入管线（touch poll/gesture/BOOT/Back）、Stage 2 场景+PHOSPHOR canvas 集成、Stage 3 安全审批/Interrupt/action queue、Stage 4 Settings/NVS、Stage 5 idle/低功耗；当前 PHOSPHOR 是 top-layer overlay、无输入轮询、theme `on_input` 为空、commands 无 UI 入口；Stage 1/2 并行开发中，不烧录直到 P5 soak 完成
 - Terminal 交互 Stage 1（2026-11-11）：新增 input task（20ms、display lock）、gesture recognizer（tap/long/swipe/debounce）、BOOT GPIO0 短按 Back/长按 Attention、独立 input queue 16、TAP/SWIPE 事件与场景导航；host tests 5386/5386；syntax 52；IDF build 1,292,352 B/16%；**未 flash**（P5 soak 占用设备）；真机 tap/swipe/long/BOOT 待 soak 后验证；PHOSPHOR overlay 仍遮挡场景，Stage 2 处理
 - Terminal 交互 Stage 2（2026-11-11）：移除 `lv_layer_top()` 全屏 overlay，PHOSPHOR 改为 terminal theme 持有的 `ESPUI_WIDGET_CANVAS`（renderer 管理 canvas、PSRAM buffer 复用、attach/detach、非 Ambient 暂停）；Ambient/Focus/Activity/Attention 四场景布局；ViewModel 8 条 Activity ring；`espui_focus_index()` accessor；修复 init 未激活 canvas；Stage 1+2 合并后 host tests **5560/5560**、syntax 52、IDF 5.5.5 build **0x13cde0 / 16% free**；**未 flash**；P5 2h soak 20:27 重启，真机四场景/touch 待 soak 后验证
+- Terminal 交互 Stage 3（2026-11-11）：UI→net action queue（4 深、8192 栈 worker），UI task 不再同步等网络；`net_client` 所有 precheck 失败投递 FAILED result；safety attention 只计 approval，completion/error 不再强制 Attention；Attention 3 行审批列表 + Reject/Once/Always（5s 二次确认）、截断 summary 仅 `OPEN MOBILE > APPROVALS`；Focus 可 tap 循环 active session，Interrupt 仅 RUNNING/WAITING；去掉 4Hz `scene_commit` 全屏失效；host tests **5962/5962**、syntax 52、IDF 5.5.5 build **0x13e4e0 / 15% free**；**未 flash**；真机触摸/审批矩阵/Interrupt 待验证
 - Terminal network QA fixes（2026-11-11）：F1 welcome 空/缺失 events、F3 stale pairing code、F5 mock stop、F7 字符串 NUL、F8 heartbeat 时序、F10 node_url 变化清 token 已合并；组合固件 0x135f00 / 17% free；启动日志 token=set、pairing_code=empty、welcome 49KB、snapshot applied、heartbeat RTT 298ms；host tests 3589/3589；F9/F4/F6/F2 仍待后续
 - Terminal 硬件目标确定为 **Waveshare ESP32-S3-Touch-LCD-4 V4**（480×480 RGB LCD + GT911 + CH32V003 helper）；真实 BSP 已接入，显示/触摸方向/PSRAM 待实物验证
 

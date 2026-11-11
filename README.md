@@ -4,7 +4,7 @@
 
 **Node-Centric · Multi-Client · Plugin-Based · LAN First · Cloud Optional**
 
-当前状态：**V2.1 核心链路已贯通**。Node 独立服务、V2.1 客户端协议、配对、事件中心、命令/权限、审计与限流已完成；Mobile 已完成 OpenCode 真实 Session、Tailscale 与 Android 真机验收（Prompt、Interrupt、权限审批、断网恢复、Node 重启恢复），并完成 UX P0/P1/P2 改造（信息层级、聊天式详情、统一开发者信息、原生触感/键盘/返回键/下拉刷新/Sheet/视觉打磨）。Terminal 已完成 E0–E3a，并完成 **Waveshare ESP32-S3-Touch-LCD-4 V4** 真机 bring-up、E4a Wi-Fi 配网、E4b-1 Node WebSocket、E4b-2 事件接入、E4b-3 command 链路、PHOSPHOR CORE R2.1/P6/P5、交互 Stage 1+2 与网络 QA 修复：ESP-IDF 5.5.5、480×480 RGB LCD、GT911、CH32V003、LVGL 8.4；STA 已连接手机热点（172.20.10.2），hello/welcome/snapshot、token NVS、心跳/重连、事件 apply/replay、`session.list` 命令已验证；PHOSPHOR state-first 视觉、Approval 90% `?`/Warning、Error 92.7% `!`/Error 红、真实 ViewModel 映射已烧录；P5 dirty-cell + partial invalidate 将 real Working 提升到 11 FPS、Idle 7 FPS，2h soak 于 20:27 重启；Stage 1 输入管线（20ms touch poll、tap/long/swipe、BOOT/Back）与 Stage 2 场景（Ambient/Focus/Activity/Attention、PHOSPHOR theme-owned canvas、Activity ring）已合并，host 5560/5560、build 1.296 MB/16%，未 flash；real touch/四场景、Stage 3 审批/Interrupt、Stage 4 Settings、real Approval/Error/Offline、AP portal 保存仍待后续。
+当前状态：**V2.1 核心链路已贯通**。Node 独立服务、V2.1 客户端协议、配对、事件中心、命令/权限、审计与限流已完成；Mobile 已完成 OpenCode 真实 Session、Tailscale 与 Android 真机验收（Prompt、Interrupt、权限审批、断网恢复、Node 重启恢复），并完成 UX P0/P1/P2 改造（信息层级、聊天式详情、统一开发者信息、原生触感/键盘/返回键/下拉刷新/Sheet/视觉打磨）。Terminal 已完成 E0–E3a，并完成 **Waveshare ESP32-S3-Touch-LCD-4 V4** 真机 bring-up、E4a Wi-Fi 配网、E4b-1 Node WebSocket、E4b-2 事件接入、E4b-3 command 链路、PHOSPHOR CORE R2.1/P6/P5、交互 Stage 1+2+3 与网络 QA 修复：ESP-IDF 5.5.5、480×480 RGB LCD、GT911、CH32V003、LVGL 8.4；STA 已连接手机热点（172.20.10.2），hello/welcome/snapshot、token NVS、心跳/重连、事件 apply/replay、`session.list` 命令已验证；PHOSPHOR state-first 视觉、Approval 90% `?`/Warning、Error 92.7% `!`/Error 红、真实 ViewModel 映射已烧录；P5 dirty-cell + partial invalidate 将 real Working 提升到 11 FPS、Idle 7 FPS，2h soak 20:27 重启；Stage 1 输入管线（20ms touch poll、tap/long/swipe、BOOT/Back）、Stage 2 场景（Ambient/Focus/Activity/Attention、PHOSPHOR theme-owned canvas、Activity ring）与 Stage 3 安全交互（非阻塞 action queue、审批 Reject/Once/Always、截断 summary Mobile 引导、Focus 切换/Interrupt）已合并，host 5962/5962、build 1.304 MB/15%，未 flash；real touch/四场景/审批、Stage 4 Settings、real Approval/Error/Offline、AP portal 保存仍待后续。
 
 > 设计文档：
 > - [`MeetAgentV2.1.md`](./MeetAgentV2.1.md) — 总体架构、双客户端、南向插件、阶段计划
@@ -49,7 +49,7 @@ Mobile (Vue + Capacitor)        ESP32 Terminal (ESP-IDF + LVGL)
 | Core / Node | `cmd/node`, `internal/`, `pkg/`, `configs/` | M0/M1/M4 完成；审计、限流、重连边界加固 |
 | Node 模拟器 | `cmd/simulator` | 可用 |
 | Mobile | `mobile/` | M5b + UX P0/P1/P2 完成；Android 真机 Prompt/Interrupt/审批/断网恢复/原生交互已验证 |
-| ESP32 Terminal / ESPUI | `firmware/terminal/` | E0–E3a + LCD-4 bring-up + E4a Wi-Fi + E4b-1/2/3 Node + PHOSPHOR R2.1/P6/P5 + Stage 1+2 interaction + net QA fixes | 2h soak、Stage 1+2 flash、real touch/四场景、Stage 3 审批/Interrupt、Stage 4 Settings、AP portal `/save` |
+| ESP32 Terminal / ESPUI | `firmware/terminal/` | E0–E3a + LCD-4 bring-up + E4a Wi-Fi + E4b-1/2/3 Node + PHOSPHOR R2.1/P6/P5 + Stage 1+2+3 interaction + net QA fixes | audit → flash 合并固件真机验证 touch/四场景/审批、Stage 4 Settings、AP portal `/save` |
 | V1 Cloud / Web Console | `cmd/cloud`, `web/test-client` | 归档参考 |
 
 ---

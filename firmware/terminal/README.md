@@ -18,6 +18,7 @@
 - E4b-3：command gateway、pending command 表、15s 超时、断线失败、session.list 安全刷新、action result → footer
 - Stage 1 输入：20ms touch poll（display lock）、tap/long/swipe/debounce、BOOT GPIO0 短按 Back/长按 Attention、独立 input queue、场景导航（**未烧录**）
 - Stage 2 场景：移除 PHOSPHOR 全屏 overlay，改为 theme-owned `ESPUI_WIDGET_CANVAS`；Ambient/Focus/Activity/Attention 布局、8 条 Activity ring、focus accessor（**未烧录**）
+- Stage 3 安全交互：UI→net action queue（4 深、8192 栈 worker，UI 不同步等网络）；审批 Reject/Once/Always（5s 二次确认）、截断 summary 仅 Mobile 引导；Focus tap 切 session + Interrupt；safety attention 只由 approval 驱动（**未烧录**）
 - PHOSPHOR P0/P1/P1.1/P1.2/P1.3/P2/P3/P3.1/P3.2/P3.3/P3.4/P3.5/P3.6/P4/R1：审计、24×16 Glyph Frame、三轨 Orbit、2× Nucleus、18×27 Bold Atlas、密度 Ramp、Palette/Compositor、Idle/Working motion、0/1 二进制流、Outer 相邻 cell 加厚、水层/漂浮物、六态 resolver/demo、Inner 密集带、中心减量、SDL2 动画/截图、ESP32 432 canvas overlay
 
 已验证：
@@ -26,7 +27,7 @@
 - 启动证据：16MB QIO Flash、8MB Octal PSRAM 80MHz、240MHz、ST7701 480×480、GT911 0x14、ESPUI 初始化
 - R1.1 build-only：`meetagent_terminal.bin` 1,284,080 bytes（`0f65a53f...7b129d78`）；**未烧录**，设备保留 P4b；app free 16%
 - 原厂 16MB Flash 已备份：`/home/perch/esp/backups/lcd4-factory-2026-11-11-1132.bin`
-- 主机测试：`5560 checks, 0 failure(s)`（ASan/UBSan + `-Werror`；Stage 1+2 合并后）
+- 主机测试：`5962 checks, 0 failure(s)`（ASan/UBSan + `-Werror`；Stage 1+2+3 合并后）
 - 主机语法检查：48 个固件 C 文件通过（board_lcd4.c / wifi_prov.c / net_client.c / phosphor_lvgl_port.c 由真实 IDF 构建验证）
 - E3a 帧预览：`make preview STATE=working FRAMES=3 DELAY=300`
 - 启动日志：`/tmp/opencode/esp-lcd4-boot.log`
@@ -36,7 +37,7 @@
 - E4b-3 实测：session.list completed、sessions=42、action result OK；最终回归 event seq 219–225 apply
 - GT911 触摸已实机确认：TL/TR/BL/BR/C 五点 + 180° 映射；临时 Touch Test overlay 已移除
 - **待人工确认**：屏幕颜色/背光亮度；AP portal `/save` 需第二台设备
-- 注意：Stage 1/2 已合并但**未烧录**；设备当前仍运行 P5（真实 ViewModel、无触摸交互）。Stage 3 审批/Interrupt 尚未实现
+- 注意：Stage 1+2+3 已合并但**未烧录**；设备当前仍运行 P5（真实 ViewModel、无触摸交互）。真机 touch/四场景/审批/Interrupt 待验证
 
 当前环境：
 
