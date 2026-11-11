@@ -38,14 +38,41 @@ static uint32_t binary_bucket(const phosphor_motion_state_t *motion)
     return time_ms / interval;
 }
 
-static char outer_glyph(uint32_t i,
-                        const phosphor_motion_state_t *motion)
+typedef struct {
+    char glyph;
+    glyph_color_id_t color;
+    uint8_t intensity;
+} outer_cell_t;
+
+static outer_cell_t outer_cell(uint32_t i,
+                               const phosphor_motion_state_t *motion)
 {
-    /* Cyclic data pattern shifted by time bucket: a visible string moving
-     * along the orbit instead of per-cell hash flicker. */
-    static const char pattern[] = "0101+#%@=/<>";
+    /* 12 water glyphs + 8 object glyphs = 60% / 40%.
+     * Objects form two 4-cell packets (#@+o, %@#+). */
+    static const outer_cell_t pattern[] = {
+        {'0', GLYPH_COLOR_SECONDARY, 230},
+        {'1', GLYPH_COLOR_SECONDARY, 230},
+        {'-', GLYPH_COLOR_SECONDARY, 230},
+        {'=', GLYPH_COLOR_SECONDARY, 230},
+        {'1', GLYPH_COLOR_SECONDARY, 230},
+        {'0', GLYPH_COLOR_SECONDARY, 230},
+        {'/', GLYPH_COLOR_SECONDARY, 230},
+        {'\\', GLYPH_COLOR_SECONDARY, 230},
+        {'#', GLYPH_COLOR_HIGHLIGHT, 255},
+        {'@', GLYPH_COLOR_HIGHLIGHT, 255},
+        {'+', GLYPH_COLOR_HIGHLIGHT, 255},
+        {'o', GLYPH_COLOR_HIGHLIGHT, 255},
+        {'1', GLYPH_COLOR_SECONDARY, 230},
+        {'0', GLYPH_COLOR_SECONDARY, 230},
+        {'=', GLYPH_COLOR_SECONDARY, 230},
+        {'-', GLYPH_COLOR_SECONDARY, 230},
+        {'%', GLYPH_COLOR_HIGHLIGHT, 255},
+        {'@', GLYPH_COLOR_HIGHLIGHT, 255},
+        {'#', GLYPH_COLOR_HIGHLIGHT, 255},
+        {'+', GLYPH_COLOR_HIGHLIGHT, 255},
+    };
     uint32_t bucket = binary_bucket(motion);
-    uint32_t len = (uint32_t)(sizeof(pattern) - 1);
+    uint32_t len = (uint32_t)(sizeof(pattern) / sizeof(pattern[0]));
     return pattern[(i + bucket) % len];
 }
 
@@ -102,7 +129,7 @@ static bool in_gap(float theta, float gap_angle, float half_width)
 static char sideband_glyph(uint32_t i,
                            const phosphor_motion_state_t *motion)
 {
-    static const char pattern[] = "0101+#%@";
+    static const char pattern[] = "01-=/";
     uint32_t bucket = binary_bucket(motion);
     uint32_t len = (uint32_t)(sizeof(pattern) - 1);
     return pattern[(i + bucket + 3u) % len];
@@ -228,12 +255,13 @@ static void draw_orbit_cell(glyph_frame_t *frame,
         intensity = 200;
     } else if (orbit_index == 1) {
         glyph = middle_glyph(i, dx, dy);
-        color = GLYPH_COLOR_SECONDARY;
+        color = GLYPH_COLOR_PRIMARY;
         intensity = 215;
     } else {
-        glyph = outer_glyph(i, motion);
-        color = GLYPH_COLOR_PRIMARY;
-        intensity = 250;
+        outer_cell_t outer = outer_cell(i, motion);
+        glyph = outer.glyph;
+        color = outer.color;
+        intensity = outer.intensity;
     }
     uint8_t flags = GLYPH_FLAG_FRONT;
     if (point.depth < 0.0f) {
@@ -243,8 +271,8 @@ static void draw_orbit_cell(glyph_frame_t *frame,
             intensity = 185;
         } else if (orbit_index == 1) {
             intensity = 175;
-        } else {
-            intensity = 185;
+        } else if (intensity > 20) {
+            intensity -= 20; /* keep water/object color, dim slightly */
         }
     }
     if (motion != NULL) {

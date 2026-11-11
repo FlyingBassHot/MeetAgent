@@ -686,6 +686,23 @@ I (26244) touch_test: TOUCH release
 - Host：**3624 checks, 0 failures**；syntax **45 files OK**。
 - P4 未开始。
 
+### 11.23 PHOSPHOR P3.6 Outer 水层/漂浮物（2026-11-11）
+
+- Outer 主带 pattern struct len20：Water 12（60%）Secondary 230，
+  Objects 8（40%，两个 4-cell packet）Highlight 255；
+  `idx=(i+bucket)%20`，bucket Working 300ms/Idle 800ms。
+- Outer 内侧 band 仅水层 `01-=/` Secondary，不铺 Highlight；
+  Middle 改 Primary 215；Inner 保持；P3.4 中心减量保持。
+- 新截图 `p3_idle_v7.png` / `p3_working_v7.png`；
+  v6→v7 changed pixels Idle 16,772 / Working 16,207。
+- 最终固件：1,273,312 B，SHA-256 `c33dd717...eb05a7`，app 剩余 17%，
+  DIRAM 204,423/341,760 (59.81%)。
+- 真机：internal_free 49,607→65,131 B，PSRAM ~6,133,068 B；
+  Idle 7 FPS，Working 7 FPS（Working 仍低于目标，P5）；
+  Wi-Fi/Node 在线；无 panic/OOM。
+- Host：**3624 checks, 0 failures**；syntax **45 files OK**。
+- P4 未开始。
+
 ## 12. 仓库约束
 
 - 只修改 `firmware/terminal/`

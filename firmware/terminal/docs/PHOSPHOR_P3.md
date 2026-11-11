@@ -1,7 +1,7 @@
-# PHOSPHOR CORE — P3.5 Outer 字符串运输
+# PHOSPHOR CORE — P3.6 Outer 水层 / 漂浮物
 
 日期：2026-11-11
-状态：P3.5 Outer 主带/副带改为循环 pattern + bucket 平移；未进入 P4。实屏由用户确认。
+状态：P3.6 Outer 分 Secondary 水层 + Highlight 漂浮物 packet；未进入 P4。实屏由用户确认。
 
 ## 1. 保持 P1.3/P2 基线
 
@@ -44,13 +44,16 @@
 - Outer warning gap 缩到 half-width **0.11 rad**；Middle gap 缩到 **0.04 rad**；
   缺口内用低亮度 `0/1/./+` 连续填充，不留大块黑；
 - Inner 半径 80、96 采样；Middle 不变；
-- **P3.5**：Outer 主带使用循环 pattern `"0101+#%@=/<>"`（len 12），
-  `idx=(i+bucket)%12`；0/1 约 33%、`%` 约 8%；不再 in-place hash 闪变；
-- **P3.5**：内侧 band 使用 `"0101+#%@"`（len 8），
-  `idx=(i+bucket+3)%8`；0/1 约 50%、`%` 约 12.5%；
-- bucket 仍 Working 300ms / Idle 800ms；字符整体沿轨道平移，形成数据串；
+- **P3.6**：Outer 主带拆成两层，pattern struct len 20：
+  - Water 12/20 = 60%：`0 1 - = 1 0 / \ 1 0 = -`，Secondary，intensity 230；
+  - Objects 8/20 = 40%：`# @ + o` + `% @ # +` 两个 4-cell packet，
+    Highlight，intensity 255；
+  - `idx=(i+bucket)%20`，bucket Working 300ms / Idle 800ms；
+- **P3.6**：Outer 内侧 band 只做水层：`01-=/`，Secondary，
+  不铺 Highlight 物体；
+- Middle 改为 Primary（intensity 215）；Inner 保持 Secondary/密集；
+  Satellite `*` Highlight / `?` Warning 仍唯一；
 - 主 Outer 仍 96 采样；副带/缺口填充连续；
-- 主 Outer 仍 `+#%@01`；副带/缺口填充连续；
 - **P3.4**：core density 收窄到半径 48–64，1/17 cell 稀疏覆盖，
   最高强度约 108–120（Idle/Working）；中心 <80 不生成 band FIELD；
   Inner band 110–150，Middle 强度 215；Outer 完全保持；
@@ -72,8 +75,8 @@
 ### 实测（真机）
 
 ```text
-Idle    fps=7  render_avg=38–82ms  period=141–146ms
-Working fps=7  render_avg=75–113ms period=135–136ms
+Idle    fps=7  render_avg=38–80ms  period=142–146ms
+Working fps=7  render_avg=72–110ms period=135–136ms
 ```
 
 - **Idle 达到 6–8 FPS 目标。**
@@ -88,46 +91,46 @@ Working fps=7  render_avg=75–113ms period=135–136ms
 cd firmware/terminal/tools/phosphor_sim
 make
 ./build/phosphor_sim                         # 动画窗口；1=Idle 2=Working ESC=退出
-SDL_VIDEODRIVER=dummy ./build/phosphor_sim --screenshot build/p3_idle_v6.bmp --state idle --time-ms 3000
-SDL_VIDEODRIVER=dummy ./build/phosphor_sim --screenshot build/p3_working_v6.bmp --state working --time-ms 3000
-convert build/p3_idle_v6.bmp ../../docs/phosphor/p3_idle_v6.png
-convert build/p3_working_v6.bmp ../../docs/phosphor/p3_working_v6.png
+SDL_VIDEODRIVER=dummy ./build/phosphor_sim --screenshot build/p3_idle_v7.bmp --state idle --time-ms 3000
+SDL_VIDEODRIVER=dummy ./build/phosphor_sim --screenshot build/p3_working_v7.bmp --state working --time-ms 3000
+convert build/p3_idle_v7.bmp ../../docs/phosphor/p3_idle_v7.png
+convert build/p3_working_v7.bmp ../../docs/phosphor/p3_working_v7.png
 ```
 
 Golden：
 
 ```text
-docs/phosphor/p3_idle_v6.png
-480x480 PNG, 3,612 B
-sha256 822929d1fc5c340f5c8e5c69bc517a453cd9a976720bcd8c3be17a91f56dc4e2
+docs/phosphor/p3_idle_v7.png
+480x480 PNG, 3,161 B
+sha256 e615a7fd4e9de61bbe7bd82606a419acdfa0f4b8618587be341ef3c03a690126
 
-docs/phosphor/p3_working_v6.png
-480x480 PNG, 3,659 B
-sha256 f8a73903280a64f0b131719ef75c069d9fc7e07c6adb9ec74c129770a4d40c98
+docs/phosphor/p3_working_v7.png
+480x480 PNG, 3,432 B
+sha256 35f37393bdfd91c609016e919255404eeb86f4aba41ea6dc3d1384c4d6cfa397
 
-历史 P3.0–P3.4 截图保留。
+历史 P3.0–P3.5 截图保留。
 ```
 
 ## 6. 构建 / 内存
 
 ```text
-app size : 1,273,056 B (0x136ce0)
-sha256   : 8e6ab088bda3a570613d812f693ee46bad7bc7a742432a261ea049c07132ecd2
-app free : 0x40320 (17%)
+app size : 1,273,312 B (0x136de0)
+sha256   : c33dd7171cbd63999ccf284799c1016afc9458db543e1b61b1b6bdb956dc05a7
+app free : 0x40220 (17%)
 DIRAM    : 204,423 / 341,760 B (59.81%)
 IRAM     : 16,384/16,384（size 固定窗口；链接断言通过）
 PSRAM canvas: 373,248 B（一次分配）
 ```
 
-真机启动日志 `/tmp/phosphor-p3f-boot.log`：
+真机启动日志 `/tmp/phosphor-p3g-boot.log`：
 
 ```text
 P3 animation started: demo 6s Idle / 6s Working
-welcome memory: internal_free=49,611 psram_free=6,133,448
+welcome memory: internal_free=49,607 psram_free=6,133,240
 network state: online
 ```
 
-后续统计 internal_free 55.9–65.1KB，PSRAM ~6,133,276 B；无持续下降。
+后续统计 internal_free 55.9–65.1KB，PSRAM ~6,133,068 B；无持续下降。
 
 ## 7. Host 验证
 

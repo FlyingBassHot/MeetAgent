@@ -225,3 +225,10 @@ P0 的 288×288 / 8×12 估算作为 P1.0 基线保留；P1.1 根据实机反馈
 - 主带 0/1 约 33%，副带约 50%，`%` 比例下降；
 - v5→v6 changed pixels 8,206/7,784；
 - 外围/Inner/Middle/中心减量保持；P4 未开始。
+
+
+## 20. P3.6 Outer 水层/漂浮物（2026-11-11）
+
+- Water 60% Secondary + Objects 40% Highlight（两个 4-cell packet）；
+- band 仅水层；Middle 改 Primary；P3.4 中心减量保持；
+- v6→v7 changed pixels 16,772/16,207；P4 未开始。
