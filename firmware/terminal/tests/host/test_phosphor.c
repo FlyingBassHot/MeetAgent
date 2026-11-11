@@ -291,9 +291,9 @@ static void test_motion_and_scene(void)
     TEST_ASSERT_TRUE(NEAR(idle->speeds[0], 0.08f));
     TEST_ASSERT_TRUE(NEAR(idle->speeds[1], -0.045f));
     TEST_ASSERT_TRUE(NEAR(idle->speeds[2], 0.025f));
-    TEST_ASSERT_TRUE(NEAR(working->speeds[0], 0.25f));
-    TEST_ASSERT_TRUE(NEAR(working->speeds[1], -0.62f));
-    TEST_ASSERT_TRUE(NEAR(working->speeds[2], 0.36f));
+    TEST_ASSERT_TRUE(NEAR(working->speeds[0], 0.22f));
+    TEST_ASSERT_TRUE(NEAR(working->speeds[1], -0.55f));
+    TEST_ASSERT_TRUE(NEAR(working->speeds[2], 0.32f));
     TEST_ASSERT_TRUE(NEAR(working->density, 0.85f));
     TEST_ASSERT_TRUE(working->density > idle->density);
     TEST_ASSERT_TRUE(working->brightness >= idle->brightness);
@@ -318,14 +318,14 @@ static void test_motion_and_scene(void)
 
     phosphor_motion_state_t transition;
     phosphor_motion_init(&transition, PHOSPHOR_MODE_IDLE);
-    for (uint32_t t = 16; t <= 500; t += 16) {
+    for (uint32_t t = 16; t <= 300; t += 16) {
         phosphor_motion_update(&transition, t, PHOSPHOR_MODE_WORKING);
     }
     TEST_ASSERT_TRUE(transition.mode_mix > 0.4f);
     TEST_ASSERT_TRUE(transition.mode_mix < 0.6f);
     TEST_ASSERT_TRUE(transition.density > idle->density);
     TEST_ASSERT_TRUE(transition.density < working->density);
-    for (uint32_t t = 516; t <= 1500; t += 16) {
+    for (uint32_t t = 316; t <= 700; t += 16) {
         phosphor_motion_update(&transition, t, PHOSPHOR_MODE_WORKING);
     }
     TEST_ASSERT_TRUE(transition.mode_mix >= 0.999f);
@@ -543,6 +543,86 @@ static void test_core_six_states(void)
     TEST_ASSERT_TRUE(memcmp(&frames[1], &frames[5], sizeof(frames[1])) != 0);
 }
 
+static void test_core_motion(void)
+{
+    phosphor_state_resolver_t resolver;
+    phosphor_input_state_t input;
+    phosphor_visual_state_t visual;
+    phosphor_motion_state_t motion;
+    glyph_frame_t a;
+    glyph_frame_t b;
+    phosphor_core_metrics_t metrics;
+
+    /* Orbit phase advances while Idle; the static R1 path remains valid. */
+    phosphor_motion_init(&motion, PHOSPHOR_MODE_IDLE);
+    phosphor_motion_update(&motion, 1000, PHOSPHOR_MODE_IDLE);
+    float phase0 = motion.orbit_phase[0];
+    phosphor_motion_update(&motion, 1100, PHOSPHOR_MODE_IDLE);
+    TEST_ASSERT_TRUE(fabsf(motion.orbit_phase[0] - phase0) > 0.001f);
+    phosphor_state_resolver_init(&resolver);
+    phosphor_demo_build_input(PHOSPHOR_DEMO_IDLE, 1, &input);
+    phosphor_state_resolver_update(&resolver, &input, 1100, &visual);
+    phosphor_core_build_frame_motion(&a, &visual, &motion, &metrics);
+    phosphor_motion_update(&motion, 1200, PHOSPHOR_MODE_IDLE);
+    phosphor_state_resolver_update(&resolver, &input, 1200, &visual);
+    phosphor_core_build_frame_motion(&b, &visual, &motion, &metrics);
+    TEST_ASSERT_TRUE(memcmp(&a, &b, sizeof(a)) != 0);
+
+    /* Completion contraction/waves differ over the 900 ms pulse. */
+    phosphor_state_resolver_init(&resolver);
+    phosphor_demo_build_input(PHOSPHOR_DEMO_COMPLETED, 1, &input);
+    phosphor_state_resolver_update(&resolver, &input, 0, &visual);
+    phosphor_state_resolver_update(&resolver, &input, 100, &visual);
+    phosphor_motion_init(&motion, PHOSPHOR_MODE_IDLE);
+    phosphor_motion_update(&motion, 100, PHOSPHOR_MODE_IDLE);
+    phosphor_core_build_frame_motion(&a, &visual, &motion, &metrics);
+    TEST_ASSERT_EQ_INT(3, metrics.completion_wave_layers);
+    phosphor_state_resolver_update(&resolver, &input, 800, &visual);
+    phosphor_motion_update(&motion, 800, PHOSPHOR_MODE_IDLE);
+    phosphor_core_build_frame_motion(&b, &visual, &motion, &metrics);
+    TEST_ASSERT_TRUE(memcmp(&a, &b, sizeof(a)) != 0);
+
+    /* Approval breath modulates edge markers, without moving the 1.35 gap. */
+    phosphor_state_resolver_init(&resolver);
+    phosphor_demo_build_input(PHOSPHOR_DEMO_APPROVAL, 1, &input);
+    phosphor_state_resolver_update(&resolver, &input, 0, &visual);
+    float first_breath = visual.approval_breath;
+    phosphor_core_build_frame_motion(&a, &visual, &motion, &metrics);
+    TEST_ASSERT_TRUE(metrics.approval_gap_cells > 0);
+    phosphor_state_resolver_update(&resolver, &input, 437, &visual);
+    TEST_ASSERT_TRUE(fabsf(visual.approval_breath - first_breath) > 0.1f);
+    phosphor_core_build_frame_motion(&b, &visual, &motion, &metrics);
+    TEST_ASSERT_TRUE(memcmp(&a, &b, sizeof(a)) != 0);
+
+    /* Error glitch is temporary and then the stable red break remains. */
+    phosphor_state_resolver_init(&resolver);
+    phosphor_demo_build_input(PHOSPHOR_DEMO_ERROR, 1, &input);
+    phosphor_state_resolver_update(&resolver, &input, 0, &visual);
+    TEST_ASSERT_TRUE(visual.error_glitch_active);
+    phosphor_core_build_frame_motion(&a, &visual, &motion, &metrics);
+    TEST_ASSERT_EQ_INT(7, metrics.error_break_cells);
+    phosphor_state_resolver_update(&resolver, &input, 300, &visual);
+    TEST_ASSERT_FALSE(visual.error_glitch_active);
+    phosphor_core_build_frame_motion(&b, &visual, &motion, &metrics);
+    TEST_ASSERT_TRUE(memcmp(&a, &b, sizeof(a)) != 0);
+
+    /* Offline freezes the motion state; recovery resumes from it. */
+    phosphor_motion_init(&motion, PHOSPHOR_MODE_WORKING);
+    phosphor_motion_update(&motion, 1000, PHOSPHOR_MODE_WORKING);
+    float frozen = motion.orbit_phase[2];
+    /* Platform does not call update while visual.activity == OFFLINE. */
+    phosphor_state_resolver_init(&resolver);
+    phosphor_demo_build_input(PHOSPHOR_DEMO_OFFLINE, 1, &input);
+    phosphor_state_resolver_update(&resolver, &input, 2000, &visual);
+    TEST_ASSERT_EQ_INT(PHOSPHOR_ACTIVITY_OFFLINE, visual.activity);
+    TEST_ASSERT_TRUE(motion.orbit_phase[2] == frozen);
+    phosphor_motion_update(&motion, 3000, PHOSPHOR_MODE_IDLE);
+    TEST_ASSERT_TRUE(motion.orbit_phase[2] != frozen);
+    phosphor_demo_build_input(PHOSPHOR_DEMO_IDLE, 2, &input);
+    phosphor_state_resolver_update(&resolver, &input, 3000, &visual);
+    TEST_ASSERT_EQ_INT(PHOSPHOR_ACTIVITY_IDLE, visual.activity);
+}
+
 static void test_scene_nucleus_and_rasterizer(void)
 {
     glyph_frame_t frame;
@@ -589,6 +669,7 @@ void test_phosphor_run(void)
     test_motion_and_scene();
     test_state_resolver();
     test_core_six_states();
+    test_core_motion();
     test_band_neighbors();
     test_scene_nucleus_and_rasterizer();
 }

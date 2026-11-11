@@ -6,7 +6,7 @@
 #include "phosphor_lut.h"
 
 #define PHOSPHOR_TWO_PI 6.28318530718f
-#define PHOSPHOR_TRANSITION_MS 1000.0f
+#define PHOSPHOR_TRANSITION_MS 600.0f
 
 static const phosphor_motion_profile_t s_idle = {
     .speeds = {0.08f, -0.045f, 0.025f},
@@ -16,7 +16,7 @@ static const phosphor_motion_profile_t s_idle = {
 };
 
 static const phosphor_motion_profile_t s_working = {
-    .speeds = {0.25f, -0.62f, 0.36f},
+    .speeds = {0.22f, -0.55f, 0.32f},
     .breath_period_ms = 5000.0f,
     .density = 0.85f,
     .brightness = 1.00f,

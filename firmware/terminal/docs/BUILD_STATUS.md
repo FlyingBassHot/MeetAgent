@@ -737,6 +737,21 @@ I (26244) touch_test: TOUCH release
 - Host：**3693 checks, 0 failures**；syntax **48 files OK**。
 - R2/motion/烧录未开始。
 
+### 11.26 PHOSPHOR R2 motion + 烧录（2026-11-11）
+
+- 在 R1.1 state-first core 上接 motion：Idle 0.08/-0.045/0.025（8s breath），
+  Working 0.22/-0.55/0.32（5s），过渡 600ms，delta 200ms，LUT。
+- Approval 1.35rad gap + 2 `?` + 1.75s edge breath；Error 220ms 一次性 glitch
+  + 稳定 7 红字；Completed 900ms 0.96→0.90 收缩 + 三层波 + 8 粒子；
+  Offline 550ms 降速后冻结，恢复回到 Idle/Working。
+- app-flash 已执行（0x10000，保留 NVS）；app 1,284,512 B，
+  SHA-256 `9afad977...e42c2bf`，free 16%，DIRAM 59.87%。
+- 实机 70s：2 个完整周期，Offline→Idle 两次；Wi-Fi/Node/WS online；
+  no panic/OOM；internal_free 55.7→64.9KB，PSRAM 6,129,748 B；
+  Idle 6–7 FPS，Working 7 FPS（10–15 未达，留 P5）。
+- Host：**3708 checks, 0 failures**；syntax **48 files OK**。
+- P5/P6 未开始；未 commit/push。
+
 ## 12. 仓库约束
 
 - 只修改 `firmware/terminal/`

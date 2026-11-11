@@ -37,13 +37,23 @@ static void fill_screen(uint16_t *screen, const uint16_t *core)
 static void render_state(uint16_t *core, phosphor_motion_state_t *motion,
                          phosphor_state_resolver_t *resolver,
                          phosphor_demo_phase_t phase, uint32_t cycle,
-                         uint32_t now_ms)
+                         uint32_t now_ms, bool *was_offline,
+                         uint32_t *offline_start_ms)
 {
     phosphor_input_state_t input;
     phosphor_visual_state_t visual;
     phosphor_demo_build_input(phase, cycle, &input);
     phosphor_state_resolver_update(resolver, &input, now_ms, &visual);
-    if (visual.activity != PHOSPHOR_ACTIVITY_OFFLINE) {
+    if (visual.activity == PHOSPHOR_ACTIVITY_OFFLINE) {
+        if (!*was_offline) {
+            *was_offline = true;
+            *offline_start_ms = now_ms;
+        }
+        if (now_ms - *offline_start_ms < 550u) {
+            phosphor_motion_update(motion, now_ms, PHOSPHOR_MODE_IDLE);
+        }
+    } else {
+        *was_offline = false;
         phosphor_motion_mode_t mode = visual.activity == PHOSPHOR_ACTIVITY_WORKING
                                           ? PHOSPHOR_MODE_WORKING
                                           : PHOSPHOR_MODE_IDLE;
@@ -122,6 +132,8 @@ static int run_window(uint16_t *screen, uint16_t *core)
     phosphor_demo_phase_t phase = PHOSPHOR_DEMO_IDLE;
     uint32_t cycle = 1;
     uint32_t start = SDL_GetTicks();
+    bool was_offline = false;
+    uint32_t offline_start_ms = 0;
     int running = 1;
     while (running) {
         SDL_Event event;
@@ -146,7 +158,8 @@ static int run_window(uint16_t *screen, uint16_t *core)
             }
         }
         uint32_t now = SDL_GetTicks() - start;
-        render_state(core, &motion, &resolver, phase, cycle, now);
+        render_state(core, &motion, &resolver, phase, cycle, now,
+                     &was_offline, &offline_start_ms);
         fill_screen(screen, core);
         SDL_UpdateTexture(texture, NULL, screen, SCREEN_W * sizeof(uint16_t));
         SDL_RenderClear(renderer);

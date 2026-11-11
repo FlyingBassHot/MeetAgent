@@ -4,7 +4,7 @@
 
 **Node-Centric · Multi-Client · Plugin-Based · LAN First · Cloud Optional**
 
-当前状态：**V2.1 核心链路已贯通**。Node 独立服务、V2.1 客户端协议、配对、事件中心、命令/权限、审计与限流已完成；Mobile 已完成 OpenCode 真实 Session、Tailscale 与 Android 真机验收（Prompt、Interrupt、权限审批、断网恢复、Node 重启恢复），并完成 UX P0/P1/P2 改造（信息层级、聊天式详情、统一开发者信息、原生触感/键盘/返回键/下拉刷新/Sheet/视觉打磨）。Terminal 已完成 E0–E3a，并完成 **Waveshare ESP32-S3-Touch-LCD-4 V4** 真机 bring-up、E4a Wi-Fi 配网、E4b-1 Node WebSocket、E4b-2 事件接入、E4b-3 command 链路、PHOSPHOR CORE R1.1 与网络 QA 修复：ESP-IDF 5.5.5、480×480 RGB LCD、GT911、CH32V003、LVGL 8.4；STA 已连接手机热点（172.20.10.2），hello/welcome/snapshot、token NVS、心跳/重连、事件 apply/replay、`session.list` 命令已验证；PHOSPHOR 按规格书从头重构为 state-first 几何（不再 base+overlay），24×16/18×27 Bold、432×432、三条轨道、2× `>_`、Outer 水层/漂浮物、六态静态 contact sheet 已验收：Approval 77° 大缺口 + 2 `?`、Error 89° 断裂 + 7 红字、Completed 三层径向波、Offline 轨道解体 + NO LINK + LAST SYNC、4 sessions + state label；host tests 3693/3693，R1.1 未烧录，R2 motion/flash 待做；P5 性能、P6 真实 ViewModel、interrupt/permission 实机、AP portal 保存仍待后续。
+当前状态：**V2.1 核心链路已贯通**。Node 独立服务、V2.1 客户端协议、配对、事件中心、命令/权限、审计与限流已完成；Mobile 已完成 OpenCode 真实 Session、Tailscale 与 Android 真机验收（Prompt、Interrupt、权限审批、断网恢复、Node 重启恢复），并完成 UX P0/P1/P2 改造（信息层级、聊天式详情、统一开发者信息、原生触感/键盘/返回键/下拉刷新/Sheet/视觉打磨）。Terminal 已完成 E0–E3a，并完成 **Waveshare ESP32-S3-Touch-LCD-4 V4** 真机 bring-up、E4a Wi-Fi 配网、E4b-1 Node WebSocket、E4b-2 事件接入、E4b-3 command 链路、PHOSPHOR CORE R2 与网络 QA 修复：ESP-IDF 5.5.5、480×480 RGB LCD、GT911、CH32V003、LVGL 8.4；STA 已连接手机热点（172.20.10.2），hello/welcome/snapshot、token NVS、心跳/重连、事件 apply/replay、`session.list` 命令已验证；PHOSPHOR 从规格书重构为 state-first 几何（不再 base+overlay），24×16/18×27 Bold、432×432、三条轨道、2× `>_`、Outer 水层/漂浮物；R2 motion 已烧录：Idle/Working 轨道运动、Approval 1.75s 呼吸、Error 220ms glitch、Completed 900ms 三层波、Offline 解体/冻结/恢复，4 sessions + state label；70s 日志 2 个完整周期、两次 Offline→Idle、无 panic/OOM，host tests 3708/3708，固件 1.28 MB，FPS 6–7；P6 真实 ViewModel 映射并行中，P5 性能、interrupt/permission 实机、AP portal 保存仍待后续。
 
 > 设计文档：
 > - [`MeetAgentV2.1.md`](./MeetAgentV2.1.md) — 总体架构、双客户端、南向插件、阶段计划
@@ -49,7 +49,7 @@ Mobile (Vue + Capacitor)        ESP32 Terminal (ESP-IDF + LVGL)
 | Core / Node | `cmd/node`, `internal/`, `pkg/`, `configs/` | M0/M1/M4 完成；审计、限流、重连边界加固 |
 | Node 模拟器 | `cmd/simulator` | 可用 |
 | Mobile | `mobile/` | M5b + UX P0/P1/P2 完成；Android 真机 Prompt/Interrupt/审批/断网恢复/原生交互已验证 |
-| ESP32 Terminal / ESPUI | `firmware/terminal/` | E0–E3a + LCD-4 bring-up + E4a Wi-Fi + E4b-1/2/3 Node + PHOSPHOR R1.1 state-first 重构 + net QA fixes | R2 motion + flash、P5 性能、P6 真实 ViewModel、interrupt/permission、AP portal `/save` |
+| ESP32 Terminal / ESPUI | `firmware/terminal/` | E0–E3a + LCD-4 bring-up + E4a Wi-Fi + E4b-1/2/3 Node + PHOSPHOR R2 state-first motion + net QA fixes | P6 真实 ViewModel 映射、P5 性能、interrupt/permission、AP portal `/save` |
 | V1 Cloud / Web Console | `cmd/cloud`, `web/test-client` | 归档参考 |
 
 ---

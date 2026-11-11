@@ -139,18 +139,24 @@ static void put_band(glyph_frame_t *frame, int orbit_index, uint8_t col,
 
 static void draw_orbit(glyph_frame_t *frame, int orbit_index,
                        const phosphor_visual_state_t *visual,
+                       const phosphor_motion_state_t *motion,
                        phosphor_core_metrics_t *metrics,
                        float error_angle, bool has_error)
 {
     phosphor_orbit_t orbit = phosphor_orbit_defaults()[orbit_index];
+    float phase_offset = motion != NULL ? motion->orbit_phase[orbit_index]
+                                        : 0.0f;
     if (visual->completion_active && (orbit_index == 1 || orbit_index == 2)) {
-        orbit.radius *= 0.90f; /* completed contraction */
+        float p = (float)visual->completion_elapsed_ms /
+                  PHOSPHOR_COMPLETION_MS;
+        if (p > 1.0f) p = 1.0f;
+        orbit.radius *= (0.96f - 0.06f * p); /* pulse contraction */
     }
     for (uint32_t i = 0; i < orbit.samples; ++i) {
-        float t0 = orbit.phase + CORE_TWO_PI * (float)i /
-                                   (float)orbit.samples;
-        float t1 = orbit.phase + CORE_TWO_PI * (float)(i + 1) /
-                                   (float)orbit.samples;
+        float t0 = orbit.phase + phase_offset +
+                   CORE_TWO_PI * (float)i / (float)orbit.samples;
+        float t1 = orbit.phase + phase_offset +
+                   CORE_TWO_PI * (float)(i + 1) / (float)orbit.samples;
         bool gap = false;
         if (orbit_index == 2 &&
             (in_gap(t0, CORE_APPROVAL_GAP,
@@ -204,6 +210,14 @@ static void draw_orbit(glyph_frame_t *frame, int orbit_index,
                 color = o.color;
                 intensity = o.intensity;
             }
+            if (motion != NULL) {
+                float b = motion->brightness;
+                if (b < 0.0f) b = 0.0f;
+                if (b > 1.0f) b = 1.0f;
+                float breath = 0.90f + 0.10f * motion->breath;
+                intensity = (uint8_t)((float)intensity *
+                                      (0.82f + 0.18f * b) * breath);
+            }
             uint8_t flags = GLYPH_FLAG_FRONT;
             if (visual->activity == PHOSPHOR_ACTIVITY_OFFLINE) {
                 flags = GLYPH_FLAG_BACK;
@@ -219,9 +233,9 @@ static void draw_orbit(glyph_frame_t *frame, int orbit_index,
     }
 }
 
-static void draw_working_water_boost(glyph_frame_t *frame,
-                                     const phosphor_visual_state_t *visual,
-                                     float error_angle, bool has_error)
+static void draw_working_water_boost(
+    glyph_frame_t *frame, const phosphor_visual_state_t *visual,
+    const phosphor_motion_state_t *motion, float error_angle, bool has_error)
 {
     if (visual->activity != PHOSPHOR_ACTIVITY_WORKING ||
         visual->attention != 0) {
@@ -232,7 +246,8 @@ static void draw_working_water_boost(glyph_frame_t *frame,
      * random halo. Working gets visibly more water cells than Idle. */
     const phosphor_orbit_t *outer = &phosphor_orbit_defaults()[2];
     for (int i = 0; i < 32; ++i) {
-        float angle = CORE_TWO_PI * (float)i / 32.0f + 0.23f;
+        float angle = CORE_TWO_PI * (float)i / 32.0f + 0.23f +
+                      (motion != NULL ? motion->orbit_phase[2] : 0.0f);
         if ((approval && in_gap(angle, CORE_APPROVAL_GAP,
                                 CORE_APPROVAL_GAP_HALF)) ||
             (has_error && in_gap(angle, error_angle,
@@ -252,7 +267,8 @@ static void draw_working_water_boost(glyph_frame_t *frame,
                         GLYPH_COLOR_SECONDARY, 210, GLYPH_FLAG_FRONT);
     }
     for (int i = 0; i < 12; ++i) {
-        float angle = CORE_TWO_PI * (float)i / 12.0f + 0.41f;
+        float angle = CORE_TWO_PI * (float)i / 12.0f + 0.41f +
+                      (motion != NULL ? motion->orbit_phase[2] : 0.0f);
         if ((approval && in_gap(angle, CORE_APPROVAL_GAP,
                                 CORE_APPROVAL_GAP_HALF)) ||
             (has_error && in_gap(angle, error_angle,
@@ -273,13 +289,15 @@ static void draw_working_water_boost(glyph_frame_t *frame,
     }
 }
 
-static void draw_error_break(glyph_frame_t *frame, float angle)
+static void draw_error_break(glyph_frame_t *frame, float angle,
+                             bool glitch)
 {
     const phosphor_orbit_t *outer = &phosphor_orbit_defaults()[2];
+    const float draw_angle = angle + (glitch ? 0.12f : 0.0f);
     static const char chars[7] = {'!', 'x', '-', '!', 'x', '-', '!'};
     for (int i = -3; i <= 3; ++i) {
         phosphor_point_t p;
-        phosphor_orbit_point(outer, angle + (float)i * 0.060f,
+        phosphor_orbit_point(outer, draw_angle + (float)i * 0.060f,
                              CORE_CX, CORE_CY, &p);
         uint8_t col, row;
         if (phosphor_point_to_cell(p.x, p.y, &col, &row)) {
@@ -291,7 +309,7 @@ static void draw_error_break(glyph_frame_t *frame, float angle)
     inner.radius -= 18.0f;
     for (int i = -3; i <= 3; ++i) {
         phosphor_point_t p;
-        phosphor_orbit_point(&inner, angle + (float)i * 0.060f + 0.02f,
+        phosphor_orbit_point(&inner, draw_angle + (float)i * 0.060f + 0.02f,
                              CORE_CX, CORE_CY, &p);
         uint8_t col, row;
         if (phosphor_point_to_cell(p.x, p.y, &col, &row)) {
@@ -300,11 +318,21 @@ static void draw_error_break(glyph_frame_t *frame, float angle)
                             GLYPH_COLOR_ERROR, 150, GLYPH_FLAG_FRONT);
         }
     }
+    if (glitch) {
+        phosphor_point_t gp;
+        phosphor_orbit_point(outer, draw_angle + 0.18f, CORE_CX, CORE_CY,
+                             &gp);
+        uint8_t gc, gr;
+        if (phosphor_point_to_cell(gp.x, gp.y, &gc, &gr)) {
+            glyph_frame_set(frame, gc, gr, glyph_atlas_index('!'),
+                            GLYPH_COLOR_ERROR, 240, GLYPH_FLAG_FRONT);
+        }
+    }
     phosphor_orbit_t inner2 = *outer;
     inner2.radius -= 36.0f;
     for (int i = -3; i <= 3; ++i) {
         phosphor_point_t p;
-        phosphor_orbit_point(&inner2, angle + (float)i * 0.060f + 0.04f,
+        phosphor_orbit_point(&inner2, draw_angle + (float)i * 0.060f + 0.04f,
                              CORE_CX, CORE_CY, &p);
         uint8_t col, row;
         if (phosphor_point_to_cell(p.x, p.y, &col, &row)) {
@@ -406,15 +434,18 @@ static void draw_approval_edges(glyph_frame_t *frame,
         for (int e = 0; e < 2; ++e) {
             for (int k = -2; k <= 2; ++k) {
                 phosphor_point_t p;
-                phosphor_orbit_point(&boundary, edges[e] + (float)k * 0.035f,
+                phosphor_orbit_point(&boundary,
+                                     edges[e] + (float)k * 0.035f,
                                      CORE_CX, CORE_CY, &p);
                 uint8_t col, row;
                 if (phosphor_point_to_cell(p.x, p.y, &col, &row)) {
                     char g = (k == 0 && layer == 0) ? '?' : (k & 1 ? ':' : '|');
+                    float breath = 0.78f + 0.22f * visual->approval_breath;
+                    uint8_t base = k == 0 ? 190 : (layer == 0 ? 120 : 90);
                     glyph_frame_set(frame, col, row, glyph_atlas_index(g),
                                     k == 0 ? GLYPH_COLOR_WARNING
                                            : GLYPH_COLOR_MUTED,
-                                    k == 0 ? 190 : (layer == 0 ? 120 : 90),
+                                    (uint8_t)((float)base * breath),
                                     GLYPH_FLAG_FRONT);
                 }
             }
@@ -449,9 +480,10 @@ static void draw_label(glyph_frame_t *frame,
     }
 }
 
-void phosphor_core_build_frame(glyph_frame_t *frame,
-                               const phosphor_visual_state_t *visual,
-                               phosphor_core_metrics_t *metrics)
+void phosphor_core_build_frame_motion(
+    glyph_frame_t *frame, const phosphor_visual_state_t *visual,
+    const phosphor_motion_state_t *motion,
+    phosphor_core_metrics_t *metrics)
 {
     if (frame == NULL || visual == NULL) return;
     if (metrics != NULL) memset(metrics, 0, sizeof(*metrics));
@@ -467,12 +499,12 @@ void phosphor_core_build_frame(glyph_frame_t *frame,
         }
     }
     for (int i = 2; i >= 0; --i) {
-        draw_orbit(frame, i, visual, metrics, error_angle, has_error);
+        draw_orbit(frame, i, visual, motion, metrics, error_angle, has_error);
     }
-    draw_working_water_boost(frame, visual, error_angle, has_error);
+    draw_working_water_boost(frame, visual, motion, error_angle, has_error);
     draw_approval_edges(frame, visual);
     if (has_error) {
-        draw_error_break(frame, error_angle);
+        draw_error_break(frame, error_angle, visual->error_glitch_active);
         if (metrics != NULL) metrics->error_break_cells = 7;
     }
     draw_satellites(frame, visual);
@@ -488,7 +520,6 @@ void phosphor_core_build_frame(glyph_frame_t *frame,
         }
     }
     draw_label(frame, visual);
-    /* Nucleus is always last. */
     uint8_t ni = visual->completion_active ? 255 : 245;
     glyph_frame_set_scaled(frame, 10, 7, glyph_atlas_index('>'),
                            GLYPH_COLOR_HIGHLIGHT, ni, GLYPH_FLAG_NUCLEUS, 2);
@@ -496,12 +527,29 @@ void phosphor_core_build_frame(glyph_frame_t *frame,
                            GLYPH_COLOR_HIGHLIGHT, ni, GLYPH_FLAG_NUCLEUS, 2);
 }
 
+void phosphor_core_build_frame(glyph_frame_t *frame,
+                               const phosphor_visual_state_t *visual,
+                               phosphor_core_metrics_t *metrics)
+{
+    phosphor_core_build_frame_motion(frame, visual, NULL, metrics);
+}
+
+void phosphor_core_render_motion_rgb565(
+    uint16_t *pixels, int width, int height,
+    const phosphor_visual_state_t *visual,
+    const phosphor_motion_state_t *motion,
+    phosphor_core_metrics_t *metrics)
+{
+    glyph_frame_t frame;
+    phosphor_core_build_frame_motion(&frame, visual, motion, metrics);
+    glyph_rasterizer_render(&frame, pixels, width, height,
+                            phosphor_palette_default());
+}
+
 void phosphor_core_render_rgb565(uint16_t *pixels, int width, int height,
                                  const phosphor_visual_state_t *visual,
                                  phosphor_core_metrics_t *metrics)
 {
-    glyph_frame_t frame;
-    phosphor_core_build_frame(&frame, visual, metrics);
-    glyph_rasterizer_render(&frame, pixels, width, height,
-                            phosphor_palette_default());
+    phosphor_core_render_motion_rgb565(pixels, width, height, visual, NULL,
+                                       metrics);
 }

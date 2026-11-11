@@ -161,6 +161,8 @@ firmware/terminal/
 - `docs/PHOSPHOR_P1.md`：P1/P1.1/P1.2/P1.3 静态 Core、18×27 Bold、三轨可辨性、模拟器、截图、真机结果
 - `docs/PHOSPHOR_P2.md`：P2 Glyph Ramp、核心密度场、Palette、前后合成、模拟器/真机
 - `docs/PHOSPHOR_P3.md`：P3/P3.1–P3.6 Idle/Working motion、水层/漂浮物、字符串运输、相邻 cell、中心减量、FPS/内存、SDL golden
+- `docs/PHOSPHOR_R1.md`：R1.1 state-first 六态静态几何、contact、pixel diff
+- `docs/PHOSPHOR_R2.md`：R2 state-first motion、六态动画、Offline 恢复、实机烧录/FPS/内存
 - `docs/BUILD_STATUS.md`：构建/测试结果、阻塞与下一步
 
 ## 未实现（明确不在本次范围）

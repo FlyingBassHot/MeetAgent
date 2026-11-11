@@ -51,6 +51,8 @@ static void phosphor_anim_task(void *arg)
     uint64_t last_frame_start_us = 0;
     uint32_t last_delay_ms = 0;
     phosphor_demo_phase_t last_phase = (phosphor_demo_phase_t)-1;
+    bool was_offline = false;
+    uint32_t offline_start_ms = 0;
 
     while (true) {
         uint64_t loop_start_us = esp_timer_get_time();
@@ -70,7 +72,17 @@ static void phosphor_anim_task(void *arg)
         phosphor_visual_state_t visual;
         phosphor_demo_build_input(phase, cycle, &input);
         phosphor_state_resolver_update(&s_resolver, &input, now_ms, &visual);
-        if (visual.activity != PHOSPHOR_ACTIVITY_OFFLINE) {
+        if (visual.activity == PHOSPHOR_ACTIVITY_OFFLINE) {
+            if (!was_offline) {
+                was_offline = true;
+                offline_start_ms = now_ms;
+            }
+            /* 550 ms ramp, then freeze; recovery resumes from this phase. */
+            if (now_ms - offline_start_ms < 550u) {
+                phosphor_motion_update(&s_motion, now_ms, PHOSPHOR_MODE_IDLE);
+            }
+        } else {
+            was_offline = false;
             phosphor_motion_mode_t motion_mode =
                 visual.activity == PHOSPHOR_ACTIVITY_WORKING
                     ? PHOSPHOR_MODE_WORKING

@@ -435,8 +435,7 @@ void phosphor_scene_build_frame_visual(
     glyph_frame_t *frame, const phosphor_motion_state_t *motion,
     const phosphor_visual_state_t *visual)
 {
-    (void)motion;
-    phosphor_core_build_frame(frame, visual, NULL);
+    phosphor_core_build_frame_motion(frame, visual, motion, NULL);
 }
 
 void phosphor_scene_render_motion_rgb565(
@@ -454,8 +453,8 @@ void phosphor_scene_render_visual_rgb565(
     const phosphor_motion_state_t *motion,
     const phosphor_visual_state_t *visual)
 {
-    (void)motion;
-    phosphor_core_render_rgb565(pixels, width, height, visual, NULL);
+    phosphor_core_render_motion_rgb565(pixels, width, height, visual,
+                                       motion, NULL);
 }
 
 void phosphor_scene_render_rgb565(uint16_t *pixels, int width, int height)
